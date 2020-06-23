@@ -31,6 +31,7 @@ from astroquery.vizier import Vizier
 
 # Function imports
 from Gaussians import fix_x0, twoD_Gaussian, cutouts_2d_gaussian
+from Vizier_catalogs import find_catalog
 
 from astropy.utils.exceptions import AstropyWarning
 import warnings
@@ -41,14 +42,14 @@ warnings.simplefilter('ignore', category=AstropyWarning)        # Removes deprec
 # Finds the zero point of a singular stack (need to run for each filter)
 # Inputs: stack (filename as a string), filter as a string, extension as an int, path to the data
 # 'show' parameters show various plots, r_annulus_in/out are x*fwhm value, log is log
-def find_zero_point(stack, fil, ext, data_path=None, show_fwhm=False, show_bkg=False, show_contours=False,
+def find_zero_point(stack, fil, ext, catalog, data_path=None, show_fwhm=False, show_bkg=False, show_contours=False,
                     r_annulus_in=3.5, r_annulus_out=4.5, log=None):
 
     '''
 
     Function used to find the FWHM, zero point, and zero point error for a specific stack and filter.
 
-    Initially finds all sources in 2MASS (HJK) or UKIDSS (Y) within the image and matches them to a
+    Initially finds all sources in specified catalog within the image and matches them to a
     10+ sigma source in the image.
     Then makes a series of cuts to determine the standard stars to use when finding the zero point:
 
@@ -67,8 +68,8 @@ def find_zero_point(stack, fil, ext, data_path=None, show_fwhm=False, show_bkg=F
     If ``show_bkg`` is True, shows the remaining sources to be used when finding the zero point, color coded by
     the median background level.
 
-    Finds the instrumental magnitudes of the remaining sources and compares to the magnitudes from the catalog (2MASS or
-    UKIDSS) and determines the zero point and zero point error. Returns these values along with the FWHM of the image.
+    Finds the instrumental magnitudes of the remaining sources and compares to the magnitudes from the catalog
+    and determines the zero point and zero point error. Returns these values along with the FWHM of the image.
 
     Parameters
     ----------
@@ -80,6 +81,9 @@ def find_zero_point(stack, fil, ext, data_path=None, show_fwhm=False, show_bkg=F
 
     :param ext: int
         Extension to use (only used if `revisit_stack` is called).
+
+    :param catalog: str
+        Name of catalog to query for magnitudes.
 
     :param data_path: str, optional
         Path to the original data (only used if `revisit_stack` is called).
@@ -138,23 +142,21 @@ def find_zero_point(stack, fil, ext, data_path=None, show_fwhm=False, show_bkg=F
 
     Vizier.ROW_LIMIT = -1     # So that you get all the rows, not just the first 50
 
-    # Information about the sources from 2MASS found in the extension (full area, not radially)
-    if (fil != 'y') or (fil != 'Y'):
-        two_mass = Vizier.query_region(coords, width=13.65*u.arcmin, catalog='II/246')[0]
-    else:
-        two_mass = Vizier.query_region(coords, width=13.65 * u.arcmin, catalog='II/319')[0]  # Todo UKIDSS not 2MASS
+    # Information about the sources from catalog found in the extension (full area, not radially)
+    cat_ID, cat_ra, cat_dec, cat_mag = find_catalog(catalog, fil)
+    cat = Vizier.query_region(coords, width=13.65*u.arcmin, catalog=cat_ID)[0]
 
     # Find the sources above 10 std in the image
     _, median, std = sigma_clipped_stats(data, sigma=3.0)
     daofind = DAOStarFinder(fwhm=7, threshold=10. * std)  # Looking for best sources, so raise threshold way up
     dao_sources = daofind(np.asarray(data))     # DAOStarFinder sources == dao_sources
     if log is not None:
-        log.info("%s objects found in 2MASS and %s sources above 10 std found in the stack" %
-                 (len(two_mass), len(dao_sources)))
+        log.info("%s objects found in "+catalog+" and %s sources above 10 std found in the stack" %
+                 (len(cat), len(dao_sources)))
         log.info("DAOStarFinder found %s sources that are 10 std above the background" % len(dao_sources))
     else:
-        print("%s objects found in 2MASS and %s sources above 10 std found in the stack" %
-              (len(two_mass), len(dao_sources)))
+        print("%s objects found in "+catalog+" and %s sources above 10 std found in the stack" %
+              (len(cat), len(dao_sources)))
         print("DAOStarFinder found %s sources that are 10 std above the background" % len(dao_sources))
 
     ra_dao = []         # Change pixel coordinates to real coordinates for DAOStarFinder sources
@@ -167,11 +169,10 @@ def find_zero_point(stack, fil, ext, data_path=None, show_fwhm=False, show_bkg=F
 
     # Coordinates need to be in real, not pixel
     coords_dao = SkyCoord(ra_dao*u.deg, dec_dao*u.deg, frame='fk5')      # Coordinates from sources
-    # coords_two_mass = SkyCoord(two_mass['ra'], two_mass['dec'], frame='fk5')    # Coordinates from 2MASS catalog
-    coords_two_mass = SkyCoord(two_mass['RAJ2000'], two_mass['DEJ2000'], frame='fk5')   # Coordinates from 2MASS catalog
+    coords_cat = SkyCoord(cat[cat_ra], cat[cat_dec], frame='fk5')   # Coordinates from catalog
 
-    # Match each 2MASS sources to the closest dao_source
-    idx, d2, d3 = coords_two_mass.match_to_catalog_sky(coords_dao)      # Match smaller to larger
+    # Match each catalog source to the closest dao_source
+    idx, d2, d3 = coords_cat.match_to_catalog_sky(coords_dao)      # Match smaller to larger
     if log is not None:
         log.info("%s objects have been matched" % len(idx))
     else:
@@ -438,10 +439,9 @@ def find_zero_point(stack, fil, ext, data_path=None, show_fwhm=False, show_bkg=F
         plt.colorbar()
         plt.show()  # Plot of matched sources with annuli, color coded by median background value in annulus
 
-    mag_two_mass = []       # Moving past show_bkg
+    mag_cat = []       # Moving past show_bkg
     for i, j in enumerate(final_idx):
-        # mag_two_mass.append(two_mass[i][fil.lower() + '_m'])  # Reference magnitudes of 2MASS objects
-        mag_two_mass.append(two_mass[i][fil.upper() + 'mag'])  # Reference magnitudes of 2MASS objects
+        mag_cat.append(cat[i][cat_mag])  # Reference magnitudes of catalog objects
 
     final_apertures = CircularAperture(final_coords, 2.5 * fwhm)      # Aperture to perform photometry
     # Annuli of DAO sources
@@ -475,7 +475,7 @@ def find_zero_point(stack, fil, ext, data_path=None, show_fwhm=False, show_bkg=F
               % len(mag_inst))
 
     for i in np.flip(np.linspace(1, 3, num=10)):
-        _, zp, zp_err = sigma_clipped_stats(mag_two_mass - mag_inst, sigma=i)
+        _, zp, zp_err = sigma_clipped_stats(mag_cat - mag_inst, sigma=i)
         if zp_err < 0.1:
             break
 
