@@ -218,7 +218,7 @@ if find_zp == "yes":
         ext, fil = stack.split("_")[2], stack.split("_")[3]            # Extension & Filter
         log.info("Using extension %s and %s filter" % (ext, fil))
         # Note: Zero point and zero point error are in Vega, not AB...converted in photometry
-        zp, zp_err, fwhm = find_zero_point(stack, fil, ext, data_path,
+        zp, zp_err, fwhm = find_zero_point(stack, fil, ext, '2MASS', data_path,
                                            show_fwhm=show_fwhm, show_bkg=show_bkg, show_contours=show_contours, log=log)
         zp_list.append(zp)
         zp_err_list.append(zp_err)
