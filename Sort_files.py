@@ -7,7 +7,7 @@
 
 # Imports
 from astropy.io import fits
-
+import shutil
 
 # Sort the calibration files:
 def sort_files(files, manual_filter=None, log2=None, date=None):
@@ -72,3 +72,23 @@ def sort_files(files, manual_filter=None, log2=None, date=None):
         filter_list[fil].append(f)
 
     return filter_list
+
+def sort_files_bino(files,raw_path): #sort the calibration files: 
+    cal_list = []
+    sci_list = []
+    for f in files:
+        with fits.open(f) as file_open:
+            hdr = file_open[1].header
+            imtype = hdr['MASK']
+            if imtype == 'imaging':
+                fil = hdr['FILTER'] #sort by filter
+                if hdr['SCRN']=='deployed': #only collect dome flats for imaging    
+                    cal_list.append(f)
+                elif hdr['SCRN']=='stowed':
+                    target = hdr['OBJECT']
+                    sci_list.append(f)
+                else:
+                    shutil.move(f,raw_path+'bad/')
+            else:
+                shutil.move(f,raw_path)
+    return cal_list, sci_list
