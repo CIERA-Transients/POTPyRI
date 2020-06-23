@@ -7,3 +7,4 @@ Repo of imagining pipelines in optical and IR. Includes:
 - MMIRS (MMT)
 - BINOSPEC (MMT)
 - UKIRT (WFCAM)
+- LRIS (Keck)
