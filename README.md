@@ -8,6 +8,7 @@ Repo of imagining pipelines in optical and IR. Includes:
 - BINOSPEC (MMT)
 - UKIRT (WFCAM)
 - LRIS (Keck)
+- DEIMOS (Keck)
 
 # Align.py
 
