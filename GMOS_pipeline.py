@@ -52,7 +52,7 @@ args = params.parse_args()
 if not args.verbose:
     warnings.simplefilter('ignore',category=(AstropyWarning, AstropyDeprecationWarning))
 
-def sort_files(files): #sort the calibration files: 
+def sort_files(files): #sort the calibration files:
     cal_list = {}
     cal_list.update({'BIAS':[]})
     sci_list = {}
@@ -95,7 +95,7 @@ def sort_files(files): #sort the calibration files:
 def onclick(event,source_list):
     if event.dblclick:
         source_list.append((event.xdata, event.ydata))
-        log.info('You selected x, y position: %d, %d' %(event.xdata, event.ydata)) 
+        log.info('You selected x, y position: %d, %d' %(event.xdata, event.ydata))
 
 def onpick(event,source_list,gaia_list,std_list):
     label = event.artist.get_label()
@@ -106,7 +106,7 @@ def onpick(event,source_list,gaia_list,std_list):
         gaia_list.append([np.float(label.split('RA = ')[1].split(',')[0]),np.float(label.split('Dec = ')[1])])
     else:
         std_list.append(np.float(label.split('mag = ')[1]))
-    
+
 raw_path = args.data_path+'/raw/' #path containing the raw data
 bad_path = raw_path+'bad/'
 cal_path = raw_path+'cal/' #path containing the calibration files
@@ -156,7 +156,7 @@ if len(cal_list['BIAS']) == 0:
     sys.exit(-1)
 
 process_bias = True
-if args.skip_red == 'True' or args.skip_red == 'yes': 
+if args.skip_red == 'True' or args.skip_red == 'yes':
     if os.path.exists(red_path+'mbias.fits'):
         mbias = [CCDData.read(red_path+'mbias.fits', hdu=x+1, unit=u.electron) for x in range(12)]
         process_bias = False
@@ -276,7 +276,7 @@ for sci in sci_list:
                     sci_full = CCDData(np.concatenate(sci_final,axis=1),header=header,wcs=wcs.WCS(header),unit=u.electron)
             sci_full.mask = np.zeros(np.shape(sci_full))
             sci_full.mask[sci_full==-999] = 1
-            sci_full.mask = sci_full.mask.astype(np.bool) 
+            sci_full.mask = sci_full.mask.astype(np.bool)
             sci_full.header['DATASEC'] = ('[1:%s,1:%s]'%(np.shape(sci_full)[1],np.shape(sci_full)[0]))
             if i == 0: wcs_object = wcs.WCS(header)
             wcs_objects[i] = wcs.WCS(header)
@@ -291,7 +291,7 @@ for sci in sci_list:
                 hdr[0].header['FILE'+str(k+1)] = (os.path.basename(n), 'Name of file used in median.')
     if args.wcs == 'True' or args.wcs == 'yes':
         fig, ax = plt.subplots(figsize=(7,7))
-        ax = plt.subplot(projection=wcs_object)  
+        ax = plt.subplot(projection=wcs_object)
         gaia = Irsa.query_region(SkyCoord(hdr[0].header['CRVAL1']*u.deg, hdr[0].header['CRVAL2']*u.deg,frame='fk5'), catalog="gaia_dr2_source", spatial="Cone",radius=3*u.arcmin)
         if len(gaia) == 0:
             log.info('No GAIA stars found within 3 arcmin for starlist.')
@@ -300,7 +300,7 @@ for sci in sci_list:
             ax.imshow(sci_med, cmap='gray', norm=ImageNormalize(sci_med, interval=ZScaleInterval()))
             _, median, std = sigma_clipped_stats(sci_med, sigma=3.0)
             daofind = DAOStarFinder(fwhm=7.0, threshold=5.*std)
-            sources = daofind(np.asarray(sci_med)) 
+            sources = daofind(np.asarray(sci_med))
             for l,m in enumerate(gaia['source_id']):
                 x, y = (wcs.WCS(hdr[0].header)).all_world2pix(gaia['ra'][l],gaia['dec'][l],1)
                 ax.add_patch(patches.Circle((x,y),radius=3,edgecolor='g',alpha=0.5,facecolor='none',linewidth=2, label='Gaia star: RA = %f, Dec = %f'%(gaia['ra'][l],gaia['dec'][l]), picker=True))
@@ -379,7 +379,7 @@ for sci in sci_list:
             else:
                 _, median, std = sigma_clipped_stats(sci_med, sigma=3.0)
                 daofind = DAOStarFinder(fwhm=7.0, threshold=3.*std)
-                sources = daofind(np.asarray(sci_med)) 
+                sources = daofind(np.asarray(sci_med))
             for i in range(len(sources)):
                 ax.add_patch(patches.Circle((sources['xcentroid'][i],sources['ycentroid'][i]),radius=3,edgecolor='b',facecolor='none',linewidth=2,label='Source star x = %f, y = %f'%(sources['xcentroid'][i],sources['ycentroid'][i]), picker=True))
             ax.set_title('Target: '+sci)
@@ -407,7 +407,7 @@ for sci in sci_list:
         if skip_phot:
             continue
         sci_med = np.asarray(sci_med)
-        , median, std = sigma_clipped_stats(sci_med, sigma=3.0)
+        dum, median, std = sigma_clipped_stats(sci_med, sigma=3.0)
         masked = np.ma.masked_outside(sci_med,median-3*std,median+3*std)
         sigma_clip = SigmaClip(sigma=3)
         bkg_estimator = MedianBackground()
@@ -437,12 +437,12 @@ for sci in sci_list:
                 log.info('Instrumental magnitude of standard = %.3f +/- %.3f.'%(mag_inst[i],mag_inst_err[i]))
         if zp_cal:
             log.info('Calculating zero point from %i stars with sigma clipping and a maximum error of 0.1.'%len(std_mag))
-            for i in np.flip(np.linspace(1,3,num=10)): 
-                _, zp, zp_err = sigma_clipped_stats(std_mag-mag_inst[1:len(mag_inst)],sigma=i) 
+            for i in np.flip(np.linspace(1,3,num=10)):
+                _, zp, zp_err = sigma_clipped_stats(std_mag-mag_inst[1:len(mag_inst)],sigma=i)
                 log.info('zp, zp_err, sigma used for clipping: %.3f, %.3f, %.3f'%(zp, zp_err, i))
-                if zp_err < 0.1: 
-                    break 
-                else: 
+                if zp_err < 0.1:
+                    break
+                else:
                     pass
             log.info('zp = %.3f +/- %.3f.'%(zp,zp_err))
             mag = mag_inst+zp
@@ -460,7 +460,7 @@ for sci in sci_list:
             for i,sci_ind in enumerate(processed):
                 with fits.open(sci_ind) as hdr:
                     start_time = hdr[0].header['DATE']+hdr[0].header['UTSTART']
-                    mid_time = datetime.datetime.strptime(start_time,'%Y-%m-%d%H:%M:%S.%f')+datetime.timedelta(seconds=hdr[0].header['ELAPSED']/2) 
+                    mid_time = datetime.datetime.strptime(start_time,'%Y-%m-%d%H:%M:%S.%f')+datetime.timedelta(seconds=hdr[0].header['ELAPSED']/2)
                     mjd.append(astropy.time.Time(mid_time).jd)
                     sci_data = hdr[0].data
                 bkg = Background2D(sci_data, (133, 132), filter_size=(3, 3),sigma_clip=sigma_clip, bkg_estimator=bkg_estimator)
@@ -500,7 +500,6 @@ for sci in sci_list:
                     np.savetxt(red_path+sci+'_lightcurve_target.txt',np.c_[mjd,lightcurve[star],lightcurve_err[star]])
                 else:
                     np.savetxt(red_path+sci+'_lightcurve_standard'+str(star)+'.txt',np.c_[mjd,lightcurve[star],lightcurve_err[star]])
-                
-            
-        
-        
+
+
+
