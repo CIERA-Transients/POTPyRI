@@ -451,7 +451,7 @@ def ordering(final):
     # Then you can use this to unpack the text file :)
     #final = np.loadtxt('200522A_result_np.txt',unpack=True)
 
-def getSDSS(coord, impix=1024, imsize=12*u.arcmin, object_name='', outdir=''):
+def getSDSS(coord, impix=1024, imsize=12*u.arcmin, outfile=''):
     from urllib.parse import urlencode
     from urllib.request import urlretrieve
 
@@ -462,6 +462,7 @@ def getSDSS(coord, impix=1024, imsize=12*u.arcmin, object_name='', outdir=''):
 
     url = '?'.join([cutoutbaseurl, query_string])
 
+    outdir, basename = os.path.split(outfile)
     if outdir and not os.path.exists(outdir):
         try:
             os.makedirs(outdir)
@@ -471,13 +472,7 @@ def getSDSS(coord, impix=1024, imsize=12*u.arcmin, object_name='', outdir=''):
             print(warning.format(outdir))
             outdir = ''
 
-    filename = ''
-    if not object_name:
-        filename = 'SDSS_cutout.jpg'
-    else:
-        filename = object_name+'_SDSS_cutout.jpg'
-
-    fulloutfile = os.path.join(outdir, filename)
+    fulloutfile = outfile
 
     # this downloads the image to your disk
     urlretrieve(url, fulloutfile)
