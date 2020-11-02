@@ -598,7 +598,7 @@ def search_catalogs(coord, catnames, search_radius=2.564*u.arcmin,
             print('{0} total records in catalog'.format(n))
 
         else:
-            print('0 records in {1} catalog'.format(len(table), name))
+            print('0 records in {1} catalog'.format(name))
 
     if not outfile:
         if not os.path.exists('data/'):
