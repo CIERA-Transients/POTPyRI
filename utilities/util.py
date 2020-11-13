@@ -164,7 +164,7 @@ def downloadPS1(coord,  filt, outdir='data/', tempdir='data/delme/'):
                 print(message.format(filename=tempdir+outname))
             else:
                 outfile = tempdir+filename+'.fz'
-                errflag = download_url_to_file(url, outfile, tempdir=tempdir)
+                errflag = download_url_to_file(url, outfile)
 
                 hdu  = fits.open(outfile)
 
@@ -195,6 +195,7 @@ def downloadPS1(coord,  filt, outdir='data/', tempdir='data/delme/'):
                 fulloutname = outdir + outname
                 hdu.writeto(fulloutname, overwrite=True)
                 print('Wrote out: {0}'.format(outname))
+                return fulloutname
 
 def docasjobsstrm(coord, size=0.1, mask=True, verbose=False,
     meta=['raMean','decMean','z_phot','z_photErr']):
@@ -598,7 +599,7 @@ def search_catalogs(coord, catnames, search_radius=2.564*u.arcmin,
             print('{0} total records in catalog'.format(n))
 
         else:
-            print('0 records in {1} catalog'.format(name))
+            print('0 records in {0} catalog'.format(name))
 
     if not outfile:
         if not os.path.exists('data/'):
