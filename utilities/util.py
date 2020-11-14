@@ -123,7 +123,7 @@ def download_url_to_file(url, filename):
     shutil.move(dat, filename)
     return(0)
 
-def downloadPS1(coord,  filt, outdir='data/', tempdir='data/delme/'):
+def downloadPS1(coord,  filt, outdir='data/'):
 
     # Check for filter
     if not filt: filt='r'
@@ -155,47 +155,17 @@ def downloadPS1(coord,  filt, outdir='data/', tempdir='data/delme/'):
 
         for product in prodList:
             filename = product['productFilename']
-            outfile = filename.replace('.fz','')
-            outname = outfile.replace('.fits', '_mod.fits')
+            outfile = outdir+filename
             url = 'https://mast.stsci.edu/api/v0/download/file?uri='
             url += product['dataURI']
-            if os.path.isfile(tempdir+outname):
+            if os.path.isfile(outfile):
                 message = '{filename} exists.  Continuing...'
-                print(message.format(filename=tempdir+outname))
+                print(message.format(filename=outfile))
+                return(outfile)
             else:
-                outfile = tempdir+filename+'.fz'
                 errflag = download_url_to_file(url, outfile)
 
-                hdu  = fits.open(outfile)
-
-                # Need to reweight the data for PS1 by effective zpt
-                exptime = hdu[1].header['EXPTIME']
-                boffset = hdu[1].header['BOFFSET']
-                bsoften = hdu[1].header['BSOFTEN']
-                a = 1.0857362
-
-                # Get the image data from the file
-                img  = hdu[1].data
-                mask = np.isnan(hdu[1].data)
-
-                # Adjust data values for asinh compression
-                data  = boffset + bsoften * (np.exp(img/a) - np.exp(-img/a))
-                zpt   = 25.0 + 2.5 * np.log10(exptime)
-                data  = data * 10**(0.4*(27.5-zpt))
-                hdu[1].data = data
-
-                # Reset the mask values
-                hdu[1].data[mask] = np.nan
-
-                # Write out modified file
-                outname = outfile.replace('.fits', '_mod.fits')
-                outname = outname.replace('.fz','')
-
-                outname = os.path.basename(outname)
-                fulloutname = outdir + outname
-                hdu.writeto(fulloutname, overwrite=True)
-                print('Wrote out: {0}'.format(outname))
-                return fulloutname
+                return(outfile)
 
 def docasjobsstrm(coord, size=0.1, mask=True, verbose=False,
     meta=['raMean','decMean','z_phot','z_photErr']):
