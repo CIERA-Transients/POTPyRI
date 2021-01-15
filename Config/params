@@ -1,0 +1,8 @@
+NUMBER                   Running object number  
+MAG_BEST                 Best of MAG_AUTO and MAG_ISOCOR                           [mag]
+MAGERR_BEST              RMS error for MAG_BEST                                    [mag]
+XWIN_IMAGE               Windowed position estimate along x                        [pixel]
+YWIN_IMAGE               Windowed position estimate along y                        [pixel]
+ALPHAWIN_J2000           Windowed right ascension (J2000)                          [deg]
+DELTAWIN_J2000           windowed declination (J2000)                              [deg]
+FLAGS                    Extraction flags                                         
