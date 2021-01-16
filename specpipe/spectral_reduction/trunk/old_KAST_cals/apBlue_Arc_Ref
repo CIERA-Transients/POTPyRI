@@ -1,0 +1,30 @@
+# Thu 11:00:35 22-Aug-2019
+begin	aperture Blue_Arc_Ref 1 1012. 142.1945
+	image	Blue_Arc_Ref
+	aperture	1
+	beam	1
+	center	1012. 142.1945
+	low	-1011. -1.084198
+	high	1013. 0.6708984
+	background
+		xmin -12.74115
+		xmax 11.71283
+		function chebyshev
+		order 1
+		sample -12.74115:-8.038464 7.637163:11.71283
+		naverage -3
+		niterate 0
+		low_reject 3.
+		high_reject 3.
+		grow 0.
+	axis	2
+	curve	8
+		2.
+		4.
+		2.
+		2022.
+		0.0732495
+		-1.090084
+		0.2035374
+		-0.1285341
+

@@ -1,0 +1,31 @@
+# Mon 22:09:20 16-Jul-2018
+begin	aperture m1_Arc_Ref 1 1020. 493.5562
+	image	m1_Arc_Ref
+	aperture	1
+	beam	1
+	center	1020. 493.5562
+	low	-1019. -3.
+	high	1021. 3.
+	background
+		xmin -24.60702
+		xmax 24.85355
+		function chebyshev
+		order 2
+		sample -24.60702:-11.40359 10.6657:24.85355
+		naverage -3
+		niterate 0
+		low_reject 3.
+		high_reject 3.
+		grow 0.
+	axis	2
+	curve	9
+		3.
+		2.
+		1.
+		2041.
+		1.460018
+		0.3230946
+		-0.0788805
+		0.1239217
+		0.2953769
+

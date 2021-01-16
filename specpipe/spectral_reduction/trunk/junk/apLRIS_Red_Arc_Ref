@@ -1,0 +1,27 @@
+# Mon 15:56:32 15-Oct-2018
+begin	aperture ARC_red 1 350. 233.6858
+	image	ARC_red
+	aperture	1
+	beam	1
+	center	350. 233.6858
+	low	-349. -1.578583
+	high	3766. 3.110489
+	background
+		xmin -10.
+		xmax 10.
+		function chebyshev
+		order 1
+		sample -10:-6,6:10
+		naverage -3
+		niterate 0
+		low_reject 3.
+		high_reject 3.
+		grow 0.
+	axis	2
+	curve	5
+		2.
+		1.
+		1.
+		4116.
+		0.
+

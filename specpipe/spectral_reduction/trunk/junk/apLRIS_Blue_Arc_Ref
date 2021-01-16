@@ -1,0 +1,27 @@
+# Mon 16:45:22 15-Oct-2018
+begin	aperture ARC_blue 1 700. 537.4471
+	image	ARC_blue
+	aperture	1
+	beam	1
+	center	700. 537.4471
+	low	-699. -2.22113
+	high	3396. 2.402283
+	background
+		xmin -10.
+		xmax 10.
+		function chebyshev
+		order 1
+		sample -10:-6,6:10
+		naverage -3
+		niterate 0
+		low_reject 3.
+		high_reject 3.
+		grow 0.
+	axis	2
+	curve	5
+		2.
+		1.
+		1.
+		4096.
+		0.
+

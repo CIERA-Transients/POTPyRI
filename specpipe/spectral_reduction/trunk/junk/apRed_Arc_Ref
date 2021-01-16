@@ -1,0 +1,30 @@
+# Sat 13:47:01 15-Sep-2018
+begin	aperture Red_Arc_Ref 1 140.2716 1195.
+	image	Red_Arc_Ref
+	aperture	1
+	beam	1
+	center	140.2716 1195.
+	low	-1.167206 -1194.
+	high	0.681366 1196.
+	background
+		xmin -20.29333
+		xmax 19.99165
+		function chebyshev
+		order 1
+		sample -20.29333:-12.63585 10.83597:19.99165
+		naverage -3
+		niterate 0
+		low_reject 3.
+		high_reject 3.
+		grow 0.
+	axis	1
+	curve	8
+		2.
+		4.
+		5.
+		2385.
+		0.7632707
+		3.494852
+		1.583915
+		-0.1799163
+
