@@ -135,7 +135,7 @@ streamhandler = logging.StreamHandler() #add log stream to logger
 streamhandler.setFormatter(formatter) #add format to log stream
 log.addHandler(streamhandler) #link logger to log stream
 
-files = glob.glob(args.data_path+'/*.fits.bz2')
+files = glob.glob(args.data_path+'/*.fits.bz2')+glob.glob(args.data_path+'/*.fits')
 if len(files) != 0:
     cal_list, sci_list = sort_files(files)
     for cal in cal_list:

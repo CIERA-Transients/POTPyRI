@@ -70,7 +70,7 @@ def parse_coord(ra, dec):
         print(error.format(ra=ra, dec=dec))
         return(None)
 
-    if (':' in ra and ':' in dec):
+    if (':' in str(ra) and ':' in str(dec)):
         # Input RA/DEC are sexagesimal
         unit = (u.hourangle, u.deg)
     else:
