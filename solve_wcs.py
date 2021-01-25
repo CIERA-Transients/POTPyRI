@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "2.0" #last updated 15/01/2021
+__version__ = "2.1" #last updated 15/01/2021
 
 import sys
 import numpy as np
@@ -30,6 +30,20 @@ import tel_params
 #turn Astropy warnings off
 import warnings
 warnings.simplefilter('ignore', category=AstropyWarning)
+
+#function to calculate rms on astrometric solution
+#David's rms function. 
+def dvrms(x):
+    r_sum = 0.0 
+    counter = 0
+    for i in x:
+        counter += 1
+        r_sum += i**2
+    if counter == 0:
+        rms = 0
+    else:
+        rms = np.sqrt(r_sum/counter)
+    return rms
 
 #plate solution
 def plate_sol(data,*p):
@@ -279,7 +293,8 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
     gaia_idx = [gaia_stars[idx_m[i]] for i in idx_m]
 
     #calculate error
-    error = calculate_error(d2_m, stars_idx, gaia_stars, header_new)
+    #error = calculate_error(d2_m, stars_idx, gaia_stars, header_new)
+    error=dvrms(d2_m)
     print('%7.4f rms error in WCS solution'%error)
 
     #write out new fits
