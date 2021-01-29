@@ -1,5 +1,8 @@
 #parameter file for MMIRS/MMT
 
+def static_mask():
+    return './staticmasks/MF.staticmask.fits'
+
 def run_wcs():
     return True
 
