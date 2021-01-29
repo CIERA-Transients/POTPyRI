@@ -1,5 +1,8 @@
 #parameter file for MOSFIRE/Keck
 
+def static_mask():
+    return './staticmasks/MF.staticmask.fits'
+
 def run_wcs():
     return True
 
