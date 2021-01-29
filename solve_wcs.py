@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "2.1" #last updated 15/01/2021
+__version__ = "2.2" #last updated 29/01/2021
 
 import sys
 import numpy as np
@@ -103,8 +103,8 @@ def calculate_error(d, coord1, coord2, hd):
     d_dec = [s.dms[2] for s in sep]
     rms_ra = np.median(d_ra)
     rms_dec = np.median(d_dec)
-    hd['RA_RMS'] = (rms_ra, 'RMS of RA fit.')
-    hd['DEC_RMS'] = (rms_dec, 'RMS of Dec fit.')
+    hd['RA_RMS'] = (rms_ra, 'RMS of RA fit (arsec).')
+    hd['DEC_RMS'] = (rms_dec, 'RMS of Dec fit (arcsec).')
     return rms_total
 
 def run_sextractor(input_file, cat_name, sex_config_dir='./Config'):
@@ -123,7 +123,7 @@ def run_sextractor(input_file, cat_name, sex_config_dir='./Config'):
 
     config = sex_config_dir+'/config'
 
-    cmd=['sex','-c',config,input_file,'-CATALOG_NAME',cat_name]
+    cmd=['sex','-c',config,input_file,'-CATALOG_NAME',cat_name,'-FLAG_IMAGE',tel.static_mask(),'-FLAG_TYPE','AND']
     subprocess.call(cmd)
 
     if os.path.exists(cat_name):
@@ -134,20 +134,26 @@ def run_sextractor(input_file, cat_name, sex_config_dir='./Config'):
         raise Exception(e.format(cat_name))
 
 # Make quads for either x,y values or ra,dec under the assumption that x=ra
-def make_quads(x, y, use=None, t=6):
+def make_quads(x, y, use=None, sky_coords=False):
     if use and use < len(x) and use < len(y):
         x = x[:use]
         y = y[:use]
 
     ind = list(itertools.combinations(np.arange(4), 2))
     stars = list(itertools.combinations(zip(x, y), 4))
-    dx = [[stars[j][ind[i][0]][0]-stars[j][ind[i][1]][0] for i in range(t)]
+    if sky_coords:
+        coords = [[SkyCoord(stars[j][i][0], stars[j][i][1], unit='deg')
+                 for i in range(4)] for j in range(len(stars))]
+        d = [[coords[j][ind[i][0]].separation(coords[j][ind[i][1]]).arcsec for i in range(6)]
                 for j in range(len(stars))]
-    dy = [[stars[j][ind[i][0]][1]-stars[j][ind[i][1]][1] for i in range(t)]
+    else:
+        dx = [[stars[j][ind[i][0]][0]-stars[j][ind[i][1]][0] for i in range(6)]
+                for j in range(len(stars))]
+        dy = [[stars[j][ind[i][0]][1]-stars[j][ind[i][1]][1] for i in range(6)]
             for j in range(len(stars))]
-    d = [np.hypot(dx[j], dy[j]) for j in range(len(stars))]
+        d = [np.hypot(dx[j], dy[j]) for j in range(len(stars))]
     ds = [sorted(d[j]) for j in range(len(stars))]
-    ratios = np.array([[ds[j][i]/ds[j][t-1] for i in range(t-1)]
+    ratios = np.array([[ds[j][i]/ds[j][5] for i in range(5)]
             for j in range(len(stars))])
 
     return(stars, d, ds, ratios)
@@ -191,13 +197,13 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
     table = run_sextractor(input_file, cat_name, sex_config_dir=sex_config_dir)
 
     #mask and sort table
-    table = table[table['FLAGS']==0]
+    table = table[(table['FLAGS']==0)&(table['IMAFLAGS_ISO']==0)]
     table.sort('MAG_BEST')
 
     #make quads using 10 brightest
     ind = list(itertools.combinations(np.arange(4), 2))
     stars, d, ds, ratios = make_quads(table['XWIN_IMAGE'],
-        table['YWIN_IMAGE'], use=10, t=6)
+        table['YWIN_IMAGE'], use=10)
 
     #query gaia
     gaiaorig = Irsa.query_region(SkyCoord(ra*u.deg, dec*u.deg,frame='icrs'),
@@ -210,7 +216,7 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
 
     #make quads using 10 brightest
     gaiastars, gaiad, gaiads, gaiaratios = make_quads(gaia['ra'], gaia['dec'],
-        use=10, t=6)
+        use=10, sky_coords=True)
 
     #match quads
     l1 = broadcast_quotient(ratios[:,0], gaiaratios[:,0])
@@ -218,7 +224,7 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
     l3 = np.hypot(np.abs(l1-1), np.abs(l2-1))
 
     indm = np.stack((np.arange(len(l3[:,0])),np.argmin(l3, axis=1)), axis=-1)
-    dr = np.array([[(gaiads[i[1]][j]/ds[i[0]][j])*3600 for j in range(6)]
+    dr = np.array([[(gaiads[i[1]][j]/ds[i[0]][j]) for j in range(6)]
         for i in indm])
     indmm = np.array([indm[i] for i in range(len(indm))
         if all(np.abs((dr[i]/tel.pixscale())-1)<0.05)])
@@ -260,15 +266,14 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
     crpix1, crpix2 = tel.ref_pix()
 
     #solve plate sol
-    c1 = curve_fit(plate_sol,(np.concatenate(starsx)-crpix1,np.concatenate(starsy)-crpix2),np.concatenate(gaiastarsra),p0=(0,0,0))[0]
-    c2 = curve_fit(plate_sol,(np.concatenate(starsx)-crpix1,np.concatenate(starsy)-crpix2),np.concatenate(gaiastarsdec),p0=(0,0,0))[0]
+    c1 = curve_fit(plate_sol,(np.concatenate(starsx)-crpix1,np.concatenate(starsy)-crpix2),np.concatenate(gaiastarsra),p0=(0,0,ra))[0]
+    c2 = curve_fit(plate_sol,(np.concatenate(starsx)-crpix1,np.concatenate(starsy)-crpix2),np.concatenate(gaiastarsdec),p0=(0,0,dec))[0]
 
     #strip header of WCS
     hd = strip_header(header)
 
     #add new WCS header keywords
     header_new = add_to_header(hd,crpix1,crpix2,c1,c2,len(starsx))
-    print(wcs.WCS(header_new))
 
     #match stars
     stars_ra, stars_dec = (wcs.WCS(header_new)).all_pix2world(table[:50]['XWIN_IMAGE'],
