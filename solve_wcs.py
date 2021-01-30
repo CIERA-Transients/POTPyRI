@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "2.2" #last updated 29/01/2021
+__version__ = "2.3" #last updated 29/01/2021
 
 import sys
 import numpy as np
@@ -32,17 +32,12 @@ import warnings
 warnings.simplefilter('ignore', category=AstropyWarning)
 
 #function to calculate rms on astrometric solution
-#David's rms function. 
+#David's rms function with Kerry's improvements.
 def dvrms(x):
-    r_sum = 0.0 
-    counter = 0
-    for i in x:
-        counter += 1
-        r_sum += i**2
-    if counter == 0:
+    if len(x) == 0:
         rms = 0
     else:
-        rms = np.sqrt(r_sum/counter)
+        rms = np.sqrt(np.sum(x**2)/len(x))
     return rms
 
 #plate solution
@@ -96,13 +91,14 @@ def add_to_header(hd,crpix1,crpix2,c1,c2,num):
     return hd
 
 #function to calculate rms on astrometric solution
+#replaced np.median() with dvrms() -David V
 def calculate_error(d, coord1, coord2, hd):
-    rms_total = np.median(d)
+    rms_total = dvrms(d)
     sep = [coord1[i].separation(coord2[i]) for i in range(len(coord1))]
     d_ra = [s.hms[2] for s in sep]
     d_dec = [s.dms[2] for s in sep]
-    rms_ra = np.median(d_ra)
-    rms_dec = np.median(d_dec)
+    rms_ra = dvrms(d_ra)
+    rms_dec = dvrms(d_dec)
     hd['RA_RMS'] = (rms_ra, 'RMS of RA fit (arsec).')
     hd['DEC_RMS'] = (rms_dec, 'RMS of Dec fit (arcsec).')
     return rms_total
@@ -297,9 +293,8 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
     stars_idx = [stars[i] for i in idx_m]
     gaia_idx = [gaia_stars[idx_m[i]] for i in idx_m]
 
-    #calculate error
-    #error = calculate_error(d2_m, stars_idx, gaia_stars, header_new)
-    error=dvrms(d2_m)
+    #calculate error. This error now uses dvrms() instead of np.median. 
+    error = calculate_error(d2_m, stars_idx, gaia_stars, header_new)
     print('%7.4f rms error in WCS solution'%error)
 
     #write out new fits
