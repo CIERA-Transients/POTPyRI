@@ -34,6 +34,7 @@ warnings.simplefilter('ignore', category=AstropyWarning)
 #function to calculate rms on astrometric solution
 #David's rms function with Kerry's improvements.
 def dvrms(x):
+    x = np.asarray(x)
     if len(x) == 0:
         rms = 0
     else:
@@ -167,6 +168,51 @@ def mask_catalog_for_wcs(gaiaorig, w, o, data_x, data_y):
 
     return(mask)
 
+def match_quads(ind,stars,gaiastars,d,gaiad,ds,gaiads,ratios,gaiaratios):
+    l1 = broadcast_quotient(ratios[:,0], gaiaratios[:,0])
+    l2 = broadcast_quotient(ratios[:,4], gaiaratios[:,4])
+    l3 = np.hypot(np.abs(l1-1), np.abs(l2-1))
+
+    indm = np.stack((np.arange(len(l3[:,0])),np.argmin(l3, axis=1)), axis=-1)
+    dr = np.array([[(gaiads[i[1]][j]/ds[i[0]][j]) for j in range(6)]
+        for i in indm])
+    indmm = np.array([indm[i] for i in range(len(indm))
+        if all(np.abs((dr[i]/tel.pixscale())-1)<0.05)])
+    starsm = [stars[i[0]] for i in indmm]
+    gaiam = [gaiastars[i[1]] for i in indmm]
+    dm = [d[i[0]] for i in indmm]
+    gaiadm = [gaiad[i[1]] for i in indmm]
+    starsx = []
+    starsy = []
+    gaiastarsra = []
+    gaiastarsdec = []
+    for k in range(len(starsm)):
+        indxyrdm_good = True
+        starsi = [x for y,x in sorted(zip(dm[k],ind))]
+        gaiai = [x for y,x in sorted(zip(gaiadm[k],ind))]
+        inds = {0:[],1:[],2:[],3:[]}
+        for ij in range(4):
+            li = []
+            for i in range(6):
+                if ij in starsi[i]:
+                    [li.append(gaiai[i][j]) for j in range(2)]
+            for idxm in inds:
+                try:
+                    li = list(filter((inds[idxm][0]).__ne__, li))
+                except IndexError:
+                    pass
+            indxyrdm, cnts = stats.mode(li)
+            if len(li) > 1 and cnts[0] == 1:
+                indxyrdm_good = False
+                continue
+            inds[ij].append(indxyrdm[0])
+        if indxyrdm_good:
+            starsx.append([starsm[k][i][0] for i in range(4)])
+            starsy.append([starsm[k][i][1] for i in range(4)])
+            gaiastarsra.append([gaiam[k][stats.mode(inds[i])[0][0]][0] for i in inds])
+            gaiastarsdec.append([gaiam[k][stats.mode(inds[i])[0][0]][1] for i in inds])
+    return starsx, starsy, gaiastarsra, gaiastarsdec
+
 #main function to calculate astrometric solution
 def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
     #start time
@@ -215,48 +261,7 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
         use=10, sky_coords=True)
 
     #match quads
-    l1 = broadcast_quotient(ratios[:,0], gaiaratios[:,0])
-    l2 = broadcast_quotient(ratios[:,4], gaiaratios[:,4])
-    l3 = np.hypot(np.abs(l1-1), np.abs(l2-1))
-
-    indm = np.stack((np.arange(len(l3[:,0])),np.argmin(l3, axis=1)), axis=-1)
-    dr = np.array([[(gaiads[i[1]][j]/ds[i[0]][j]) for j in range(6)]
-        for i in indm])
-    indmm = np.array([indm[i] for i in range(len(indm))
-        if all(np.abs((dr[i]/tel.pixscale())-1)<0.05)])
-    starsm = [stars[i[0]] for i in indmm]
-    gaiam = [gaiastars[i[1]] for i in indmm]
-    dm = [d[i[0]] for i in indmm]
-    gaiadm = [gaiad[i[1]] for i in indmm]
-    starsx = []
-    starsy = []
-    gaiastarsra = []
-    gaiastarsdec = []
-    for k in range(len(starsm)):
-        indxyrdm_good = True
-        starsi = [x for y,x in sorted(zip(dm[k],ind))]
-        gaiai = [x for y,x in sorted(zip(gaiadm[k],ind))]
-        inds = {0:[],1:[],2:[],3:[]}
-        for ij in range(4):
-            li = []
-            for i in range(6):
-                if ij in starsi[i]:
-                    [li.append(gaiai[i][j]) for j in range(2)]
-            for idxm in inds:
-                try:
-                    li = list(filter((inds[idxm][0]).__ne__, li))
-                except IndexError:
-                    pass
-            indxyrdm, cnts = stats.mode(li)
-            if len(li) > 1 and cnts[0] == 1:
-                indxyrdm_good = False
-                continue
-            inds[ij].append(indxyrdm[0])
-        if indxyrdm_good:
-            starsx.append([starsm[k][i][0] for i in range(4)])
-            starsy.append([starsm[k][i][1] for i in range(4)])
-            gaiastarsra.append([gaiam[k][stats.mode(inds[i])[0][0]][0] for i in inds])
-            gaiastarsdec.append([gaiam[k][stats.mode(inds[i])[0][0]][1] for i in inds])
+    starsx, starsy, gaiastarsra, gaiastarsdec = match_quads(ind,stars,gaiastars,d,gaiad,ds,gaiads,ratios,gaiaratios)
 
     #load ref pixels
     crpix1, crpix2 = tel.ref_pix()
