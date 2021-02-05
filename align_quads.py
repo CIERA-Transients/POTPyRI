@@ -3,14 +3,16 @@
 "Function to pixel align a list of images using quads."
 "Author: Kerry Paterson"
 
-__version__ = "1.0" #last updated 03/02/2021
+__version__ = "1.1" #last updated 05/02/2021
 
 import numpy as np
 from astropy.io import fits
 from skimage import transform as tf
+import importlib
 import solve_wcs
+import tel_params
 
-def align_stars(images,tel,hdu=0):
+def align_stars(images,telescope,hdu=0):
     """
     Pixel align a list of images
     
@@ -30,6 +32,14 @@ def align_stars(images,tel,hdu=0):
     algined_arrays: numpy array
         List of pixel aligned numpy arrays
     """
+
+    #import telescope parameter file
+    try:
+        tel = importlib.import_module('tel_params.'+telescope)
+    except ImportError:
+        print('No such telescope file, please check that you have entered the'+\
+            ' correct name or this telescope is available.''')
+        sys.exit(-1)
     
     #run sextractor
     stars_list = []
@@ -59,14 +69,19 @@ def align_stars(images,tel,hdu=0):
 
     #apply shifts
     image_arrays = []
+    header_arrays = []
     for i, f in enumerate(images):
         with fits.open(f) as fo:
             image_data = fo[hdu].data
             image_arrays.append(np.nan_to_num(image_data).astype(np.float64))
+            header_arrays.append(fo[hdu].header)
     aligned_arrays = []
     aligned_arrays.append(image_arrays[0])
     for i in range(len(image_arrays)-1):
         tform = tf.SimilarityTransform(scale=1, rotation=0, translation=(-shift_x[i], -shift_y[i]))
         aligned_arrays.append(tf.warp(image_arrays[i+1], tform))
+    
+    for i in range(len(aligned_arrays)):
+        fits.writeto(images[i].replace('.fits','_aligned.fits'),aligned_arrays[i],header_arrays[i],overwrite=True)
 
     return aligned_arrays
