@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "2.3" #last updated 29/01/2021
+__version__ = "2.4" #last updated 03/02/2021
 
 import sys
 import numpy as np
@@ -104,7 +104,7 @@ def calculate_error(d, coord1, coord2, hd):
     hd['DEC_RMS'] = (rms_dec, 'RMS of Dec fit (arcsec).')
     return rms_total
 
-def run_sextractor(input_file, cat_name, sex_config_dir='./Config'):
+def run_sextractor(input_file, cat_name, tel, sex_config_dir='./Config'):
 
     if not os.path.exists(sex_config_dir+'/config'):
         e = 'ERROR: Could not find source extractor config file!'
@@ -168,16 +168,21 @@ def mask_catalog_for_wcs(gaiaorig, w, o, data_x, data_y):
 
     return(mask)
 
-def match_quads(ind,stars,gaiastars,d,gaiad,ds,gaiads,ratios,gaiaratios):
+def match_quads(stars,gaiastars,d,gaiad,ds,gaiads,ratios,gaiaratios,sky_coords=True):
     l1 = broadcast_quotient(ratios[:,0], gaiaratios[:,0])
     l2 = broadcast_quotient(ratios[:,4], gaiaratios[:,4])
     l3 = np.hypot(np.abs(l1-1), np.abs(l2-1))
 
+    ind = list(itertools.combinations(np.arange(4), 2))
     indm = np.stack((np.arange(len(l3[:,0])),np.argmin(l3, axis=1)), axis=-1)
     dr = np.array([[(gaiads[i[1]][j]/ds[i[0]][j]) for j in range(6)]
         for i in indm])
-    indmm = np.array([indm[i] for i in range(len(indm))
-        if all(np.abs((dr[i]/tel.pixscale())-1)<0.05)])
+    if sky_coords:
+        indmm = np.array([indm[i] for i in range(len(indm))
+            if all(np.abs((dr[i]/tel.pixscale())-1)<0.05)])
+    else:
+        indmm = np.array([indm[i] for i in range(len(indm))
+            if all(np.abs(dr[i]-1)<0.05)])
     starsm = [stars[i[0]] for i in indmm]
     gaiam = [gaiastars[i[1]] for i in indmm]
     dm = [d[i[0]] for i in indmm]
@@ -236,7 +241,7 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
 
     #run sextractor
     cat_name = input_file.replace('.fits','.cat')
-    table = run_sextractor(input_file, cat_name, sex_config_dir=sex_config_dir)
+    table = run_sextractor(input_file, cat_name, tel, sex_config_dir=sex_config_dir)
 
     #mask and sort table
     table = table[(table['FLAGS']==0)&(table['IMAFLAGS_ISO']==0)]
@@ -261,7 +266,7 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
         use=10, sky_coords=True)
 
     #match quads
-    starsx, starsy, gaiastarsra, gaiastarsdec = match_quads(ind,stars,gaiastars,d,gaiad,ds,gaiads,ratios,gaiaratios)
+    starsx, starsy, gaiastarsra, gaiastarsdec = match_quads(stars,gaiastars,d,gaiad,ds,gaiads,ratios,gaiaratios,sky_coords=True)
 
     #load ref pixels
     crpix1, crpix2 = tel.ref_pix()
