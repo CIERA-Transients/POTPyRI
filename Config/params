@@ -7,3 +7,4 @@ ALPHAWIN_J2000           Windowed right ascension (J2000)                       
 DELTAWIN_J2000           windowed declination (J2000)                              [deg]
 FLAGS                    Extraction flags                              
 IMAFLAGS_ISO
+EXT_NUMBER
