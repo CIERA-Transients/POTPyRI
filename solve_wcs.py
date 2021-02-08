@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "2.4" #last updated 03/02/2021
+__version__ = "2.5" #last updated 08/02/2021
 
 import sys
 import numpy as np
@@ -244,7 +244,7 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
     table = run_sextractor(input_file, cat_name, tel, sex_config_dir=sex_config_dir)
 
     #mask and sort table
-    table = table[(table['FLAGS']==0)&(table['IMAFLAGS_ISO']==0)]
+    table = table[(table['FLAGS']==0)&(table['IMAFLAGS_ISO']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
     table.sort('MAG_BEST')
 
     #make quads using 10 brightest
