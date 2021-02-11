@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "2.5" #last updated 08/02/2021
+__version__ = "2.6" #last updated 11/02/2021
 
 import sys
 import numpy as np
@@ -216,7 +216,16 @@ def match_quads(stars,gaiastars,d,gaiad,ds,gaiads,ratios,gaiaratios,sky_coords=T
             starsy.append([starsm[k][i][1] for i in range(4)])
             gaiastarsra.append([gaiam[k][stats.mode(inds[i])[0][0]][0] for i in inds])
             gaiastarsdec.append([gaiam[k][stats.mode(inds[i])[0][0]][1] for i in inds])
-    return starsx, starsy, gaiastarsra, gaiastarsdec
+    
+    starsx_unq = list(dict.fromkeys(np.concatenate(starsx)))
+    starsy_unq = list(dict.fromkeys(np.concatenate(starsy)))
+    gaiastarsra_unq = []
+    gaiastarsdec_unq = []
+    for i in range(len(starsx_unq)):
+        gaiastarsra_unq.append(stats.mode(np.concatenate(gaiastarsra)[np.where(np.concatenate(starsx)==starsx_unq[i])])[0][0])
+        gaiastarsdec_unq.append(stats.mode(np.concatenate(gaiastarsdec)[np.where(np.concatenate(starsy)==starsy_unq[i])])[0][0])
+
+    return starsx_unq, starsy_unq, gaiastarsra_unq, gaiastarsdec_unq
 
 #main function to calculate astrometric solution
 def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
@@ -272,8 +281,8 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
     crpix1, crpix2 = tel.ref_pix()
 
     #solve plate sol
-    c1 = curve_fit(plate_sol,(np.concatenate(starsx)-crpix1,np.concatenate(starsy)-crpix2),np.concatenate(gaiastarsra),p0=(0,0,ra))[0]
-    c2 = curve_fit(plate_sol,(np.concatenate(starsx)-crpix1,np.concatenate(starsy)-crpix2),np.concatenate(gaiastarsdec),p0=(0,0,dec))[0]
+    c1 = curve_fit(plate_sol,(np.array(starsx)-crpix1,np.array(starsy)-crpix2),np.array(gaiastarsra),p0=(0,0,ra))[0]
+    c2 = curve_fit(plate_sol,(np.array(starsx)-crpix1,np.array(starsy)-crpix2),np.array(gaiastarsdec),p0=(0,0,dec))[0]
 
     #strip header of WCS
     hd = strip_header(header)
