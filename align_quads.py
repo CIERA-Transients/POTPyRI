@@ -3,7 +3,7 @@
 "Function to pixel align a list of images using quads."
 "Author: Kerry Paterson"
 
-__version__ = "1.1" #last updated 05/02/2021
+__version__ = "1.2" #last updated 11/02/2021
 
 import numpy as np
 from astropy.io import fits
@@ -49,7 +49,7 @@ def align_stars(images,telescope,hdu=0):
     for f in images:
         cat_name = f.replace('.fits','.cat')
         table = solve_wcs.run_sextractor(f, cat_name, tel, sex_config_dir='./Config')
-        table = table[(table['FLAGS']==0)&(table['IMAFLAGS_ISO']==0)]
+        table = table[(table['FLAGS']==0)&(table['IMAFLAGS_ISO']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
         table.sort('MAG_BEST')
         stars, d, ds, ratios = solve_wcs.make_quads(table['XWIN_IMAGE'],
                 table['YWIN_IMAGE'], use=10)
@@ -64,8 +64,8 @@ def align_stars(images,telescope,hdu=0):
     for i in range(len(stars_list)-1):
         starsx1, starsy1, starsx2, starsy2 = solve_wcs.match_quads(stars_list[0],stars_list[i+1],
                 d_list[0],d_list[i+1],ds_list[0],ds_list[i+1],ratios_list[0],ratios_list[i+1],sky_coords=False)
-        shift_x.append(np.median([starsx1[j][k]-starsx2[j][k] for j in range(len(starsx1)) for k in range(4)]))
-        shift_y.append(np.median([starsy1[j][k]-starsy2[j][k] for j in range(len(starsy1)) for k in range(4)]))
+        shift_x.append(np.median([starsx1[j]-starsx2[j] for j in range(len(starsx1))]))
+        shift_y.append(np.median([starsy1[j]-starsy2[j] for j in range(len(starsy1))]))
 
     #apply shifts
     image_arrays = []
