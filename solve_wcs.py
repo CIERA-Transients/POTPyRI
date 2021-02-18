@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "2.6" #last updated 11/02/2021
+__version__ = "2.7" #last updated 18/02/2021
 
 import sys
 import numpy as np
@@ -88,7 +88,7 @@ def add_to_header(hd,crpix1,crpix2,c1,c2,num):
     hd['WAT2_005'] = WAT2_005
     hd['RADESYSa'] = 'ICRS'
     hd['WCS_REF'] = ('GAIA-DR2', 'Reference catalog for astrometric solution.')
-    hd['WCS_QUAD'] = (num, 'Number of quads used for astrometric solution.')
+    hd['WCS_QUAD'] = (num, 'Number of stars used for astrometric solution.')
     return hd
 
 #function to calculate rms on astrometric solution
@@ -137,13 +137,21 @@ def make_quads(x, y, use=None, sky_coords=False):
         y = y[:use]
 
     ind = list(itertools.combinations(np.arange(4), 2))
-    stars = list(itertools.combinations(zip(x, y), 4))
     if sky_coords:
+        stars = []
+        coords = [SkyCoord(x[i],y[i], unit='deg') for i in range(len(x))]
+        dis_all = [[coords[j].separation(coords[i]).arcsec for i in range(len(coords))] for j in range(len(coords))]
+        for j in range(len(coords)):
+            i_n = [x for y,x in sorted(zip(dis_all[j],np.arange(0,len(coords))))][1:5]
+            stars.append([(x[i],y[i]) for i in i_n])
+            i_n = [x for y,x in sorted(zip(dis_all[j],np.arange(0,len(coords))))][5:9]
+            stars.append([(x[i],y[i]) for i in i_n])
         coords = [[SkyCoord(stars[j][i][0], stars[j][i][1], unit='deg')
                  for i in range(4)] for j in range(len(stars))]
         d = [[coords[j][ind[i][0]].separation(coords[j][ind[i][1]]).arcsec for i in range(6)]
                 for j in range(len(stars))]
     else:
+        stars = list(itertools.combinations(zip(x, y), 4))
         dx = [[stars[j][ind[i][0]][0]-stars[j][ind[i][1]][0] for i in range(6)]
                 for j in range(len(stars))]
         dy = [[stars[j][ind[i][0]][1]-stars[j][ind[i][1]][1] for i in range(6)]
@@ -158,13 +166,13 @@ def make_quads(x, y, use=None, sky_coords=False):
 # Create 2D list with len(l1) x len(l2) with pairwise quotient of all elements
 def broadcast_quotient(l1, l2):
     l1 = list(l1) ; l2 = list(l2)
-    out = np.array([[a/b for a in l2] for b in l1])
+    out = np.array([[a/b for a in l1] for b in l2])
     return(out)
 
 def mask_catalog_for_wcs(gaiaorig, w, o, data_x, data_y):
     gaiacoord = SkyCoord(gaiaorig['ra'], gaiaorig['dec'], unit='deg')
     gaiax, gaiay = wcs.utils.skycoord_to_pixel(gaiacoord, w, o)
-    mask = (gaiax > 0) & (gaiax < data_x) & (gaiay > 0) & (gaiay < data_y)
+    mask = (gaiax > 50) & (gaiax < data_x-50) & (gaiay > 50) & (gaiay < data_y-50)
 
     return(mask)
 
@@ -174,8 +182,13 @@ def match_quads(stars,gaiastars,d,gaiad,ds,gaiads,ratios,gaiaratios,sky_coords=T
     l3 = np.hypot(np.abs(l1-1), np.abs(l2-1))
 
     ind = list(itertools.combinations(np.arange(4), 2))
-    indm = np.stack((np.arange(len(l3[:,0])),np.argmin(l3, axis=1)), axis=-1)
-    dr = np.array([[(gaiads[i[1]][j]/ds[i[0]][j]) for j in range(6)]
+    gaia_ind = list(itertools.permutations(np.arange(0,4), 4))
+    indm = []
+    for i in range(len(l3)):
+        min_all = np.where(l3[i]==np.min(l3[i]))[0]
+        for j in min_all:
+            indm.append([i,j])
+    dr = np.array([[(gaiads[i[0]][j]/ds[i[1]][j]) for j in range(6)]
         for i in indm])
     if sky_coords:
         indmm = np.array([indm[i] for i in range(len(indm))
@@ -183,49 +196,35 @@ def match_quads(stars,gaiastars,d,gaiad,ds,gaiads,ratios,gaiaratios,sky_coords=T
     else:
         indmm = np.array([indm[i] for i in range(len(indm))
             if all(np.abs(dr[i]-1)<0.05)])
-    starsm = [stars[i[0]] for i in indmm]
-    gaiam = [gaiastars[i[1]] for i in indmm]
-    dm = [d[i[0]] for i in indmm]
-    gaiadm = [gaiad[i[1]] for i in indmm]
+    starsm = [stars[i[1]] for i in indmm]
+    gaiam = [gaiastars[i[0]] for i in indmm]
+    dm = [d[i[1]] for i in indmm]
+    gaiadm = [gaiad[i[0]] for i in indmm]
     starsx = []
     starsy = []
     gaiastarsra = []
     gaiastarsdec = []
     for k in range(len(starsm)):
-        indxyrdm_good = True
-        starsi = [x for y,x in sorted(zip(dm[k],ind))]
-        gaiai = [x for y,x in sorted(zip(gaiadm[k],ind))]
-        inds = {0:[],1:[],2:[],3:[]}
-        for ij in range(4):
-            li = []
-            for i in range(6):
-                if ij in starsi[i]:
-                    [li.append(gaiai[i][j]) for j in range(2)]
-            for idxm in inds:
-                try:
-                    li = list(filter((inds[idxm][0]).__ne__, li))
-                except IndexError:
-                    pass
-            indxyrdm, cnts = stats.mode(li)
-            if len(li) > 1 and cnts[0] == 1:
-                indxyrdm_good = False
-                continue
-            inds[ij].append(indxyrdm[0])
-        if indxyrdm_good:
-            starsx.append([starsm[k][i][0] for i in range(4)])
-            starsy.append([starsm[k][i][1] for i in range(4)])
-            gaiastarsra.append([gaiam[k][stats.mode(inds[i])[0][0]][0] for i in inds])
-            gaiastarsdec.append([gaiam[k][stats.mode(inds[i])[0][0]][1] for i in inds])
-    
+        star_d = np.array(dm[k])
+        ratio_quads = []
+        for j in range(len(gaia_ind)):
+            if sky_coords:
+                gaia_coords = [SkyCoord(gaiam[k][i][0], gaiam[k][i][1], unit='deg') for i in gaia_ind[j]]
+                gaia_d = np.array([[gaia_coords[ind[i][0]].separation(gaia_coords[ind[i][1]]).arcsec for i in range(6)]])
+                ratio_quads.append(np.sum(np.abs(((gaia_d/star_d)/tel.pixscale())-1)))
+            else:
+                gaia_d = [np.hypot(gaiam[k][m_ind[i][0]][0]-stars[k][m_ind[i][1]][0], gaiam[k][m_ind[i][0]][1]-stars[k][m_ind[i][1]][1]) for i in range(6)]
+                ratio_quads.append(np.sum(np.abs((gaia_d/star_d)-1)))
+        starsx.append([starsm[k][i][0] for i in range(4)])
+        starsy.append([starsm[k][i][1] for i in range(4)])
+        gaiastarsra.append([gaiam[k][gaia_ind[np.argmin(ratio_quads)][i]][0] for i in range(4)])
+        gaiastarsdec.append([gaiam[k][gaia_ind[np.argmin(ratio_quads)][i]][1] for i in range(4)])
     starsx_unq = list(dict.fromkeys(np.concatenate(starsx)))
     starsy_unq = list(dict.fromkeys(np.concatenate(starsy)))
-    gaiastarsra_unq = []
-    gaiastarsdec_unq = []
-    for i in range(len(starsx_unq)):
-        gaiastarsra_unq.append(stats.mode(np.concatenate(gaiastarsra)[np.where(np.concatenate(starsx)==starsx_unq[i])])[0][0])
-        gaiastarsdec_unq.append(stats.mode(np.concatenate(gaiastarsdec)[np.where(np.concatenate(starsy)==starsy_unq[i])])[0][0])
+    gaiastarsra_unq = list(dict.fromkeys(np.concatenate(gaiastarsra)))
+    gaiastarsdec_unq = list(dict.fromkeys(np.concatenate(gaiastarsdec)))
 
-    return starsx_unq, starsy_unq, gaiastarsra_unq, gaiastarsdec_unq
+    return np.array(starsx_unq), np.array(starsy_unq), np.array(gaiastarsra_unq), np.array(gaiastarsdec_unq)
 
 #main function to calculate astrometric solution
 def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
@@ -253,13 +252,15 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
     table = run_sextractor(input_file, cat_name, tel, sex_config_dir=sex_config_dir)
 
     #mask and sort table
-    table = table[(table['FLAGS']==0)&(table['IMAFLAGS_ISO']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
+    table = table[(table['FLAGS']==0)&(table['IMAFLAGS_ISO']==0)
+            &(table['EXT_NUMBER']==tel.wcs_extension()+1)]
     table.sort('MAG_BEST')
+    table = table[table['MAG_BEST']<(np.median(table['MAG_BEST'])-np.std(table['MAG_BEST']))]
 
-    #make quads using 10 brightest
+    #make quads using brightest stars
     ind = list(itertools.combinations(np.arange(4), 2))
     stars, d, ds, ratios = make_quads(table['XWIN_IMAGE'],
-        table['YWIN_IMAGE'], use=10)
+        table['YWIN_IMAGE'], use=len(table))
 
     #query gaia
     gaiaorig = Irsa.query_region(SkyCoord(ra*u.deg, dec*u.deg,frame='icrs'),
@@ -270,19 +271,21 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
     mask = mask_catalog_for_wcs(gaiaorig, wcs.WCS(header), 1, data_x, data_y)
     gaia = gaiaorig[mask]
 
-    #make quads using 10 brightest
+    #make quads using stars brigher than 19 mag
+    gaia = gaia[gaia['phot_g_mean_mag']<19]
     gaiastars, gaiad, gaiads, gaiaratios = make_quads(gaia['ra'], gaia['dec'],
-        use=10, sky_coords=True)
+        use=len(gaia), sky_coords=True)
 
     #match quads
-    starsx, starsy, gaiastarsra, gaiastarsdec = match_quads(stars,gaiastars,d,gaiad,ds,gaiads,ratios,gaiaratios,sky_coords=True)
+    starsx, starsy, gaiastarsra, gaiastarsdec = match_quads(stars,gaiastars,d,gaiad,
+            ds,gaiads,ratios,gaiaratios,sky_coords=True)
 
     #load ref pixels
     crpix1, crpix2 = tel.ref_pix()
 
     #solve plate sol
-    c1 = curve_fit(plate_sol,(np.array(starsx)-crpix1,np.array(starsy)-crpix2),np.array(gaiastarsra),p0=(0,0,ra))[0]
-    c2 = curve_fit(plate_sol,(np.array(starsx)-crpix1,np.array(starsy)-crpix2),np.array(gaiastarsdec),p0=(0,0,dec))[0]
+    c1 = curve_fit(plate_sol,(starsx-crpix1,starsy-crpix2),gaiastarsra,p0=(0,0,ra))[0]
+    c2 = curve_fit(plate_sol,(starsx-crpix1,starsy-crpix2),gaiastarsdec,p0=(0,0,dec))[0]
 
     #strip header of WCS
     hd = strip_header(header)
