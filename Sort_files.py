@@ -1,16 +1,17 @@
-# UKIRT pipeline function
-# Owen Eskandari
-# 6/16/20
+#!/usr/bin/env python
 
-# This function takes in a list of files (and a filter if the filter is not in the header)
-# and returns a dictionary of the files sorted by filter
+"Function to sort files for main_pipeline."
+"Authors: Owen Eskandari, Kerry Paterson"
 
-# Imports
-from astropy.io import fits
+__version__ = "2.0" #last updated 18/02/2021
+
+from astropy.io import fits, Table
 import shutil
+import importlib
+import tel_params
 
 # Sort the calibration files:
-def sort_files(files, manual_filter=None, log2=None, date=None):
+def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=None,
 
     '''
 
@@ -43,52 +44,118 @@ def sort_files(files, manual_filter=None, log2=None, date=None):
 
     '''
 
-    filter_list = {}        # Create new dictionaries for the files filtered by filter
+    tel = importlib.import_module('tel_params.'+telescope)
+
+    ext = tel.raw_header_ext()
+    science_keyword = tel.science_keyword()
+    flat_keyword = tel.flat_keyword()
+    bias_keyword = tel.bias_keyword()
+    dark_keyword = tel.dark_keyword()
+
+    science_files = tel.science_files()
+    flat_files = tel.flat_files()
+    bias_files = tel.bias_files()
+    dark_files = tel.dark_files()
+
+    target_keyword = tel.target_keyword()
+    fil_keyword = tel.filter_keyword()
+
+    cal_list = {'BIAS':[],'DARK':[]}
+    sci_list = {}
+    sky_list = {}
+    time_list = {}
+
+    file_list = path+'/file_list.txt'
+    file_table = Table(names=('File','Filter','Type','Time'),dtype=('S', 'S', 'S', 'f'))
 
     for i, f in enumerate(files):
         with fits.open(f) as file_open:
-            hdr = file_open[0].header
+            hdr = file_open[ext].header
+        target = hdr[target_keyword].replace(' ','')
+        fil = hdr[fil_keyword].replace(' ','')
+        file_time = None
+        if np.all([hdr[science_keyword[j]] == science_files[j] for j in range(len(science_keyword))]):
+            file_type = 'SCIENCE'
+            try:
+                sci_list[target+'_'+fil]
+            except KeyError:
+                sci_list.update({target+'_'+fil:[]})
+            sci_list[target+'_'+fil].append(f)
+            try:
+                time_list[target+'_'+fil]
+            except KeyError:
+                time_list.update({target+'_'+fil:[]})
+            file_time = tel.time_format(hdr)
+            time_list[target+'_'+fil].append(file_time)
+            if tel.sky():
+                try:
+                    sky_list[fil]
+                except KeyError:
+                    sky_list.update({fil:[]})
+                sky_list[fil].append(f)
+        elif np.all([hdr[flat_keyword[j]] == flat_files[j] for j in range(len(flat_keyword))])):
+            file_type = 'FLAT'
+            try:
+                cal_list['FLAT_'+fil]
+            except KeyError:
+                cal_list.update({'FLAT_'+fil:[]})
+            cal_list['FLAT_'+fil].append(f)          
+        elif np.all([hdr[bias_keyword[j]] == bias_files[j] for j in range(len(bias_keyword))])):
+            file_type = 'BIAS'
+            cal_list['BIAS'].append(f)
+        elif np.all([hdr[dark_keyword[j]] == dark_files[j] for j in range(len(dark_keyword))])):
+            file_type = 'DARK'
+            cal_list['DARK'].append(f)
+        elif np.all[hdr[spec_keyword[j]] == spec_files[j] for j in range(len(spec_keyword))])):
+            file_type = 'SPEC'
+            shutil.move(f,path+'spec/')
+        else:
+            file_type = 'BAD'
+            shutil.move(f,path+'bad/')
+        file_table.add_row((target,fil,file_type,file_time))
+    file_table.write(file_list,format='ascii',delimiter='\t')
+    lists_to_move = [cal_list, sci_list]
+    for l in lists:
+        for key in l:
+            [shutil.move(f,path+'raw/') for f in l]
+            [l[i] = l[i].replace(path,path+'raw/') for i in l]
 
-        if i == 0:
-            event_name = hdr['OBJECT']
-            if log2 is not None:
-                log2.info("Event: " + event_name)
-                if date is not None:
-                    log2.info("Date observed: %s" % date)
-            else:
-                print("Event: " + event_name)
-                if date is not None:
-                    print("Date observed: %s" % date)
+    return cal_list, sci_list, sky_list, time_list
 
-        try:
-            fil = hdr['FILTER']         # add filter
-        except KeyError:
-            fil = manual_filter.upper()
-        try:
-            filter_list[fil]
-        except KeyError:
-            filter_list.update({fil: []})
-
-        filter_list[fil].append(f)
-
-    return filter_list
-
-def sort_files_bino(files,raw_path): #sort the calibration files: 
-    cal_list = []
-    sci_list = []
-    for f in files:
-        with fits.open(f) as file_open:
-            hdr = file_open[1].header
-            imtype = hdr['MASK']
-            if imtype == 'imaging':
-                fil = hdr['FILTER'] #sort by filter
-                if hdr['SCRN']=='deployed': #only collect dome flats for imaging    
-                    cal_list.append(f)
-                elif hdr['SCRN']=='stowed':
-                    target = hdr['OBJECT']
-                    sci_list.append(f)
-                else:
-                    shutil.move(f,raw_path+'bad/')
-            else:
-                shutil.move(f,raw_path)
-    return cal_list, sci_list
+def load_files(file_list):
+    cal_list = {'BIAS':[],'DARK':[]}
+    sci_list = {}
+    sky_list = {}
+    time_list = {}
+    file_table = Table.read(file_list,format='ascii',delimiter='\t')
+    for i in range(len(file_table)):
+        if file_table['Type'] == 'SCIENCE':
+            target = file_table['File'][i]
+            fil = file_table['Filter'][i]
+            try:
+                sci_list[target+'_'+fil]
+            except KeyError:
+                sci_list.update({target+'_'+fil:[]})
+            sci_list[target+'_'+fil].append(f)
+            try:
+                time_list[target+'_'+fil]
+            except KeyError:
+                time_list.update({target+'_'+fil:[]})
+            time_list[target+'_'+fil].append(file_time)
+            if tel.sky():
+                try:
+                    sky_list[fil]
+                except KeyError:
+                    sky_list.update({fil:[]})
+                sky_list[fil].append(f)
+        elif file_table['Type'] == 'FLAT':
+            try:
+                cal_list['FLAT_'+fil]
+            except KeyError:
+                cal_list.update({'FLAT_'+fil:[]})
+            cal_list['FLAT_'+fil].append(f)
+        elif file_table['Type'] == 'BIAS':
+            cal_list['BIAS'].append(f)
+        elif file_table['Type'] == 'DARK':
+            cal_list['DARK'].append(f)
+    return cal_list, sci_list, sky_list, time_list
