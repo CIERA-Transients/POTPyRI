@@ -3,12 +3,14 @@
 "Function to sort files for main_pipeline."
 "Authors: Owen Eskandari, Kerry Paterson"
 
-__version__ = "2.0" #last updated 18/02/2021
+__version__ = "2.1" #last updated 24/02/2021 by DV
 
-from astropy.io import fits, Table
+from astropy.io import fits
+from astropy.table import Table
 import shutil
 import importlib
 import tel_params
+import numpy as np
 
 # Sort the calibration files:
 def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=None,
@@ -93,32 +95,32 @@ def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=Non
                 except KeyError:
                     sky_list.update({fil:[]})
                 sky_list[fil].append(f)
-        elif np.all([hdr[flat_keyword[j]] == flat_files[j] for j in range(len(flat_keyword))])):
+        elif np.all([hdr[flat_keyword[j]] == flat_files[j] for j in range(len(flat_keyword))]):
             file_type = 'FLAT'
             try:
                 cal_list['FLAT_'+fil]
             except KeyError:
                 cal_list.update({'FLAT_'+fil:[]})
             cal_list['FLAT_'+fil].append(f)          
-        elif np.all([hdr[bias_keyword[j]] == bias_files[j] for j in range(len(bias_keyword))])):
+        elif np.all([hdr[bias_keyword[j]] == bias_files[j] for j in range(len(bias_keyword))]):
             file_type = 'BIAS'
             cal_list['BIAS'].append(f)
-        elif np.all([hdr[dark_keyword[j]] == dark_files[j] for j in range(len(dark_keyword))])):
+        elif np.all([hdr[dark_keyword[j]] == dark_files[j] for j in range(len(dark_keyword))]):
             file_type = 'DARK'
             cal_list['DARK'].append(f)
-        elif np.all[hdr[spec_keyword[j]] == spec_files[j] for j in range(len(spec_keyword))])):
-            file_type = 'SPEC'
-            shutil.move(f,path+'spec/')
+       # elif np.all([hdr[spec_keyword[j]] == spec_files[j] for j in range(len(spec_keyword))]):
+        #    file_type = 'SPEC'
+         #   shutil.move(f,path+'spec/')
         else:
             file_type = 'BAD'
             shutil.move(f,path+'bad/')
         file_table.add_row((target,fil,file_type,file_time))
     file_table.write(file_list,format='ascii',delimiter='\t')
     lists_to_move = [cal_list, sci_list]
-    for l in lists:
+    for l in lists_to_move:
         for key in l:
             [shutil.move(f,path+'raw/') for f in l]
-            [l[i] = l[i].replace(path,path+'raw/') for i in l]
+            l[i] = [l[i].replace(path,path+'raw/') for i in l]
 
     return cal_list, sci_list, sky_list, time_list
 
