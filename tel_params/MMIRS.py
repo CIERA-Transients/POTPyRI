@@ -1,4 +1,6 @@
 #parameter file for MMIRS/MMT
+import os
+import datetime
 
 def static_mask():
     return './staticmasks/MMIRS.staticmask.fits'
@@ -28,3 +30,51 @@ def WCS_keywords(): #WCS keywords
     WAT2_004 = '78736 -0.001787914383662314 0.00591838599589976 0.4698673160370906 0'
     WAT2_005 = '.002964492811835905 0.3360926419983717 0.7822291841773272 "'
     return WAT0_001, WAT1_001, WAT1_002, WAT1_003, WAT1_004, WAT1_005, WAT2_001, WAT2_002, WAT2_003, WAT2_004, WAT2_005
+
+def cal_path():
+    return os.getenv("HOME")+'/Pipelines/MMIRS_calib/'
+
+def raw_format():
+    return '*.fits'
+
+def dark():
+    return True
+
+def flat():
+    return False
+
+def raw_header_ext():
+    return 1
+
+def science_keyword():
+    return ['OBSMODE','APTYPE']
+
+def science_files():
+    return ['imaging','open']
+
+def flat_keyword():
+    return ['']
+
+def flat_files():
+    return None
+
+def bias_keyword():
+    return = ['']
+
+def bias_files():
+    return = None
+
+def dark_keywords():
+    return = ['OBJECT']
+
+def dark_files():
+    return ['Dark']
+
+def target_keyword():
+    return = 'OBJECT'
+
+def fil_keyword():
+    return = 'FILTER'
+
+def time_format(hdr):
+    return datetime.datetime.strptime(hdr['DATE-OBS'],'%Y-%m-%dT%H:%M:%S')
