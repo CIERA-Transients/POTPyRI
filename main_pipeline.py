@@ -15,6 +15,7 @@ import datetime
 import time
 import astropy
 import astropy.units.astrophys as u
+import astropy.units as u
 from astropy.io import fits
 import ccdproc
 import glob
