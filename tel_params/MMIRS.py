@@ -1,6 +1,9 @@
 #parameter file for MMIRS/MMT
 import os
 import datetime
+import numpy as np
+from photutils import make_source_mask, Background2D, MedianBackground
+from astropy.stats import SigmaClip
 
 def static_mask():
     return './staticmasks/MMIRS.staticmask.fits'
@@ -40,6 +43,9 @@ def raw_format():
 def dark():
     return True
 
+def bias():
+    return False
+
 def flat():
     return False
 
@@ -64,7 +70,7 @@ def bias_keyword():
 def bias_files():
     return = None
 
-def dark_keywords():
+def dark_keyword():
     return = ['OBJECT']
 
 def dark_files():
@@ -78,3 +84,36 @@ def fil_keyword():
 
 def time_format(hdr):
     return datetime.datetime.strptime(hdr['DATE-OBS'],'%Y-%m-%dT%H:%M:%S')
+
+def wavelength():
+    return 'NIR'
+
+def flat_name(cpath,fil):
+    return cpath+'/pixflat_'+fil+'.fits.gz'
+
+def load_flat(flat):
+    with fits.open(flat) as hdr:
+        mflat = hdr[1].data
+        mflat[np.isnan(mflat)] = np.nanmedian(mflat)
+        mflat = CCDData(mflat,unit=u.electron)
+    return mflat
+
+def create_flat(flat_list):
+    return None
+
+def process_science(sci_list):
+    masks = []
+    processed = []
+    for sci in sci_list:
+        raw = CCDData.read(sci,hdu=1,unit=u.adu)
+        red = ccdproc.subtract_overscan(raw, overscan=raw[0:4,:], overscan_axis=0, model=models.Chebyshev1D(3))
+        red = ccdproc.ccd_process(red, gain=raw.header['GAIN']*u.electron/u.adu, readnoise=raw.header['RDNOISE']*u.electron)
+        red = ccdproc.subtract_dark(red, mdark, exposure_time='EXPTIME', exposure_unit=u.second)
+        red = ccdproc.flat_correct(red, mflat)
+        processed_data = ccdproc.ccd_process(red, trim=raw.header['DATASEC'])
+        mask = make_source_mask(processed_data, nsigma=3, npixels=5)
+        masks.append(mask)
+        bkg_estimator = MedianBackground()
+        bkg = Background2D(processed_data, (30, 30), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=bkg_estimator, mask=mask, exclude_percentile=80)
+        processed.append(processed_data.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found').divide(red.header['EXPTIME']*u.second,propagate_uncertainties=True,handle_meta='first_found'))
+    return processed, masks
