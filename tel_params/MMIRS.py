@@ -65,22 +65,22 @@ def flat_files():
     return None
 
 def bias_keyword():
-    return = ['']
+    return ['']
 
 def bias_files():
-    return = None
+    return None
 
 def dark_keyword():
-    return = ['OBJECT']
+    return ['OBJECT']
 
 def dark_files():
     return ['Dark']
 
 def target_keyword():
-    return = 'OBJECT'
+    return 'OBJECT'
 
 def fil_keyword():
-    return = 'FILTER'
+    return 'FILTER'
 
 def time_format(hdr):
     return datetime.datetime.strptime(hdr['DATE-OBS'],'%Y-%m-%dT%H:%M:%S')
