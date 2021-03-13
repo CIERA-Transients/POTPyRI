@@ -79,7 +79,7 @@ def cutouts_2d_gaussian(stack, coords, d_x_y, fwhm, show_cutouts=False, log=None
                            np.linspace(0, np.shape(d)[0] - 1, np.shape(d)[0]))
 
         initial_guess = (100, d_x_y, d_x_y, fwhm/2.35482, fwhm/2.35482, 0, 0)     # Initial guess is VERY IMPORTANT
-        popt, pcov = curve_fit(twoD_Gaussian, (x, y), d.ravel(), p0=initial_guess)      # Fit of 2D Gaussian
+        popt, pcov = curve_fit(twoD_Gaussian, (x, y), d.ravel(), p0=initial_guess, maxfev=100000)      # Fit of 2D Gaussian
         field_ratios.append(popt[4] / popt[3])
 
         if i == 0 and show_cutouts:     # Show an example (not random because I want to show the same example each time)
