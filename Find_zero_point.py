@@ -9,6 +9,8 @@
 
 # TODO: This zero point also allows for Y-band photometry --> table is empty when location not in UKIDSS database
 
+# Updates by CDK on 13 Mar 2021
+
 # Imports
 import numpy as np
 import astropy.units.astrophys as u
@@ -26,6 +28,7 @@ from scipy.stats import sigmaclip
 from scipy.optimize import curve_fit
 from astropy.visualization import simple_norm
 import glob
+from utilities import absphot
 
 from astroquery.vizier import Vizier
 
@@ -42,8 +45,9 @@ warnings.simplefilter('ignore', category=AstropyWarning)        # Removes deprec
 # Finds the zero point of a singular stack (need to run for each filter)
 # Inputs: stack (filename as a string), filter as a string, extension as an int, path to the data
 # 'show' parameters show various plots, r_annulus_in/out are x*fwhm value, log is log
-def find_zero_point(stack, fil, ext, catalog, data_path=None, show_fwhm=False, show_bkg=False, show_contours=False,
-                    r_annulus_in=3.5, r_annulus_out=4.5, log=None):
+def find_zero_point(stack, fil, ext, catalog, data_path=None, show_fwhm=False,
+    show_bkg=False, show_contours=False, r_annulus_in=3.5, r_annulus_out=4.5,
+    log=None):
 
     '''
 
@@ -143,21 +147,27 @@ def find_zero_point(stack, fil, ext, catalog, data_path=None, show_fwhm=False, s
     Vizier.ROW_LIMIT = -1     # So that you get all the rows, not just the first 50
 
     # Information about the sources from catalog found in the extension (full area, not radially)
-    cat_ID, cat_ra, cat_dec, cat_mag = find_catalog(catalog, fil)
-    cat = Vizier.query_region(coords, width=13.65*u.arcmin, catalog=cat_ID)[0]
+    cat_ID, cat_ra, cat_dec, cat_mag, cat_err = find_catalog(catalog, fil)
+    cat = Vizier.query_region(coords, width=13.65*u.arcmin, catalog=cat_ID)
+    if len(cat)==0:
+        log.info('No catalog sources at input coordinates!  Exiting...')
+        sys.exit()
+    else:
+        cat = cat[0]
+        mask = (~cat[cat_ra].mask) & (~cat[cat_dec].mask) &\
+            (~cat[cat_mag].mask) & (~cat[cat_err].mask)
+        cat = cat[mask]
 
     # Find the sources above 10 std in the image
     _, median, std = sigma_clipped_stats(data, sigma=3.0)
     daofind = DAOStarFinder(fwhm=7, threshold=10. * std)  # Looking for best sources, so raise threshold way up
     dao_sources = daofind(np.asarray(data))     # DAOStarFinder sources == dao_sources
     if log is not None:
-        log.info("%s objects found in "+catalog+" and %s sources above 10 std found in the stack" %
-                 (len(cat), len(dao_sources)))
-        log.info("DAOStarFinder found %s sources that are 10 std above the background" % len(dao_sources))
+        log.info("{0} objects found in {1} and {2} sources above 10 std found in the stack".format(len(cat), catalog, len(dao_sources)))
+        log.info("DAOStarFinder found {0} sources that are 10 std above the background".format(len(dao_sources)))
     else:
-        print("%s objects found in "+catalog+" and %s sources above 10 std found in the stack" %
-              (len(cat), len(dao_sources)))
-        print("DAOStarFinder found %s sources that are 10 std above the background" % len(dao_sources))
+        print("{0} objects found in {1} and {2} sources above 10 std found in the stack".format(len(cat), catalog, len(dao_sources)))
+        print("DAOStarFinder found {0} sources that are 10 std above the background".format(len(dao_sources)))
 
     ra_dao = []         # Change pixel coordinates to real coordinates for DAOStarFinder sources
     dec_dao = []
@@ -174,13 +184,13 @@ def find_zero_point(stack, fil, ext, catalog, data_path=None, show_fwhm=False, s
     # Match each catalog source to the closest dao_source
     idx, d2, d3 = coords_cat.match_to_catalog_sky(coords_dao)      # Match smaller to larger
     if log is not None:
-        log.info("%s objects have been matched" % len(idx))
+        log.info("{0} objects have been matched".format(len(idx)))
     else:
-        print("%s objects have been matched" % len(idx))
+        print("{0} objects have been matched".format(len(idx)))
 
     # Next step: find the radial profiles from intermediate-brightness sources and then find the fwhm of the field
-    step_size = 0.7
-    fwhm_orig = 5
+    step_size = 1
+    fwhm_orig = 4
 
     coords = [w.wcs_world2pix(np.array([[ra_dao[j], dec_dao[j]]], np.float), 1)[0] for j in idx]    # Positions of DAO
 
@@ -204,7 +214,7 @@ def find_zero_point(stack, fil, ext, catalog, data_path=None, show_fwhm=False, s
     for i, source in enumerate(phot_table):               # Find the sums per area (adu/pix/sec) for each of the sources
         sums = [source[i] / apers_area[i - 3] for i in range(3, len(source))]
         # Only consider moderately bright sources; too bright are saturated and too dim can have larger error values
-        if 100 <= sums[0] <= 300 and sums[len(sums) - 1] < 15:
+        if 100 <= sums[0] <= 30000 and sums[len(sums) - 1] < 30000:
             try:    # Try unless it takes too much time...if that happens, it's probably a bad fit and we don't want it
                 w_fit = x_data
                 f_fit = sums
@@ -222,11 +232,9 @@ def find_zero_point(stack, fil, ext, catalog, data_path=None, show_fwhm=False, s
     med = np.median(sigmas_post_clipping)       # Median sigma value
     fwhm = med * 2.35482            # FWHM to be used to find the zero point and make cuts
     if log is not None:
-        log.info("Median sigma: %.3f Median FWHM: %.3f Number of sources counted/total found in field: %s/%s" %
-                 (med, fwhm, len(sigmas_post_clipping), len(dao_sources)))
+        log.info("Median sigma: {0} Median FWHM: {1} Number of sources counted/total found in field: {2}/{3}".format('%5.3f'%med, '%2.3f'%fwhm, len(sigmas_post_clipping), len(dao_sources)))
     else:
-        print("Median sigma: %.3f Median FWHM: %.3f Number of sources counted/total found in field: %s/%s" %
-              (med, fwhm, len(sigmas_post_clipping), len(dao_sources)))
+        print("Median sigma: {0} Median FWHM: {1} Number of sources counted/total found in field: {2}/{3}".format('%5.3f'%med, '%2.3f'%fwhm, len(sigmas_post_clipping), len(dao_sources)))
 
     clipped_fwhm_values = [i*2.35482 for i in sigmas_post_clipping]
 
@@ -244,9 +252,9 @@ def find_zero_point(stack, fil, ext, catalog, data_path=None, show_fwhm=False, s
 
     # Calculate the zero point
     if log is not None:
-        log.info("Computing the zero point of the stack %s with filter %s and FWHM of %.3f" % (stack, fil, fwhm))
+        log.info("Computing the zero point of the stack {0} with filter {1} and FWHM of {2}".format(stack, fil, '%2.3f'%fwhm))
     else:
-        print("Computing the zero point of the stack %s with filter %s and FWHM of %.3f" % (stack, fil, fwhm))
+        print("Computing the zero point of the stack {0} with filter {1} and FWHM of {2}".format(stack, fil, '%2.3f'%fwhm))
 
     orig_coords = [w.wcs_world2pix(np.array([[ra_dao[j], dec_dao[j]]], np.float), 1)[0] for j in new_idx]  # DAO pos
 
@@ -291,23 +299,23 @@ def find_zero_point(stack, fil, ext, catalog, data_path=None, show_fwhm=False, s
             third_fwhm_values.append(j)
 
     if log is not None:
-        log.info("Checking if the stack was performed correctly with %s sources" % len(third_cut_coords))  # Final check
+        log.info("Checking if the stack was performed correctly with {0} sources".format(len(third_cut_coords)))  # Final check
     else:
-        print("Checking if the stack was performed correctly with %s sources" % len(third_cut_coords))  # Final check
+        print("Checking if the stack was performed correctly with {0} sources".format(len(third_cut_coords)))  # Final check
 
     d_x_y = 40
     field_sigmas = cutouts_2d_gaussian(stack, third_cut_coords, d_x_y, fwhm, show_cutouts=show_contours)
     field_ratio = np.median(field_sigmas)
     if log is not None:
-        log.info("Median field ratio (y_sigma/x_sigma): %.3f" % field_ratio)
+        log.info("Median field ratio (y_sigma/x_sigma): {0}".format('%2.3f'%field_ratio))
     else:
-        print("Median field ratio (y_sigma/x_sigma): %.3f" % field_ratio)
+        print("Median field ratio (y_sigma/x_sigma): {0}".format('%2.3f'%field_ratio))
 
     if not((1 / 1.2) > field_ratio or 1.2 < field_ratio):
         if log is not None:
-            log.info("Good to go! Now calculating the zero point with %s sources" % len(third_cut_coords))
+            log.info("Good to go! Now calculating the zero point with {0} sources".format(len(third_cut_coords)))
         else:
-            print("Good to go! Now calculating the zero point with %s sources" % len(third_cut_coords))
+            print("Good to go! Now calculating the zero point with {0} sources".format(len(third_cut_coords)))
 
     else:      # Stack is slightly off. Check to see what the issue is
         if log is not None:
@@ -326,9 +334,9 @@ def find_zero_point(stack, fil, ext, catalog, data_path=None, show_fwhm=False, s
 
                 if np.abs((popt[4] / popt[3]) - field_ratio) < 0.01:
                     if log is not None:
-                        log.info('x sigma = %.3f y sigma = %.3f ratio = %.3f' % (popt[3], popt[4], popt[4] / popt[3]))
+                        log.info('x sigma = {0} y sigma = {1} ratio = {2}'.format('%7.3f'%popt[3], '%7.3f'%popt[4], '%7.3f'%(popt[4] / popt[3])))
                     else:
-                        print('x sigma = %.3f y sigma = %.3f ratio = %.3f' % (popt[3], popt[4], popt[4] / popt[3]))
+                        print('x sigma = {0} y sigma = {1} ratio = {2}'.format('%7.3f'%popt[3], '%7.3f'%popt[4], '%7.3f'%(popt[4] / popt[3])))
 
                     fitted_data = twoD_Gaussian((x, y), *popt)
                     contours = np.arange(np.min(d), np.max(d), 30.)
@@ -440,8 +448,10 @@ def find_zero_point(stack, fil, ext, catalog, data_path=None, show_fwhm=False, s
         plt.show()  # Plot of matched sources with annuli, color coded by median background value in annulus
 
     mag_cat = []       # Moving past show_bkg
+    magerr_cat = []
     for i, j in enumerate(final_idx):
         mag_cat.append(cat[i][cat_mag])  # Reference magnitudes of catalog objects
+        magerr_cat.append(cat[i][cat_err])
 
     final_apertures = CircularAperture(final_coords, 2.5 * fwhm)      # Aperture to perform photometry
     # Annuli of DAO sources
@@ -464,15 +474,22 @@ def find_zero_point(stack, fil, ext, catalog, data_path=None, show_fwhm=False, s
     phot_table = aperture_photometry(data, final_apertures, error=error)  # Photometry, error accounted for
     bkg_aper = final_bkg_median * final_apertures.area
 
+    flux = np.asarray(phot_table['aperture_sum'])-bkg_aper
+    fluxerr = np.sqrt(np.asarray(phot_table['aperture_sum_err'])**2 + bkg_aper)
+
+    ap = absphot.absphot()
+    zpt, zpterr = ap.zpt_iteration(flux, fluxerr, mag_cat, magerr_cat)
+    print(zpt, zpterr)
+
     mag_inst = -2.5*np.log10((np.asarray(phot_table['aperture_sum']) - bkg_aper))  # Instrumental magnitudes (and error)
+
+
 
     # Find zero point
     if log is not None:
-        log.info('Calculating zero point from %i stars with sigma clipping and a maximum std error of 0.1.'
-                 % len(mag_inst))
+        log.info('Calculating zero point from {0} stars with sigma clipping and a maximum std error of 0.1.'.format(len(mag_inst)))
     else:
-        print('Calculating zero point from %i stars with sigma clipping and a maximum std error of 0.1.'
-              % len(mag_inst))
+        print('Calculating zero point from {0} stars with sigma clipping and a maximum std error of 0.1.'.format(len(mag_inst)))
 
     for i in np.flip(np.linspace(1, 3, num=10)):
         _, zp, zp_err = sigma_clipped_stats(mag_cat - mag_inst, sigma=i)
@@ -480,9 +497,9 @@ def find_zero_point(stack, fil, ext, catalog, data_path=None, show_fwhm=False, s
             break
 
     if log is not None:
-        log.info('zp = %.3f +/- %.3f.' % (zp, zp_err))
+        log.info('zp = {0} +/- {1}'.format('%2.3f'%zp, '%2.3f'%zp_err))
     else:
-        print('zp = %.3f +/- %.3f.' % (zp, zp_err))
+        print('zp = {0} +/- {1}'.format('%2.3f'%zp, '%2.3f'%zp_err))
 
     # Online zp (vega): https://www.ukirt.hawaii.edu/instruments/wfcam/user_guide/performance.html
     return zp, zp_err, fwhm
