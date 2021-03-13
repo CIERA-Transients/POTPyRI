@@ -11,6 +11,7 @@ import shutil
 import importlib
 import tel_params
 import numpy as np
+import os
 
 # Sort the calibration files:
 def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=None,
@@ -69,6 +70,10 @@ def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=Non
 
     file_list = path+'/file_list.txt'
     file_table = Table(names=('File','Filter','Type','Time'),dtype=('S', 'S', 'S', 'f'))
+    
+    dir_path = path +'BIAS/'
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
 
     for i, f in enumerate(files):
         with fits.open(f) as file_open:
@@ -108,15 +113,25 @@ def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=Non
         elif np.all([hdr[dark_keyword[j]] == dark_files[j] for j in range(len(dark_keyword))]):
             file_type = 'DARK'
             cal_list['DARK'].append(f)
-       # elif np.all([hdr[spec_keyword[j]] == spec_files[j] for j in range(len(spec_keyword))]):
-        #    file_type = 'SPEC'
-         #   shutil.move(f,path+'spec/')
+            #David changes here
+        #elif np.all([hdr[spec_keyword[j]] == spec_files[j] for j in range(len(spec_keyword))]):
+         #   file_type = 'SPEC'
+          #  shutil.move(f,path+'spec/')
         else:
             file_type = 'BAD'
-            shutil.move(f,path+'bad/')
+            #David changes here
+            # check if directory exists or not yet
+            dir_path = path +'BAD/'
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
+            shutil.move(f,dir_path)
+            
         file_table.add_row((target,fil,file_type,file_time))
     file_table.write(file_list,format='ascii',delimiter='\t')
     lists_to_move = [cal_list, sci_list]
+    dir_path = path +'raw/'
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
     for l in lists_to_move:
         for key in l:
             [shutil.move(f,path+'raw/') for f in l]
