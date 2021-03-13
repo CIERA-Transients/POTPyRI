@@ -1,4 +1,4 @@
-#parameter file for MMIRS/MMT
+#parameter file for MOSFIRE/Keck
 
 def static_mask():
     return './staticmasks/MF.staticmask.fits'
@@ -10,7 +10,7 @@ def wcs_extension():
     return 0
 
 def pixscale():
-    return 0.180
+    return 0.1799
 
 def ref_pix():
     # Sorry this ref pix is so crazy.  Haven't figured out how to set this yet.
