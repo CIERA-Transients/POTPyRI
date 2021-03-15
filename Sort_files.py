@@ -69,7 +69,7 @@ def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=Non
     time_list = {}
 
     file_list = path+'/file_list.txt'
-    file_table = Table(names=('File','Filter','Type','Time'),dtype=('S', 'S', 'S', 'float64'))
+    file_table = Table(names=('File','Target','Filter','Type','Time'),dtype=('S','S', 'S', 'S', 'float64'))
 
     for i, f in enumerate(files):
         with fits.open(f) as file_open:
@@ -116,7 +116,7 @@ def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=Non
             file_type = 'BAD'
             shutil.move(f,path+'bad/')
         print(target,fil,file_type,file_time)
-        file_table.add_row((target,fil,file_type,file_time))
+        file_table.add_row((f,target,fil,file_type,file_time))
     file_table.write(file_list,format='ascii',delimiter='\t')
     lists_to_move = [cal_list, sci_list]
     for l in lists_to_move:
@@ -133,8 +133,9 @@ def load_files(file_list):
     time_list = {}
     file_table = Table.read(file_list,format='ascii',delimiter='\t')
     for i in range(len(file_table)):
+        f = file_table['File'][i]
         if file_table['Type'][i] == 'SCIENCE':
-            target = file_table['File'][i]
+            target = file_table['Target'][i]
             fil = file_table['Filter'][i]
             try:
                 sci_list[target+'_'+fil]
