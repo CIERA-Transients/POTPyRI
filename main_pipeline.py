@@ -59,7 +59,7 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None):
 
     wavelength = tel.wavelength()
 
-    log_file_name = red_path+telescope'_log_'+datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')+'.log' #create log file name
+    log_file_name = red_path+telescope+'_log_'+datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')+'.log' #create log file name
     log = logging.getLogger(log_file_name) #create logger
     log.setLevel(logging.INFO) #set level of logger
     formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s") #set format of logger
