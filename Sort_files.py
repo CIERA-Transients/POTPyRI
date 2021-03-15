@@ -126,7 +126,8 @@ def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=Non
 
     return cal_list, sci_list, sky_list, time_list
 
-def load_files(file_list):
+def load_files(file_list, telescope):
+    tel = importlib.import_module('tel_params.'+telescope)
     cal_list = {'BIAS':[],'DARK':[]}
     sci_list = {}
     sky_list = {}
