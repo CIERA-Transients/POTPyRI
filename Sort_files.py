@@ -3,10 +3,11 @@
 "Function to sort files for main_pipeline."
 "Authors: Owen Eskandari, Kerry Paterson"
 
-__version__ = "2.1" #last updated 24/02/2021 by DV
+__version__ = "2.0" #last updated 15/03/2021
 
 from astropy.io import fits
 from astropy.table import Table
+from astropy.time import Time
 import shutil
 import importlib
 import tel_params
@@ -68,7 +69,7 @@ def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=Non
     time_list = {}
 
     file_list = path+'/file_list.txt'
-    file_table = Table(names=('File','Filter','Type','Time'),dtype=('S', 'S', 'S', 'f'))
+    file_table = Table(names=('File','Filter','Type','Time'),dtype=('S', 'S', 'S', 'float64'))
 
     for i, f in enumerate(files):
         with fits.open(f) as file_open:
@@ -87,9 +88,9 @@ def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=Non
                 time_list[target+'_'+fil]
             except KeyError:
                 time_list.update({target+'_'+fil:[]})
-            file_time = tel.time_format(hdr)
+            file_time = Time(tel.time_format(hdr)).mjd
             time_list[target+'_'+fil].append(file_time)
-            if tel.sky():
+            if tel.wavelength() == 'NIR':
                 try:
                     sky_list[fil]
                 except KeyError:
@@ -108,19 +109,20 @@ def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=Non
         elif np.all([hdr[dark_keyword[j]] == dark_files[j] for j in range(len(dark_keyword))]):
             file_type = 'DARK'
             cal_list['DARK'].append(f)
-       # elif np.all([hdr[spec_keyword[j]] == spec_files[j] for j in range(len(spec_keyword))]):
-        #    file_type = 'SPEC'
-         #   shutil.move(f,path+'spec/')
+        elif np.all([hdr[spec_keyword[j]] == spec_files[j] for j in range(len(spec_keyword))]):
+            file_type = 'SPEC'
+            shutil.move(f,path+'spec/')
         else:
             file_type = 'BAD'
             shutil.move(f,path+'bad/')
+        print(target,fil,file_type,file_time)
         file_table.add_row((target,fil,file_type,file_time))
     file_table.write(file_list,format='ascii',delimiter='\t')
     lists_to_move = [cal_list, sci_list]
     for l in lists_to_move:
         for key in l:
-            [shutil.move(f,path+'raw/') for f in l]
-            l[i] = [l[i].replace(path,path+'raw/') for i in l]
+            [shutil.move(f,path+'raw/') for f in l[key]]
+            l[key] = [i.replace(path,path+'raw/') for i in l[key]]
 
     return cal_list, sci_list, sky_list, time_list
 
@@ -131,7 +133,7 @@ def load_files(file_list):
     time_list = {}
     file_table = Table.read(file_list,format='ascii',delimiter='\t')
     for i in range(len(file_table)):
-        if file_table['Type'] == 'SCIENCE':
+        if file_table['Type'][i] == 'SCIENCE':
             target = file_table['File'][i]
             fil = file_table['Filter'][i]
             try:
@@ -143,21 +145,22 @@ def load_files(file_list):
                 time_list[target+'_'+fil]
             except KeyError:
                 time_list.update({target+'_'+fil:[]})
+            file_time = file_table['Time'][i]
             time_list[target+'_'+fil].append(file_time)
-            if tel.sky():
+            if tel.wavelength() == 'NIR':
                 try:
                     sky_list[fil]
                 except KeyError:
                     sky_list.update({fil:[]})
                 sky_list[fil].append(f)
-        elif file_table['Type'] == 'FLAT':
+        elif file_table['Type'][i] == 'FLAT':
             try:
                 cal_list['FLAT_'+fil]
             except KeyError:
                 cal_list.update({'FLAT_'+fil:[]})
             cal_list['FLAT_'+fil].append(f)
-        elif file_table['Type'] == 'BIAS':
+        elif file_table['Type'][i] == 'BIAS':
             cal_list['BIAS'].append(f)
-        elif file_table['Type'] == 'DARK':
+        elif file_table['Type'][i] == 'DARK':
             cal_list['DARK'].append(f)
     return cal_list, sci_list, sky_list, time_list

@@ -35,7 +35,7 @@ def WCS_keywords(): #WCS keywords
     return WAT0_001, WAT1_001, WAT1_002, WAT1_003, WAT1_004, WAT1_005, WAT2_001, WAT2_002, WAT2_003, WAT2_004, WAT2_005
 
 def cal_path():
-    return os.getenv("HOME")+'/Pipelines/MMIRS_calib/'
+    return os.getenv("PIPELINE_HOME")+'/Imaging_pipelines/MMIRS_calib/'
 
 def raw_format():
     return '*.fits'
@@ -62,13 +62,13 @@ def flat_keyword():
     return ['']
 
 def flat_files():
-    return None
+    return [None]
 
 def bias_keyword():
     return ['']
 
 def bias_files():
-    return None
+    return [None]
 
 def dark_keyword():
     return ['OBJECT']
@@ -79,7 +79,7 @@ def dark_files():
 def target_keyword():
     return 'OBJECT'
 
-def fil_keyword():
+def filter_keyword():
     return 'FILTER'
 
 def time_format(hdr):
