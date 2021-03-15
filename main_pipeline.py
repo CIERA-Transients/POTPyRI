@@ -226,6 +226,9 @@ def main():
     params.add_argument('--wcs', type=str, default=None, help='Option to use IRAF to apply WCS.') #must have pyraf install and access to IRAF to use
     params.add_argument('--phot', type=str, default=None, help='Option to use IRAF to perform photometry.') #must have pyraf install and access to IRAF to use
     args = params.parse_args()
+    
+    main_pipeline(args.telescope,args.data_path,args.cal_path,target=args.target,skip_red=args.skip_red)
 
 if __name__ == "__main__":
-    main_pipeline(args.telescope,args.data_path,args.cal_path,target=args.target,skip_red=args.skip_red)
+    main()
+    
