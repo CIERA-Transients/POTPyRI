@@ -207,7 +207,7 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None):
             red_list = [red_path+os.path.basename(sci).replace('.fits','_red.fits') for sci in sci_list[tar]]
             for j,process_data in enumerate(processed):
                 process_data.write(red_list[j],overwrite=True)
-            aligned = align_quads.align_stars(red_list,telescope,hdu=tel.wcs_extension())
+            aligned = CCDData(align_quads.align_stars(red_list,telescope,hdu=tel.wcs_extension()),unit=u.electron/u.second)
             sci_med = ccdproc.combine(aligned,method='median',sigma_clip=True,sigma_clip_func=np.ma.median)
             sci_med.header['RDNOISE'] = sci_med.header['RDNOISE']/len(aligned)
             sci_med.header['NFILES'] = len(aligned)
