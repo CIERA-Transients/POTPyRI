@@ -106,6 +106,8 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None):
             log.critical('No darks present, check data before rerunning.')
             logging.shutdown()
             sys.exit(-1)
+    else:
+        mdark = None
     
     if tel.bias():
         if len(cal_list['BIAS']) != 0:
@@ -130,6 +132,8 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None):
             log.critical('No bias present, check data before rerunning.')
             logging.shutdown()
             sys.exit(-1)
+    else:
+        mbias = None
 
     if tel.flat():
             for cal in cal_list:
