@@ -182,8 +182,8 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None):
              
             #DELETE THESE LINES. JUst used for troubleshooting. 
             print('Here')
-            print(cal_path)
             print(master_flat)
+            ####
             
             if not os.path.exists(master_flat):
                 log.error('No master flat present for filter '+fil+', skipping data reduction for '+tar+'. Check data before rerunning')
@@ -192,21 +192,21 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None):
             processed, masks = tel.process_science(sci_list[tar],fil,cal_path,mdark=mdark,mbias=mbias,mflat=flat_data)
             if wavelength=='NIR':
                 for j,n in enumerate(processed):
-                    time_diff = sorted([(abs(time_list[tar][j]-n2),k) for k,n2 in enumerate(time_list[target])])
+                    time_diff = sorted([(abs(time_list[tar][j]-n2),k) for k,n2 in enumerate(time_list[tar])])
                     sky_list = [time_list[tar][k] for _,k in time_diff[1:10]]
                     sky_data = [processed[k] for _,k in time_diff[1:10]]
                     sky_mask = [masks[k] for _,k in time_diff[1:10]]
                     sky_hdu = fits.PrimaryHDU()
                     sky_hdu.header['FILE'] = (time_list[tar][j], 'NIR sky flat for file.')
                     for k,m in enumerate(sky_list):
-                        sky_hdu.header['FILE'+str(k+1)] = (os.path.basename(m), 'Name of file used in creation of sky.')
+                        sky_hdu.header['FILE'+str(k+1)] = (os.path.basename(str(m)), 'Name of file used in creation of sky.')
                     sky = ccdproc.combine(sky_data,method='median',sigma_clip=True,sigma_clip_func=np.ma.median,mask=sky_mask)
                     sky.header = sky_hdu.header
-                    sky.write(red_path+os.path.basename(time_list[tar][j]).replace('.fits','_sky.fits'),overwrite=True)
+                    sky.write(red_path+os.path.basename(sci_list[tar][j]).replace('.fits','_sky.fits'),overwrite=True)
                     processed[j] = n.subtract(sky,propagate_uncertainties=True,handle_meta='first_found')
-            for process_data in processed:
-                process_data.write(red_path+os.path.basename(sci_list[tar][j]).replace('.fits','_red.fits'),overwrite=True)
-            red_list = [sci.replace('.fits','_red.fits') for sci in sci_list[tar]]
+            red_list = [red_path+os.path.basename(sci).replace('.fits','_red.fits') for sci in sci_list[tar]]
+            for j,process_data in enumerate(processed):
+                process_data.write(red_list[j],overwrite=True)
             aligned = align_quads.align_stars(red_list,telescope,hdu=tel.wcs_extension())
             sci_med = ccdproc.combine(aligned,method='median',sigma_clip=True,sigma_clip_func=np.ma.median)
             sci_med.header['RDNOISE'] = sci_med.header['RDNOISE']/len(aligned)
