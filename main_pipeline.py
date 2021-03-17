@@ -72,8 +72,9 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None):
     log.addHandler(streamhandler) #link logger to log stream
 
     if os.path.exists(data_path+'/file_list.txt'):
-        cal_list, sci_list, sky_list, time_list = Sort_files.load_files(data_path+'/file_list.txt')
+        cal_list, sci_list, sky_list, time_list = Sort_files.load_files( data_path+'/file_list.txt', telescope)
     else:
+        print(data_path+tel.raw_format())
         files = glob.glob(data_path+tel.raw_format())
         if len(files) != 0:
             cal_list, sci_list, sky_list, time_list = Sort_files.sort_files(files,telescope,data_path)
@@ -163,7 +164,7 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None):
         log.critical('No science files to process, check data before rerunning.')
         logging.shutdown()
         sys.exit(-1)     
-    log.info('User specified a target for reduction: '+target)
+    log.info('User specified a target for reduction: '+str(target))
     for tar in sci_list:
         target = tar.split('_')[0]
         fil = tar.split('_')[-1]
@@ -183,8 +184,13 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None):
             else:
                 log.error('No reduced image found, processing data.')        
         if process_data:             
-            fil = target.split('_')[-1]
-            master_flat = tel.flat_name(fil)
+            master_flat = tel.flat_name(cal_path, fil)
+           
+            #DELETE THESE LINES. JUst used for troubleshooting. 
+            print('Here')
+            print(cal_path)
+            print(master_flat)
+            
             if not os.path.exists(master_flat):
                 log.error('No master flat present for filter '+fil+', skipping data reduction for '+tar+'. Check data before rerunning')
                 continue
