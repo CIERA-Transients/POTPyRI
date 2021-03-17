@@ -103,14 +103,9 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None):
                 mdark = ccdproc.combine(processed,method='median')
                 mdark.write(red_path+'mdark.fits',overwrite=True)
         else:
-            con = input('No darks present. Continue without dark subtraction? (True or False) ')
-            if con == 'True':
-                log.error('No darks present, continuing without dark subtraction.')
-                mdark = None
-            else:
-                log.critical('No darks present, check data before rerunning.')
-                logging.shutdown()
-                sys.exit(-1)
+            log.critical('No darks present, check data before rerunning.')
+            logging.shutdown()
+            sys.exit(-1)
     
     if tel.bias():
         if len(cal_list['BIAS']) != 0:
@@ -132,14 +127,9 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None):
                 mbias = ccdproc.combine(processed,method='median')
                 mbias.write(red_path+'mdark.fits',overwrite=True)
         else:
-            con = input('No bias present. Continue without bias subtraction? (True or False) ')
-            if con == 'True':
-                log.error('No bias present, continuing without bias subtraction.')
-                mbias = None
-            else:
-                log.critical('No bias present, check data before rerunning.')
-                logging.shutdown()
-                sys.exit(-1)
+            log.critical('No bias present, check data before rerunning.')
+            logging.shutdown()
+            sys.exit(-1)
 
     if tel.flat():
             for cal in cal_list:
@@ -185,7 +175,7 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None):
                 log.error('No reduced image found, processing data.')        
         if process_data:             
             master_flat = tel.flat_name(cal_path, fil)
-           
+             
             #DELETE THESE LINES. JUst used for troubleshooting. 
             print('Here')
             print(cal_path)
@@ -195,7 +185,7 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None):
                 log.error('No master flat present for filter '+fil+', skipping data reduction for '+tar+'. Check data before rerunning')
                 continue
             flat_data = tel.load_flat(master_flat)
-            processed, masks = tel.process_science(sci_list[tar])
+            processed, masks = tel.process_science(sci_list[tar],fil,cal_path,mdark=mdark,mbias=mbias,mflat=flat_data)
             if wavelength=='NIR':
                 for j,n in enumerate(processed):
                     time_diff = sorted([(abs(time_list[tar][j]-n2),k) for k,n2 in enumerate(time_list[target])])

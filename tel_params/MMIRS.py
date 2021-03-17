@@ -107,7 +107,7 @@ def load_flat(flat):
 def create_flat(flat_list):
     return None
 
-def process_science(sci_list):
+def process_science(sci_list,fil,cal_path,mdark=None,mbias=None,mflat=None):
     masks = []
     processed = []
     for sci in sci_list:
