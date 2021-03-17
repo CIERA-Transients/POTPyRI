@@ -20,7 +20,7 @@ from astropy.io import fits, ascii
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
 from astropy.utils.exceptions import AstropyWarning, AstropyDeprecationWarning
-from astroquery.irsa import Irsa
+from astroquery.gaia import Gaia
 from scipy.optimize import curve_fit
 from scipy import stats
 import itertools
@@ -260,11 +260,12 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
     #make quads using brightest stars
     ind = list(itertools.combinations(np.arange(4), 2))
     stars, d, ds, ratios = make_quads(table['XWIN_IMAGE'],
-        table['YWIN_IMAGE'], use=len(table))
+        table['YWIN_IMAGE'], use=50)
 
     #query gaia
-    gaiaorig = Irsa.query_region(SkyCoord(ra*u.deg, dec*u.deg,frame='icrs'),
-        catalog='gaia_dr2_source', spatial='Cone',radius=10*u.arcmin)
+    Gaia.ROW_LIMIT = -1
+    job = Gaia.cone_search_async(SkyCoord(ra*u.deg, dec*u.deg,frame='icrs'),10*u.arcmin,table_name='gaiaedr3.gaia_source')
+    gaiaorig = job.get_results()
     gaiaorig.sort('phot_g_mean_mag')
 
     # Mask catalog so all data are inside nominal image
@@ -272,9 +273,9 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
     gaia = gaiaorig[mask]
 
     #make quads using stars brigher than 19 mag
-    gaia = gaia[gaia['phot_g_mean_mag']<19]
+    gaia = gaia[gaia['phot_g_mean_mag']<20]
     gaiastars, gaiad, gaiads, gaiaratios = make_quads(gaia['ra'], gaia['dec'],
-        use=len(gaia), sky_coords=True)
+        use=50, sky_coords=True)
 
     #match quads
     starsx, starsy, gaiastarsra, gaiastarsdec = match_quads(stars,gaiastars,d,gaiad,
