@@ -4,6 +4,12 @@ import datetime
 import numpy as np
 from photutils import make_source_mask, Background2D, MedianBackground
 from astropy.stats import SigmaClip
+from astropy.io import fits
+from astropy.nddata import CCDData
+import astropy.units.astrophys as u
+import ccdproc
+from astropy.modeling import models
+
 
 def static_mask():
     return './staticmasks/MMIRS.staticmask.fits'
@@ -35,7 +41,7 @@ def WCS_keywords(): #WCS keywords
     return WAT0_001, WAT1_001, WAT1_002, WAT1_003, WAT1_004, WAT1_005, WAT2_001, WAT2_002, WAT2_003, WAT2_004, WAT2_005
 
 def cal_path():
-    return os.getenv("PIPELINE_HOME")+'/Imaging_pipelines/MMIRS_calib/'
+    return str(os.getenv("PIPELINE_HOME"))+'/Imaging_pipelines/MMIRS_calib/'
 
 def raw_format():
     return '*.fits'
