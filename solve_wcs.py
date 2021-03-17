@@ -213,7 +213,7 @@ def match_quads(stars,gaiastars,d,gaiad,ds,gaiads,ratios,gaiaratios,sky_coords=T
                 gaia_d = np.array([[gaia_coords[ind[i][0]].separation(gaia_coords[ind[i][1]]).arcsec for i in range(6)]])
                 ratio_quads.append(np.sum(np.abs(((gaia_d/star_d)/tel.pixscale())-1)))
             else:
-                gaia_d = [np.hypot(gaiam[k][m_ind[i][0]][0]-stars[k][m_ind[i][1]][0], gaiam[k][m_ind[i][0]][1]-stars[k][m_ind[i][1]][1]) for i in range(6)]
+                gaia_d = [np.hypot(gaiam[k][gaia_ind[i][0]][0]-stars[k][gaia_ind[i][1]][0], gaiam[k][gaia_ind[i][0]][1]-stars[k][gaia_ind[i][1]][1]) for i in range(6)]
                 ratio_quads.append(np.sum(np.abs((gaia_d/star_d)-1)))
         starsx.append([starsm[k][i][0] for i in range(4)])
         starsy.append([starsm[k][i][1] for i in range(4)])
