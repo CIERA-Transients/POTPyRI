@@ -6,7 +6,7 @@ from photutils import make_source_mask, Background2D, MedianBackground
 from astropy.stats import SigmaClip
 from astropy.io import fits
 from astropy.nddata import CCDData
-import astropy.units.astrophys as u
+import astropy.units as u
 import ccdproc
 from astropy.modeling import models
 
