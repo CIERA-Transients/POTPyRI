@@ -12,6 +12,8 @@ from astropy.nddata import CCDData
 import importlib
 import solve_wcs
 import tel_params
+from solve_wcs import match_quads
+import astropy.units as u
 
 def align_stars(images,telescope,hdu=0):
     """
