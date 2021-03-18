@@ -7,6 +7,7 @@ __version__ = "2.0" #last updated 15/03/2021
 
 from astropy.io import fits
 from astropy.table import Table
+import os
 import shutil
 import importlib
 import tel_params
@@ -78,49 +79,54 @@ def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=Non
         file_time = None
         if np.all([hdr[science_keyword[j]] == science_files[j] for j in range(len(science_keyword))]):
             file_type = 'SCIENCE'
+            moved_path = path+'raw/'
+            shutil.move(f,moved_path)
             try:
                 sci_list[target+'_'+fil]
             except KeyError:
                 sci_list.update({target+'_'+fil:[]})
-            sci_list[target+'_'+fil].append(f)
+            sci_list[target+'_'+fil].append(f.replace(path,moved_path))
             try:
                 time_list[target+'_'+fil]
             except KeyError:
                 time_list.update({target+'_'+fil:[]})
-            time_list[target+'_'+fil].append(tel.time_format(hdr))
+            file_time = tel.time_format(hdr)
+            time_list[target+'_'+fil].append(file_time)
             if tel.wavelength() == 'NIR':
                 try:
                     sky_list[fil]
                 except KeyError:
                     sky_list.update({fil:[]})
-                sky_list[fil].append(f)
+                sky_list[fil].append(f.replace(path,moved_path))
         elif np.all([hdr[flat_keyword[j]] == flat_files[j] for j in range(len(flat_keyword))]):
             file_type = 'FLAT'
+            moved_path = path+'raw/' 
+            shutil.move(f,moved_path)
             try:
                 cal_list['FLAT_'+fil]
             except KeyError:
-                cal_list.update({'FLAT_'+fil:[]})
-            cal_list['FLAT_'+fil].append(f)          
+                cal_list.update({'FLAT_'+fil:[]}) 
+            cal_list['FLAT_'+fil].append(f.replace(path,moved_path))   
         elif np.all([hdr[bias_keyword[j]] == bias_files[j] for j in range(len(bias_keyword))]):
             file_type = 'BIAS'
-            cal_list['BIAS'].append(f)
+            moved_path = path+'raw/'
+            shutil.move(f,moved_path)
+            cal_list['BIAS'].append(f.replace(path,moved_path))
         elif np.all([hdr[dark_keyword[j]] == dark_files[j] for j in range(len(dark_keyword))]):
             file_type = 'DARK'
-            cal_list['DARK'].append(f)
+            moved_path = path+'raw/'
+            shutil.move(f,moved_path)
+            cal_list['DARK'].append(f.replace(path,moved_path))
         elif np.all([hdr[spec_keyword[j]] == spec_files[j] for j in range(len(spec_keyword))]):
             file_type = 'SPEC'
-            shutil.move(f,path+'spec/')
+            moved_path = path+'spec/'
+            shutil.move(f,moved_path)
         else:
             file_type = 'BAD'
-            shutil.move(f,path+'bad/')
-        print(target,fil,file_type,file_time)
-        file_table.add_row((f,target,fil,file_type,file_time))
+            moved_path = path+'bad/'
+            shutil.move(f,moved_path)
+        file_table.add_row((moved_path+os.path.basename(f),target,fil,file_type,file_time))
     file_table.write(file_list,format='ascii',delimiter='\t')
-    lists_to_move = [cal_list, sci_list]
-    for l in lists_to_move:
-        for key in l:
-            [shutil.move(f,path+'raw/') for f in l[key]]
-            l[key] = [i.replace(path,path+'raw/') for i in l[key]]
 
     return cal_list, sci_list, sky_list, time_list
 
