@@ -7,7 +7,6 @@ __version__ = "2.0" #last updated 15/03/2021
 
 from astropy.io import fits
 from astropy.table import Table
-from astropy.time import Time
 import shutil
 import importlib
 import tel_params
@@ -88,8 +87,7 @@ def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=Non
                 time_list[target+'_'+fil]
             except KeyError:
                 time_list.update({target+'_'+fil:[]})
-            file_time = Time(tel.time_format(hdr)).mjd
-            time_list[target+'_'+fil].append(file_time)
+            time_list[target+'_'+fil].append(tel.time_format(hdr))
             if tel.wavelength() == 'NIR':
                 try:
                     sky_list[fil]
