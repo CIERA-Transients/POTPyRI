@@ -3,17 +3,17 @@
 "Function to pixel align a list of images using quads."
 "Author: Kerry Paterson"
 
-__version__ = "1.2" #last updated 11/02/2021
+__version__ = "1.2" #last updated 18/03/2021
 
 import numpy as np
 from astropy.io import fits
 from skimage import transform as tf
 from astropy.nddata import CCDData
+import astropy.units.astrophys as u
+import astropy.units as u
 import importlib
 import solve_wcs
 import tel_params
-from solve_wcs import match_quads
-import astropy.units as u
 
 def align_stars(images,telescope,hdu=0):
     """
@@ -65,7 +65,7 @@ def align_stars(images,telescope,hdu=0):
     shift_x = []
     shift_y = []
     for i in range(len(stars_list)-1):
-        starsx1, starsy1, starsx2, starsy2 = match_quads(stars_list[0],stars_list[i+1],
+        starsx1, starsy1, starsx2, starsy2 = solve_wcs.match_quads(stars_list[0],stars_list[i+1],
                 d_list[0],d_list[i+1],ds_list[0],ds_list[i+1],ratios_list[0],ratios_list[i+1],sky_coords=False)
         shift_x.append(np.median([np.array(starsx1[j])-np.array(starsx2[j]) for j in range(len(starsx1))]))
         shift_y.append(np.median([np.array(starsy1[j])-np.array(starsy2[j]) for j in range(len(starsy1))]))
