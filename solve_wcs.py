@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "2.7" #last updated 18/02/2021
+__version__ = "2.8" #last updated 18/03/2021
 
 import sys
 import numpy as np
@@ -213,7 +213,7 @@ def match_quads(stars,gaiastars,d,gaiad,ds,gaiads,ratios,gaiaratios,sky_coords=T
                 gaia_d = np.array([[gaia_coords[ind[i][0]].separation(gaia_coords[ind[i][1]]).arcsec for i in range(6)]])
                 ratio_quads.append(np.sum(np.abs(((gaia_d/star_d)/tel.pixscale())-1)))
             else:
-                gaia_d = [np.hypot(gaiam[k][gaia_ind[i][0]][0]-stars[k][gaia_ind[i][1]][0], gaiam[k][gaia_ind[i][0]][1]-stars[k][gaia_ind[i][1]][1]) for i in range(6)]
+                gaia_d = [np.hypot(gaiam[k][gaia_ind[i][0]][0]-starsm[k][gaia_ind[i][1]][0], gaiam[k][gaia_ind[i][0]][1]-starsm[k][gaia_ind[i][1]][1]) for i in range(6)]
                 ratio_quads.append(np.sum(np.abs((gaia_d/star_d)-1)))
         starsx.append([starsm[k][i][0] for i in range(4)])
         starsy.append([starsm[k][i][1] for i in range(4)])
@@ -224,7 +224,7 @@ def match_quads(stars,gaiastars,d,gaiad,ds,gaiads,ratios,gaiaratios,sky_coords=T
     gaiastarsra_unq = list(dict.fromkeys(np.concatenate(gaiastarsra)))
     gaiastarsdec_unq = list(dict.fromkeys(np.concatenate(gaiastarsdec)))
 
-    return np.array(starsx_unq), np.array(starsy_unq), np.array(gaiastarsra_unq), np.array(gaiastarsdec_unq)
+    return np.array(starsx_unq[0:len(gaiastarsra_unq)]), np.array(starsy_unq[0:len(gaiastarsdec_unq)]), np.array(gaiastarsra_unq[0:len(starsx_unq)]), np.array(gaiastarsdec_unq[0:len(starsy_unq)])
 
 #main function to calculate astrometric solution
 def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
