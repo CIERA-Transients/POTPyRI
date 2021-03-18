@@ -7,7 +7,7 @@ from astropy.stats import SigmaClip
 from astropy.io import fits
 from astropy.time import Time
 from astropy.nddata import CCDData
-import astropy.units.astrophys as u
+import astropy.units as u
 import ccdproc
 from astropy.modeling import models
 
