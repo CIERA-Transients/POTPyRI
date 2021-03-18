@@ -5,6 +5,7 @@ import numpy as np
 from photutils import make_source_mask, Background2D, MedianBackground
 from astropy.stats import SigmaClip
 from astropy.io import fits
+from astropy.time import Time
 from astropy.nddata import CCDData
 import astropy.units.astrophys as u
 import ccdproc
@@ -89,7 +90,7 @@ def filter_keyword():
     return 'FILTER'
 
 def time_format(hdr):
-    return datetime.datetime.strptime(hdr['DATE-OBS'],'%Y-%m-%dT%H:%M:%S')
+    return Time(hdr['DATE-OBS']).mjd
 
 def wavelength():
     return 'NIR'
