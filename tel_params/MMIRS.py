@@ -3,7 +3,7 @@ import os
 import datetime
 import numpy as np
 from photutils import make_source_mask, Background2D, MedianBackground
-from astropy.stats import SigmaClip
+from astropy.stats import SigmaClip, sigma_clipped_stats
 from astropy.io import fits
 from astropy.time import Time
 from astropy.nddata import CCDData
