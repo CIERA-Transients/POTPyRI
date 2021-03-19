@@ -123,6 +123,6 @@ def process_science(sci_list,fil,cal_path,mdark=None,mbias=None,mflat=None):
         m = np.ma.masked_greater(processed_data,median+3*std)
         masks.append(m.mask)
         bkg_estimator = MedianBackground()
-        bkg = Background2D(processed_data, (30, 30), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=bkg_estimator, mask=mask, exclude_percentile=80)
+        bkg = Background2D(processed_data, (30, 30), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=bkg_estimator, mask=m.mask, exclude_percentile=80)
         processed.append(processed_data.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found').divide(red.header['EXPTIME']*u.second,propagate_uncertainties=True,handle_meta='first_found'))
     return processed, masks
