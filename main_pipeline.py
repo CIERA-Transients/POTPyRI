@@ -22,12 +22,14 @@ import glob
 import argparse
 import logging
 from astropy.nddata import CCDData
+from photutils import make_source_mask, Background2D, MedianBackground
+from astropy.stats import SigmaClip
 import importlib
 import Sort_files
 import align_quads
 import solve_wcs
 
-def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None):
+def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,proc=None):
     #start time
     t_start = time.time()
     #import telescope parameter file
@@ -74,39 +76,13 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None):
     if os.path.exists(data_path+'/file_list.txt'):
         cal_list, sci_list, sky_list, time_list = Sort_files.load_files(data_path+'/file_list.txt', telescope)
     else:
-        files = glob.glob(data_path+tel.raw_format())
+        files = sorted(glob.glob(data_path+tel.raw_format()))
         if len(files) != 0:
             cal_list, sci_list, sky_list, time_list = Sort_files.sort_files(files,telescope,data_path)
         else:
             log.critical('No files found, please check data path and rerun.')
             logging.shutdown()
             sys.exit(-1)
-
-    if tel.dark():
-        if len(cal_list['DARK']) != 0:
-            process_dark = True
-            if skip_red == 'True' or skip_red == 'yes':
-                if os.path.exists(red_path+'mdark.fits'):
-                    mdark = CCDData.read(red_path+'mdark.fits', unit=u.electron)
-                    process_dark = False
-                else:
-                    log.error('No master dark found, creating master dark.')
-            if process_dark:
-                processed = []
-                for dark in cal_list['DARK']:
-                    try:
-                        raw = CCDData.read(dark, hdu=1, unit='adu')
-                    except astropy.io.registry.IORegistryError:
-                        log.error('File '+dark+' not recognized.')
-                    processed.append(ccdproc.ccd_process(raw, gain=raw.header['GAIN']*u.electron/u.adu, readnoise=raw.header['RDNOISE']*u.electron))
-                mdark = ccdproc.combine(processed,method='median')
-                mdark.write(red_path+'mdark.fits',overwrite=True)
-        else:
-            log.critical('No darks present, check data before rerunning.')
-            logging.shutdown()
-            sys.exit(-1)
-    else:
-        mdark = None
     
     if tel.bias():
         if len(cal_list['BIAS']) != 0:
@@ -133,6 +109,32 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None):
             sys.exit(-1)
     else:
         mbias = None
+
+    if tel.dark():
+        if len(cal_list['DARK']) != 0:
+            process_dark = True
+            if skip_red == 'True' or skip_red == 'yes':
+                if os.path.exists(red_path+'mdark.fits'):
+                    mdark = CCDData.read(red_path+'mdark.fits', unit=u.electron)
+                    process_dark = False
+                else:
+                    log.error('No master dark found, creating master dark.')
+            if process_dark:
+                processed = []
+                for dark in cal_list['DARK']:
+                    try:
+                        raw = CCDData.read(dark, hdu=1, unit='adu')
+                    except astropy.io.registry.IORegistryError:
+                        log.error('File '+dark+' not recognized.')
+                    processed.append(ccdproc.ccd_process(raw, gain=raw.header['GAIN']*u.electron/u.adu, readnoise=raw.header['RDNOISE']*u.electron, master_bias=mbias))
+                mdark = ccdproc.combine(processed,method='median')
+                mdark.write(red_path+'mdark.fits',overwrite=True)
+        else:
+            log.critical('No darks present, check data before rerunning.')
+            logging.shutdown()
+            sys.exit(-1)
+    else:
+        mdark = None
 
     if tel.flat():
             for cal in cal_list:
@@ -186,11 +188,11 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None):
             if wavelength=='NIR':
                 for j,n in enumerate(processed):
                     time_diff = sorted([(abs(time_list[tar][j]-n2),k) for k,n2 in enumerate(time_list[tar])])
-                    sky_list = [time_list[tar][k] for _,k in time_diff[1:10]]
+                    sky_list = [sci_list[tar][k] for _,k in time_diff[1:10]]
                     sky_data = [processed[k] for _,k in time_diff[1:10]]
                     sky_mask = [masks[k] for _,k in time_diff[1:10]]
                     sky_hdu = fits.PrimaryHDU()
-                    sky_hdu.header['FILE'] = (time_list[tar][j], 'NIR sky flat for file.')
+                    sky_hdu.header['FILE'] = (sci_list[tar][j], 'NIR sky flat for file.')
                     for k,m in enumerate(sky_list):
                         sky_hdu.header['FILE'+str(k+1)] = (os.path.basename(str(m)), 'Name of file used in creation of sky.')
                     sky = ccdproc.combine(sky_data,method='median',sigma_clip=True,sigma_clip_func=np.ma.median,mask=sky_mask)
