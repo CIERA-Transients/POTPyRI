@@ -122,6 +122,5 @@ def process_science(sci_list,fil,cal_path,mdark=None,mbias=None,mflat=None):
         mask = make_source_mask(processed_data, nsigma=3, npixels=5)
         masks.append(mask)
         bkg = Background2D(processed_data, (120, 120), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MedianBackground(), mask=mask, exclude_percentile=80)
-        fits.writeto('/Users/kerry/Downloads/mtest/red/'+os.path.basename(sci).replace('.fits','_bkg.fits'),bkg.background,overwrite=True)
         processed.append(processed_data.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found').divide(red.header['EXPTIME']*u.second,propagate_uncertainties=True,handle_meta='first_found'))
     return processed, masks
