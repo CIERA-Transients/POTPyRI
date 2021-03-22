@@ -3,7 +3,7 @@ import os
 import datetime
 import numpy as np
 from photutils import make_source_mask, Background2D, MedianBackground
-from astropy.stats import SigmaClip, sigma_clipped_stats
+from astropy.stats import SigmaClip
 from astropy.io import fits
 from astropy.time import Time
 from astropy.nddata import CCDData
@@ -119,10 +119,9 @@ def process_science(sci_list,fil,cal_path,mdark=None,mbias=None,mflat=None):
         red = ccdproc.subtract_dark(red, mdark, exposure_time='EXPTIME', exposure_unit=u.second)
         red = ccdproc.flat_correct(red, mflat)
         processed_data = ccdproc.ccd_process(red, trim=raw.header['DATASEC'])
-        _, median, std = sigma_clipped_stats(processed_data, sigma=3.0) 
-        m = np.ma.masked_greater(processed_data,median+3*std)
-        masks.append(m.mask)
-        bkg_estimator = MedianBackground()
-        bkg = Background2D(processed_data, (30, 30), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=bkg_estimator, mask=m.mask, exclude_percentile=80)
+        mask = make_source_mask(processed_data, nsigma=3, npixels=5)
+        masks.append(mask)
+        bkg = Background2D(processed_data, (120, 120), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MedianBackground(), mask=mask, exclude_percentile=80)
+        fits.writeto('/Users/kerry/Downloads/mtest/red/'+os.path.basename(sci).replace('.fits','_bkg.fits'),bkg.background,overwrite=True)
         processed.append(processed_data.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found').divide(red.header['EXPTIME']*u.second,propagate_uncertainties=True,handle_meta='first_found'))
     return processed, masks
