@@ -22,7 +22,7 @@ import glob
 import argparse
 import logging
 from astropy.nddata import CCDData
-from photutils import make_source_mask, Background2D, MedianBackground
+from photutils import Background2D, MeanBackground
 from astropy.stats import SigmaClip
 import importlib
 import Sort_files
@@ -184,29 +184,41 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
                 log.error('No master flat present for filter '+fil+', skipping data reduction for '+tar+'. Check data before rerunning')
                 continue
             flat_data = tel.load_flat(master_flat)
+            log.info('Processing data for '+str(target))
             processed, masks = tel.process_science(sci_list[tar],fil,cal_path,mdark=mdark,mbias=mbias,mflat=flat_data)
+            log.info('Data processed.')
             if wavelength=='NIR':
+                log.info('NIR data, creating NIR sky maps.')
                 for j,n in enumerate(processed):
                     time_diff = sorted([(abs(time_list[tar][j]-n2),k) for k,n2 in enumerate(time_list[tar])])
-                    sky_list = [sci_list[tar][k] for _,k in time_diff[1:10]]
-                    sky_data = [processed[k] for _,k in time_diff[1:10]]
-                    sky_mask = [masks[k] for _,k in time_diff[1:10]]
+                    sky_list = [sci_list[tar][k] for _,k in time_diff[0:5]]
+                    sky_data = [processed[k] for _,k in time_diff[0:5]]
+                    sky_mask = [masks[k] for _,k in time_diff[0:5]]
+                    sky_masked_data = []
+                    for k in range(5): 
+                        bkg = Background2D(sky_data[k], (20, 20), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=sky_mask[k], exclude_percentile=80)
+                        masked = np.array(sky_data[k])
+                        masked[sky_mask[k]] = bkg.background[sky_mask[k]]
+                        sky_masked_data.append(CCDData(masked,unit=u.electron/u.second))
                     sky_hdu = fits.PrimaryHDU()
-                    sky_hdu.header['FILE'] = (sci_list[tar][j], 'NIR sky flat for file.')
+                    sky_hdu.header['FILE'] = (os.path.basename(sci_list[tar][j]), 'NIR sky flat for file.')
                     for k,m in enumerate(sky_list):
                         sky_hdu.header['FILE'+str(k+1)] = (os.path.basename(str(m)), 'Name of file used in creation of sky.')
-                    sky = ccdproc.combine(sky_data,method='median',sigma_clip=True,sigma_clip_func=np.ma.median,mask=sky_mask)
+                    sky = ccdproc.combine(sky_masked_data,method='median',sigma_clip=True,sigma_clip_func=np.ma.median,mask=sky_mask)
                     sky.header = sky_hdu.header
                     sky.write(red_path+os.path.basename(sci_list[tar][j]).replace('.fits','_sky.fits'),overwrite=True)
                     processed[j] = n.subtract(sky,propagate_uncertainties=True,handle_meta='first_found')
             red_list = [red_path+os.path.basename(sci).replace('.fits','_red.fits') for sci in sci_list[tar]]
             for j,process_data in enumerate(processed):
                 process_data.write(red_list[j],overwrite=True)
+            log.info('Aligning images.')
             aligned = align_quads.align_stars(red_list,telescope,hdu=tel.wcs_extension())
+            log.info('Images aligned, creating median stack.')
             sci_med = ccdproc.combine(aligned,method='median',sigma_clip=True,sigma_clip_func=np.ma.median)
             sci_med.header['RDNOISE'] = sci_med.header['RDNOISE']/len(aligned)
             sci_med.header['NFILES'] = len(aligned)
             sci_med.write(red_path+tar+'.fits',overwrite=True)
+            log.info('Median stack made for '+str(target))
 
 
 def main():
