@@ -75,10 +75,12 @@ def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=Non
         with fits.open(f) as file_open:
             try:
                 hdr = file_open[ext].header
-            except:
+            except IndexError:
                 file_type = 'BAD'
                 moved_path = path+'bad/'
                 shutil.move(f,moved_path)
+                file_table.add_row((moved_path+os.path.basename(f),target,fil,file_type,file_time))
+                continue
         target = hdr[target_keyword].replace(' ','')
         fil = hdr[fil_keyword].replace(' ','').split('_')[0]
         file_time = None
