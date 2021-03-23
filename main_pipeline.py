@@ -76,7 +76,7 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
     if os.path.exists(data_path+'/file_list.txt'):
         cal_list, sci_list, sky_list, time_list = Sort_files.load_files(data_path+'/file_list.txt', telescope)
     else:
-        files = sorted(glob.glob(data_path+tel.raw_format()))
+        files = sorted(glob.glob(data_path+tel.raw_format(proc)))
         if len(files) != 0:
             cal_list, sci_list, sky_list, time_list = Sort_files.sort_files(files,telescope,data_path)
         else:
@@ -161,6 +161,7 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
         sys.exit(-1)     
     log.info('User specified a target for reduction: '+str(target))
     for tar in sci_list:
+        stack = tel.stacked_image(tar,red_path)
         target = tar.split('_')[0]
         fil = tar.split('_')[-1]
         if target is not None:
@@ -170,21 +171,21 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
                 log.info('Matching target found: '+tar)
         process_data = True
         if skip_red == 'True' or skip_red == 'yes':
-            if os.path.exists(red_path+tar+'.fits'):
-                with fits.open(red_path+tar+'.fits',mode='update') as hdr:
-                    sci_med = hdr[0].data
-                    wcs_object = wcs.WCS(hdr[0].header)
-                processed = [x.replace(sci_path,red_path).replace('.fits','.fits') for x in sci_list[tar]]
+            if np.all([os.path.exists(st) for st in stack]):
+                # with fits.open(red_path+tar+'.fits',mode='update') as hdr:
+                #     sci_med = hdr[0].data
+                #     wcs_object = wcs.WCS(hdr[0].header)
+                # processed = [x.replace(sci_path,red_path).replace('.fits','_red.fits') for x in sci_list[tar]]
                 process_data = False
             else:
-                log.error('No reduced image found, processing data.')        
+                log.error('No reduced image found, processing data.')      
         if process_data:             
             master_flat = tel.flat_name(cal_path, fil)
-            if not os.path.exists(master_flat):
+            if not np.all([os.path.exists(mf) for mf in master_flat]):
                 log.error('No master flat present for filter '+fil+', skipping data reduction for '+tar+'. Check data before rerunning')
                 continue
             flat_data = tel.load_flat(master_flat)
-            log.info('Processing data for '+str(target))
+            log.info('Processing data for '+str(tar))
             processed, masks = tel.process_science(sci_list[tar],fil,cal_path,mdark=mdark,mbias=mbias,mflat=flat_data)
             log.info('Data processed.')
             if wavelength=='NIR':
@@ -208,17 +209,34 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
                     sky.header = sky_hdu.header
                     sky.write(red_path+os.path.basename(sci_list[tar][j]).replace('.fits','_sky.fits'),overwrite=True)
                     processed[j] = n.subtract(sky,propagate_uncertainties=True,handle_meta='first_found')
-            red_list = [red_path+os.path.basename(sci).replace('.fits','_red.fits') for sci in sci_list[tar]]
-            for j,process_data in enumerate(processed):
-                process_data.write(red_list[j],overwrite=True)
-            log.info('Aligning images.')
-            aligned = align_quads.align_stars(red_list,telescope,hdu=tel.wcs_extension())
-            log.info('Images aligned, creating median stack.')
-            sci_med = ccdproc.combine(aligned,method='median',sigma_clip=True,sigma_clip_func=np.ma.median)
-            sci_med.header['RDNOISE'] = sci_med.header['RDNOISE']/len(aligned)
-            sci_med.header['NFILES'] = len(aligned)
-            sci_med.write(red_path+tar+'.fits',overwrite=True)
-            log.info('Median stack made for '+str(target))
+            dimen = len(stack)
+            if dimen == 1:
+                red_list = [red_path+os.path.basename(sci).replace('.fits','_red.fits') for sci in sci_list[tar]]
+                for j,process_data in enumerate(processed):
+                    process_data.write(red_list[j],overwrite=True)
+                log.info('Aligning images.')
+                aligned = align_quads.align_stars(red_list,telescope,hdu=tel.wcs_extension())
+                log.info('Images aligned, creating median stack.')
+                sci_med = ccdproc.combine(aligned,method='median',sigma_clip=True,sigma_clip_func=np.ma.median)
+                sci_med.header['RDNOISE'] = sci_med.header['RDNOISE']/np.sqrt(len(aligned))
+                sci_med.header['NFILES'] = len(aligned)
+                sci_med.write(stack[0],overwrite=True)
+                log.info('Median stack made for '+str(tar))
+            else:
+                log.info('Multiple extensions to stack.')
+                suffix = tel.suffix()
+                for k in range(dimen):
+                    red_list = [red_path+os.path.basename(sci).replace('.fits',suffix[k]) for sci in sci_list[tar]]
+                    for j,process_data in enumerate(processed[k]):
+                        process_data.write(red_list[j],overwrite=True)
+                    log.info('Aligning images.')
+                    aligned = align_quads.align_stars(red_list,telescope,hdu=tel.wcs_extension())
+                    log.info('Images aligned, creating median stack.')
+                    sci_med = ccdproc.combine(aligned,method='median',sigma_clip=True,sigma_clip_func=np.ma.median)
+                    sci_med.header['RDNOISE'] = sci_med.header['RDNOISE']/np.sqrt(len(aligned))
+                    sci_med.header['NFILES'] = len(aligned)
+                    sci_med.write(stack[k],overwrite=True)
+                    log.info('Median stack made for '+str(tar))                    
 
 
 def main():
