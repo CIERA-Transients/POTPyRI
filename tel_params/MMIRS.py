@@ -2,7 +2,7 @@
 import os
 import datetime
 import numpy as np
-from photutils import make_source_mask, Background2D, MedianBackground
+from photutils import make_source_mask, Background2D, MeanBackground
 from astropy.stats import SigmaClip
 from astropy.io import fits
 from astropy.time import Time
@@ -114,13 +114,17 @@ def process_science(sci_list,fil,cal_path,mdark=None,mbias=None,mflat=None):
     processed = []
     for sci in sci_list:
         raw = CCDData.read(sci,hdu=1,unit=u.adu)
-        red = ccdproc.subtract_overscan(raw, overscan=raw[0:4,:], overscan_axis=0, model=models.Chebyshev1D(3))
-        red = ccdproc.ccd_process(red, gain=raw.header['GAIN']*u.electron/u.adu, readnoise=raw.header['RDNOISE']*u.electron)
+        red = ccdproc.ccd_process(raw, gain=raw.header['GAIN']*u.electron/u.adu, readnoise=raw.header['RDNOISE']*u.electron)
         red = ccdproc.subtract_dark(red, mdark, exposure_time='EXPTIME', exposure_unit=u.second)
+        red = ccdproc.subtract_overscan(red, overscan=red[0:4,:], overscan_axis=0, model=models.Chebyshev1D(3))
         red = ccdproc.flat_correct(red, mflat)
         processed_data = ccdproc.ccd_process(red, trim=raw.header['DATASEC'])
         mask = make_source_mask(processed_data, nsigma=3, npixels=5)
         masks.append(mask)
-        bkg = Background2D(processed_data, (120, 120), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MedianBackground(), mask=mask, exclude_percentile=80)
-        processed.append(processed_data.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found').divide(red.header['EXPTIME']*u.second,propagate_uncertainties=True,handle_meta='first_found'))
+        fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_mask.fits'),mask.astype(int),overwrite=True)
+        bkg = Background2D(processed_data, (20, 20), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=mask, exclude_percentile=80)
+        fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_bkg.fits'),bkg.background,overwrite=True)
+        final = processed_data.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found').divide(red.header['EXPTIME']*u.second,propagate_uncertainties=True,handle_meta='first_found')
+        final.write(sci.replace('/raw/','/red/'),overwrite=True)
+        processed.append(final)
     return processed, masks
