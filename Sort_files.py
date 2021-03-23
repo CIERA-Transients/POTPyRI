@@ -73,9 +73,14 @@ def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=Non
 
     for i, f in enumerate(files):
         with fits.open(f) as file_open:
-            hdr = file_open[ext].header
+            try:
+                hdr = file_open[ext].header
+            except:
+                file_type = 'BAD'
+                moved_path = path+'bad/'
+                shutil.move(f,moved_path)
         target = hdr[target_keyword].replace(' ','')
-        fil = hdr[fil_keyword].replace(' ','')
+        fil = hdr[fil_keyword].replace(' ','').split('_')[0]
         file_time = None
         if np.all([hdr[science_keyword[j]] == science_files[j] for j in range(len(science_keyword))]):
             file_type = 'SCIENCE'

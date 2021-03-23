@@ -45,7 +45,7 @@ def WCS_keywords(): #WCS keywords
 def cal_path():
     return str(os.getenv("PIPELINE_HOME"))+'/Imaging_pipelines/MMIRS_calib/'
 
-def raw_format():
+def raw_format(proc):
     return '*.fits'
 
 def dark():
@@ -97,10 +97,10 @@ def wavelength():
     return 'NIR'
 
 def flat_name(cpath,fil):
-    return cpath+'/pixflat_'+fil+'.fits.gz'
+    return [cpath+'/pixflat_'+fil+'.fits.gz']
 
 def load_flat(flat):
-    with fits.open(flat) as hdr:
+    with fits.open(flat[0]) as hdr:
         mflat = hdr[1].data
         mflat[np.isnan(mflat)] = np.nanmedian(mflat)
         mflat = CCDData(mflat,unit=u.electron)
@@ -127,3 +127,6 @@ def process_science(sci_list,fil,cal_path,mdark=None,mbias=None,mflat=None):
         final = processed_data.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found').divide(red.header['EXPTIME']*u.second,propagate_uncertainties=True,handle_meta='first_found')
         processed.append(final)
     return processed, masks
+
+def stacked_image(tar,red_path):
+    return [red_path+tar+'.fits']
