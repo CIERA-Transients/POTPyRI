@@ -14,6 +14,7 @@ import shutil
 import casjobs
 import math
 import copy
+import pickle
 import requests
 import warnings
 from contextlib import contextmanager
@@ -367,7 +368,7 @@ def data(nest):
         count += 1
     return final
 
-def ordering(final):
+def ordering(final,file_name):
     #Make a r_mag list
     r_mag = []
     for i in range(len(final)):
@@ -408,12 +409,12 @@ def ordering(final):
 
 
     # Write the ordered photometry as a text file using pickle so they can be in floats and not integers
-    with open(object_name+'.txt', 'wb') as fp:
-        pickle.dump(final,fp)
+    # with open(file_name, 'wb') as fp:
+    #     pickle.dump(final,fp)
 
     # Use this to open the pickled text file
-    with open(object_name+'.txt', 'rb') as fp:
-        b = pickle.load(fp)
+    # with open(object_name+'.txt', 'rb') as fp:
+    #     b = pickle.load(fp)
     #print(b)
 
     # You can also write your result using this method since pickle does not allow you to read it in a text editor
