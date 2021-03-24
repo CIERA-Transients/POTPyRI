@@ -13,7 +13,7 @@ import ccdproc
 from astropy.modeling import models
 
 
-def static_mask():
+def static_mask(proc):
     return './staticmasks/MMIRS.staticmask.fits'
 
 def run_wcs():
@@ -109,7 +109,7 @@ def load_flat(flat):
 def create_flat(flat_list):
     return None
 
-def process_science(sci_list,fil,cal_path,mdark=None,mbias=None,mflat=None):
+def process_science(sci_list,fil,cal_path,mdark=None,mbias=None,mflat=None,proc=None):
     masks = []
     processed = []
     for sci in sci_list:
@@ -130,3 +130,6 @@ def process_science(sci_list,fil,cal_path,mdark=None,mbias=None,mflat=None):
 
 def stacked_image(tar,red_path):
     return [red_path+tar+'.fits']
+
+def rdnoise(header):
+    return header['RDNOISE']

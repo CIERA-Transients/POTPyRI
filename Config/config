@@ -76,7 +76,3 @@ VERBOSE_TYPE     NORMAL         # can be QUIET, NORMAL or FULL
 HEADER_SUFFIX    .head          # Filename extension for additional headers
 WRITE_XML        N              # Write XML file (Y/N)?
 XML_NAME         sex.xml        # Filename for XML output
-
-#----------------------------- Extras ----------------------------------------
- 
-FLAG_TYPE        AND
