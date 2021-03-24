@@ -186,7 +186,7 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
                 continue
             flat_data = tel.load_flat(master_flat)
             log.info('Processing data for '+str(tar))
-            processed, masks = tel.process_science(sci_list[tar],fil,cal_path,mdark=mdark,mbias=mbias,mflat=flat_data)
+            processed, masks = tel.process_science(sci_list[tar],fil,cal_path,mdark=mdark,mbias=mbias,mflat=flat_data,proc=proc)
             log.info('Data processed.')
             if wavelength=='NIR':
                 log.info('NIR data, creating NIR sky maps.')
@@ -215,25 +215,26 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
                 for j,process_data in enumerate(processed):
                     process_data.write(red_list[j],overwrite=True)
                 log.info('Aligning images.')
-                aligned = align_quads.align_stars(red_list,telescope,hdu=tel.wcs_extension())
+                aligned = align_quads.align_stars(red_list,telescope,hdu=tel.wcs_extension(),mask=tel.static_mask(proc))
                 log.info('Images aligned, creating median stack.')
                 sci_med = ccdproc.combine(aligned,method='median',sigma_clip=True,sigma_clip_func=np.ma.median)
-                sci_med.header['RDNOISE'] = sci_med.header['RDNOISE']/np.sqrt(len(aligned))
+                sci_med.header['RDNOISE'] = tel.rdnoise(sci_med.header)/np.sqrt(len(aligned))
                 sci_med.header['NFILES'] = len(aligned)
                 sci_med.write(stack[0],overwrite=True)
                 log.info('Median stack made for '+str(tar))
             else:
                 log.info('Multiple extensions to stack.')
                 suffix = tel.suffix()
+                mask = tel.static_mask(proc)
                 for k in range(dimen):
                     red_list = [red_path+os.path.basename(sci).replace('.fits',suffix[k]) for sci in sci_list[tar]]
                     for j,process_data in enumerate(processed[k]):
                         process_data.write(red_list[j],overwrite=True)
                     log.info('Aligning images.')
-                    aligned = align_quads.align_stars(red_list,telescope,hdu=tel.wcs_extension())
+                    aligned = align_quads.align_stars(red_list,telescope,hdu=tel.wcs_extension(),mask=mask[k])
                     log.info('Images aligned, creating median stack.')
                     sci_med = ccdproc.combine(aligned,method='median',sigma_clip=True,sigma_clip_func=np.ma.median)
-                    sci_med.header['RDNOISE'] = sci_med.header['RDNOISE']/np.sqrt(len(aligned))
+                    sci_med.header['RDNOISE'] = tel.rdnoise(sci_med.header)/np.sqrt(len(aligned))
                     sci_med.header['NFILES'] = len(aligned)
                     sci_med.write(stack[k],overwrite=True)
                     log.info('Median stack made for '+str(tar))                    
@@ -252,7 +253,7 @@ def main():
     params.add_argument('--phot', type=str, default=None, help='Option to use IRAF to perform photometry.') #must have pyraf install and access to IRAF to use
     args = params.parse_args()
     
-    main_pipeline(args.telescope,args.data_path,args.cal_path,target=args.target,skip_red=args.skip_red)
+    main_pipeline(args.telescope,args.data_path,args.cal_path,target=args.target,skip_red=args.skip_red,proc=args.proc)
 
 if __name__ == "__main__":
     main()

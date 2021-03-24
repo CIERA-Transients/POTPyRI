@@ -104,7 +104,7 @@ def calculate_error(d, coord1, coord2, hd):
     hd['DEC_RMS'] = (rms_dec, 'RMS of Dec fit (arcsec).')
     return rms_total
 
-def run_sextractor(input_file, cat_name, tel, sex_config_dir='./Config'):
+def run_sextractor(input_file, cat_name, tel, mask, sex_config_dir='./Config'):
 
     if not os.path.exists(sex_config_dir+'/config'):
         e = 'ERROR: Could not find source extractor config file!'
@@ -113,15 +113,21 @@ def run_sextractor(input_file, cat_name, tel, sex_config_dir='./Config'):
         e = 'ERROR: Could not find source extractor param file!'
         raise Exception(e)
 
-    params = []
-    with open(sex_config_dir+'/params') as f:
-        for line in f:
-            params.append(line.split()[0].strip())
-
     config = sex_config_dir+'/config'
 
-    cmd=['sex','-c',config,input_file,'-CATALOG_NAME',cat_name,'-FLAG_IMAGE',tel.static_mask(),'-FLAG_TYPE','AND']
+    cmd=['sex','-c',config,input_file,'-CATALOG_NAME',cat_name]
+    if mask:
+        cmd+=['-FLAG_IMAGE',mask,'-FLAG_TYPE','AND']
+        param_file = sex_config_dir+'/params'
+    else:
+        cmd+=['-PARAMETERS_NAME',sex_config_dir+'/params_nomask']
+        param_file = sex_config_dir+'/params_nomask'
     subprocess.call(cmd)
+
+    params = []
+    with open(param_file) as f:
+        for line in f:
+            params.append(line.split()[0].strip())
 
     if os.path.exists(cat_name):
         table = ascii.read(cat_name, names=params, comment='#')
@@ -249,11 +255,15 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
 
     #run sextractor
     cat_name = input_file.replace('.fits','.cat')
-    table = run_sextractor(input_file, cat_name, tel, sex_config_dir=sex_config_dir)
+    table = run_sextractor(input_file, cat_name, tel, tel.static_mask(), sex_config_dir=sex_config_dir)
 
     #mask and sort table
-    table = table[(table['FLAGS']==0)&(table['IMAFLAGS_ISO']==0)
-            &(table['EXT_NUMBER']==tel.wcs_extension()+1)]
+    print(tel.static_mask())
+    if tel.static_mask():
+        table = table[(table['FLAGS']==0)&(table['IMAFLAGS_ISO']==0)
+                &(table['EXT_NUMBER']==tel.wcs_extension()+1)]
+    else:
+        table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
     table.sort('MAG_BEST')
     table = table[table['MAG_BEST']<(np.median(table['MAG_BEST'])-np.std(table['MAG_BEST']))]
 
