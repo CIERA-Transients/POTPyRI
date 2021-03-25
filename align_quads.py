@@ -15,7 +15,7 @@ import importlib
 import solve_wcs
 import tel_params
 
-def align_stars(images,telescope,hdu=0):
+def align_stars(images,telescope,hdu=0,mask=None):
     """
     Pixel align a list of images
     
@@ -51,8 +51,11 @@ def align_stars(images,telescope,hdu=0):
     ratios_list = []
     for f in images:
         cat_name = f.replace('.fits','.cat')
-        table = solve_wcs.run_sextractor(f, cat_name, tel, sex_config_dir='./Config')
-        table = table[(table['FLAGS']==0)&(table['IMAFLAGS_ISO']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
+        table = solve_wcs.run_sextractor(f, cat_name, tel, mask, sex_config_dir='./Config')
+        if mask:
+            table = table[(table['FLAGS']==0)&(table['IMAFLAGS_ISO']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
+        else:
+            table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
         table.sort('MAG_BEST')
         stars, d, ds, ratios = solve_wcs.make_quads(table['XWIN_IMAGE'],
                 table['YWIN_IMAGE'], use=10)
