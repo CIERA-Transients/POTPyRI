@@ -423,6 +423,15 @@ def ordering(final,file_name):
     # Then you can use this to unpack the text file :)
     #final = np.loadtxt('200522A_result_np.txt',unpack=True)
 
+def mask_catalog_around_coord(catalog, coord, radius=5.0*u.arcsec):
+
+    newcat = copy.copy(catalog)
+    coords = SkyCoord(newcat['ra'], newcat['dec'], unit='deg')
+    mask = coord.separation(coords) < radius
+
+    newcat = newcat[mask]
+    return(newcat)
+
 def getSDSS(coord, impix=1024, imsize=12*u.arcmin, outfile=''):
     from urllib.parse import urlencode
     from urllib.request import urlretrieve
