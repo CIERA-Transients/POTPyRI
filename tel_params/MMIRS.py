@@ -14,7 +14,8 @@ from astropy.modeling import models
 
 
 def static_mask(proc):
-    return './staticmasks/MMIRS.staticmask.fits'
+    return None
+    #return './staticmasks/MMIRS.staticmask.fits'
 
 def run_wcs():
     return True
