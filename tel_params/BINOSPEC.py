@@ -15,7 +15,7 @@ import astropy.wcs as wcs
 
 def static_mask(proc):
     if proc:
-        return ['./staticmasks/bino_proc_left.staticmask.fits','./staticmasks/bino_proc_right.staticmask.fits']
+        return [None,None]#['./staticmasks/bino_proc_left.staticmask.fits','./staticmasks/bino_proc_right.staticmask.fits']
     else:
         return ['./staticmasks/bino_left.staticmask.fits','./staticmasks/bino_right.staticmask.fits']
 
@@ -124,30 +124,29 @@ def process_science(sci_list,fil,cal_path,mdark=None,mbias=None,mflat=None,proc=
     flat_right = mflat[1]
     left_list = []
     right_list = []
-    if proc:
-        static_masks = static_mask(proc)
-        with fits.open(static_masks[0]) as mhdr:
-            mask_left = mhdr[0].data
-        with fits.open(static_masks[1]) as mhdr:
-            mask_right = mhdr[0].data        
+    if proc:  
         for j,sci in enumerate(sci_list):
             left = CCDData.read(sci, hdu=1, unit=u.electron)
             left = ccdproc.flat_correct(left,flat_left)
-            mask = make_source_mask(left, nsigma=3, npixels=5, mask=mask_left)
+            left = ccdproc.ccd_process(left, trim=left.header['DATASEC'])
+            mask = make_source_mask(left, nsigma=3, npixels=5)
             fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_mask_left.fits'),mask.astype(int),overwrite=True)
-            bkg = Background2D(left, (90, 90), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=mask, exclude_percentile=80)
+            bkg = Background2D(left, (120, 120), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=mask, exclude_percentile=80)
             fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_bkg_left.fits'),bkg.background,overwrite=True)
             left = left.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found')
             left = left.divide(left.header['EXPTIME'],propagate_uncertainties=True,handle_meta='first_found')
+            left.header['DATASEC'] = '[1:'+str(np.shape(left)[1])+',1:'+str(np.shape(left)[0])+']'
             left_list.append(left)
             right = CCDData.read(sci, hdu=2, unit=u.electron)
             right = ccdproc.flat_correct(right,flat_right)
-            mask = make_source_mask(right, nsigma=3, npixels=5, mask=mask_right)
+            right = ccdproc.ccd_process(right, trim=right.header['DATASEC'])
+            mask = make_source_mask(right, nsigma=3, npixels=5)
             fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_mask_right.fits'),mask.astype(int),overwrite=True)
-            bkg = Background2D(right, (90, 90), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=mask, exclude_percentile=80)
+            bkg = Background2D(right, (120, 120), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=mask, exclude_percentile=80)
             fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_bkg_right.fits'),bkg.background,overwrite=True)
             right = right.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found')
             right = right.divide(right.header['EXPTIME'],propagate_uncertainties=True,handle_meta='first_found')
+            right.header['DATASEC'] = '[1:'+str(np.shape(right)[1])+',1:'+str(np.shape(right)[0])+']'
             right_list.append(right)
     else:
         for j,sci in enumerate(sci_list):

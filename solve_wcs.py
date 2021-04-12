@@ -104,7 +104,7 @@ def calculate_error(d, coord1, coord2, hd):
     hd['DEC_RMS'] = (rms_dec, 'RMS of Dec fit (arcsec).')
     return rms_total
 
-def run_sextractor(input_file, cat_name, tel, mask, sex_config_dir='./Config'):
+def run_sextractor(input_file, cat_name, tel, sex_config_dir='./Config'):
 
     if not os.path.exists(sex_config_dir+'/config'):
         e = 'ERROR: Could not find source extractor config file!'
@@ -114,14 +114,9 @@ def run_sextractor(input_file, cat_name, tel, mask, sex_config_dir='./Config'):
         raise Exception(e)
 
     config = sex_config_dir+'/config'
+    param_file = sex_config_dir+'/params'
 
     cmd=['sex','-c',config,input_file,'-CATALOG_NAME',cat_name]
-    if mask:
-        cmd+=['-FLAG_IMAGE',mask,'-FLAG_TYPE','AND']
-        param_file = sex_config_dir+'/params'
-    else:
-        cmd+=['-PARAMETERS_NAME',sex_config_dir+'/params_nomask']
-        param_file = sex_config_dir+'/params_nomask'
     subprocess.call(cmd)
 
     params = []
@@ -233,7 +228,7 @@ def match_quads(stars,gaiastars,d,gaiad,ds,gaiads,ratios,gaiaratios,sky_coords=T
     return np.array(starsx_unq[0:len(gaiastarsra_unq)]), np.array(starsy_unq[0:len(gaiastarsdec_unq)]), np.array(gaiastarsra_unq[0:len(starsx_unq)]), np.array(gaiastarsdec_unq[0:len(starsy_unq)])
 
 #main function to calculate astrometric solution
-def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
+def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None):
     #start time
     t_start = time.time()
     #import telescope parameter file
@@ -258,12 +253,11 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config'):
     table = run_sextractor(input_file, cat_name, tel, tel.static_mask(), sex_config_dir=sex_config_dir)
 
     #mask and sort table
-    print(tel.static_mask())
-    if tel.static_mask():
-        table = table[(table['FLAGS']==0)&(table['IMAFLAGS_ISO']==0)
-                &(table['EXT_NUMBER']==tel.wcs_extension()+1)]
-    else:
-        table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
+    table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
+    if static_mask:
+        with fits.open(static_mask) as mask_hdu:
+            stat_mask = mask_hdu[0].data
+        table = table[(stat_mask[table['YWIN_IMAGE'].astype(int)-1,table['XWIN_IMAGE'].astype(int)-1]!=0)]
     table.sort('MAG_BEST')
     table = table[table['MAG_BEST']<(np.median(table['MAG_BEST'])-np.std(table['MAG_BEST']))]
 
