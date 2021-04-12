@@ -51,11 +51,12 @@ def align_stars(images,telescope,hdu=0,mask=None):
     ratios_list = []
     for f in images:
         cat_name = f.replace('.fits','.cat')
-        table = solve_wcs.run_sextractor(f, cat_name, tel, mask, sex_config_dir='./Config')
+        table = solve_wcs.run_sextractor(f, cat_name, tel, sex_config_dir='./Config')
+        table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
         if mask:
-            table = table[(table['FLAGS']==0)&(table['IMAFLAGS_ISO']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
-        else:
-            table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
+            with fits.open(mask) as mask_hdu:
+                stat_mask = mask_hdu[0].data
+            table = table[(stat_mask[table['YWIN_IMAGE'].astype(int)-1,table['XWIN_IMAGE'].astype(int)-1]!=0)]
         table.sort('MAG_BEST')
         stars, d, ds, ratios = solve_wcs.make_quads(table['XWIN_IMAGE'],
                 table['YWIN_IMAGE'], use=10)
