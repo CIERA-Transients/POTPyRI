@@ -92,7 +92,6 @@ def align_stars(images,telescope,hdu=0,mask=None):
     aligned_arrays = []
     aligned_arrays.append(CCDData(image_arrays[0],meta=header_arrays[0],unit=u.electron/u.second))
     for i in range(len(image_arrays)-1):
-        if shift_x[i] or shift_y[i] 
         tform = tf.SimilarityTransform(scale=1, rotation=0, translation=(-shift_x[i], -shift_y[i]))
         aligned_arrays.append(CCDData(tf.warp(image_arrays[i+1], tform),meta=header_arrays[i],unit=u.electron/u.second))
     
