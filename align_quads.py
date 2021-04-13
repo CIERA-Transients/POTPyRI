@@ -68,16 +68,23 @@ def align_stars(images,telescope,hdu=0,mask=None):
     #match quads and calcculate shifts
     shift_x = []
     shift_y = []
+    aligned_images = []
+    aligned_images.append(images[0])
     for i in range(len(stars_list)-1):
-        starsx1, starsy1, starsx2, starsy2 = solve_wcs.match_quads(stars_list[0],stars_list[i+1],
-                d_list[0],d_list[i+1],ds_list[0],ds_list[i+1],ratios_list[0],ratios_list[i+1],sky_coords=False)
+        try:
+            starsx1, starsy1, starsx2, starsy2 = solve_wcs.match_quads(stars_list[0],stars_list[i+1],
+                    d_list[0],d_list[i+1],ds_list[0],ds_list[i+1],ratios_list[0],ratios_list[i+1],sky_coords=False)
+        except:
+            print(image[i]+' failed to alignment, removing from stack.')
+            continue
         shift_x.append(np.median([np.array(starsx1[j])-np.array(starsx2[j]) for j in range(len(starsx1))]))
         shift_y.append(np.median([np.array(starsy1[j])-np.array(starsy2[j]) for j in range(len(starsy1))]))
+        aligned_images.append(images[i])
 
     #apply shifts
     image_arrays = []
     header_arrays = []
-    for i, f in enumerate(images):
+    for i, f in enumerate(aligned_images):
         with fits.open(f) as fo:
             image_data = fo[hdu].data
             image_arrays.append(np.nan_to_num(image_data).astype(np.float64))
@@ -85,10 +92,11 @@ def align_stars(images,telescope,hdu=0,mask=None):
     aligned_arrays = []
     aligned_arrays.append(CCDData(image_arrays[0],meta=header_arrays[0],unit=u.electron/u.second))
     for i in range(len(image_arrays)-1):
+        if shift_x[i] or shift_y[i] 
         tform = tf.SimilarityTransform(scale=1, rotation=0, translation=(-shift_x[i], -shift_y[i]))
         aligned_arrays.append(CCDData(tf.warp(image_arrays[i+1], tform),meta=header_arrays[i],unit=u.electron/u.second))
     
     for i in range(len(aligned_arrays)):
-        aligned_arrays[i].write(images[i].replace('.fits','_aligned.fits'),overwrite=True)
+        aligned_arrays[i].write(aligned_images[i].replace('.fits','_aligned.fits'),overwrite=True)
 
     return aligned_arrays
