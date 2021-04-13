@@ -75,11 +75,11 @@ def align_stars(images,telescope,hdu=0,mask=None):
             starsx1, starsy1, starsx2, starsy2 = solve_wcs.match_quads(stars_list[0],stars_list[i+1],
                     d_list[0],d_list[i+1],ds_list[0],ds_list[i+1],ratios_list[0],ratios_list[i+1],sky_coords=False)
         except:
-            print(image[i]+' failed to alignment, removing from stack.')
+            print(images[i+1]+' failed to alignment, removing from stack.')
             continue
         shift_x.append(np.median([np.array(starsx1[j])-np.array(starsx2[j]) for j in range(len(starsx1))]))
         shift_y.append(np.median([np.array(starsy1[j])-np.array(starsy2[j]) for j in range(len(starsy1))]))
-        aligned_images.append(images[i])
+        aligned_images.append(images[i+1])
 
     #apply shifts
     image_arrays = []
