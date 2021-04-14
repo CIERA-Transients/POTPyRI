@@ -3,7 +3,7 @@
 "Function to pixel align a list of images using quads."
 "Author: Kerry Paterson"
 
-__version__ = "1.2" #last updated 18/03/2021
+__version__ = "1.3" #last updated 14/04/2021
 
 import numpy as np
 from astropy.io import fits
@@ -92,7 +92,7 @@ def align_stars(images,telescope,hdu=0,mask=None):
     aligned_arrays = []
     aligned_arrays.append(CCDData(image_arrays[0],meta=header_arrays[0],unit=u.electron/u.second))
     for i in range(len(image_arrays)-1):
-        tform = tf.SimilarityTransform(scale=1, rotation=0, translation=(-shift_x[i], -shift_y[i]))
+        tform = tf.EuclideanTransform(rotation=0, translation=(-shift_x[i], -shift_y[i]))
         aligned_arrays.append(CCDData(tf.warp(image_arrays[i+1], tform),meta=header_arrays[i],unit=u.electron/u.second))
     
     for i in range(len(aligned_arrays)):

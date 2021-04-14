@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.0" #last updated 18/03/2021
+__version__ = "1.0" #last updated 14/04/2021
 
 import sys
 import numpy as np

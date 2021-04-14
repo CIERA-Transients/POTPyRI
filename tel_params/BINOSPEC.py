@@ -111,13 +111,13 @@ def load_flat(flat):
         mflat.append(CCDData.read(f,hdu=1,unit=u.electron))
     return mflat
 
-def create_flat(flat_list):
+def create_flat(flat_list,fil,red_path,mdark=None,mbias=None):
     return None
 
 def gain():
     return [1.085, 1.04649118, 1.04159151, 0.97505369, 1.028, 1.16341855, 1.04742053, 1.0447564]
 
-def process_science(sci_list,fil,cal_path,mdark=None,mbias=None,mflat=None,proc=None):
+def process_science(sci_list,fil,mdark=None,mbias=None,mflat=None,proc=None):
     masks = []
     processed = []
     flat_left = mflat[0]
