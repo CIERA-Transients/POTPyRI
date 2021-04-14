@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "2.8" #last updated 18/03/2021
+__version__ = "3.0" #last updated 14/04/2021
 
 import sys
 import numpy as np
@@ -21,7 +21,7 @@ from astropy.coordinates import SkyCoord
 from astropy.table import Table
 from astropy.utils.exceptions import AstropyWarning, AstropyDeprecationWarning
 from astroquery.gaia import Gaia
-from scipy.optimize import curve_fit
+from skimage import transform as tf
 from scipy import stats
 import itertools
 import importlib
@@ -42,54 +42,62 @@ def dvrms(x):
     return rms
 
 #plate solution
-def plate_sol(data,*p):
-    xi,eta=data
-    a,b,c = p
-    return a*xi+b*eta+c
+# def plate_sol(starsx, starsy, gaiastarsra, gaiastarsdec):
+def apply_wcs_transformation(header,tform):
+    crpix1, crpix2, cd11, cd12, cd21, cd22 = wcs_keyword = tel.WCS_keywords()
+    header[crpix1] = header[crpix1]+tform.translation[0]
+    header[crpix2] = header[crpix2]+tform.translation[1]
+    cd_matrix = tf.EuclideanTransform(rotation=tform.rotation)
+    cd_transformed = tf.warp(cd,cd_matrix)
+    header[cd11] = cd_transformed[0][0]
+    header[cd12] = cd_transformed[0][1]
+    header[cd21] = cd_transformed[1][0]
+    header[cd22] = cd_transformed[1][1]
+    return header
 
 #function to remove old WCS keywords from header
-def strip_header(hd):
-    wcs_obj = wcs.WCS(hd)
-    wcs_keywords_old = wcs_obj.to_header()
-    for wcs_keyword in wcs_keywords_old:
-        try:
-            del hd[wcs_keyword]
-        except:
-            pass
-    return hd
+# def strip_header(hd):
+#     wcs_obj = wcs.WCS(hd)
+#     wcs_keywords_old = wcs_obj.to_header()
+#     for wcs_keyword in wcs_keywords_old:
+#         try:
+#             del hd[wcs_keyword]
+#         except:
+#             pass
+#     return hd
 
 #function to add new astrometric solution to header
-def add_to_header(hd,crpix1,crpix2,c1,c2,num):
-    hd['WCSAXES'] = 2
-    hd['CRPIX1'] = crpix1
-    hd['CRPIX2'] = crpix2
-    hd['CRVAL1'] = c1[2]
-    hd['CRVAL2'] = c2[2]
-    hd['CUNIT1'] = 'deg'
-    hd['CUNIT2'] = 'deg'
-    hd['CTYPE1'] = 'RA---TNX'
-    hd['CTYPE2'] = 'DEC--TNX'
-    hd['CD1_1'] = c1[0]
-    hd['CD1_2'] = c1[1]
-    hd['CD2_1'] = c2[0]
-    hd['CD2_2'] = c2[1]
-    WAT0_001, WAT1_001, WAT1_002, WAT1_003, WAT1_004, WAT1_005, \
-        WAT2_001, WAT2_002, WAT2_003, WAT2_004, WAT2_005 = tel.WCS_keywords()
-    hd['WAT0_001'] = WAT0_001
-    hd['WAT1_001'] = WAT1_001
-    hd['WAT1_002'] = WAT1_002
-    hd['WAT1_003'] = WAT1_003
-    hd['WAT1_004'] = WAT1_004
-    hd['WAT1_005'] = WAT1_005
-    hd['WAT2_001'] = WAT2_001
-    hd['WAT2_002'] = WAT2_002
-    hd['WAT2_003'] = WAT2_003
-    hd['WAT2_004'] = WAT2_004
-    hd['WAT2_005'] = WAT2_005
-    hd['RADESYSa'] = 'ICRS'
-    hd['WCS_REF'] = ('GAIA-DR2', 'Reference catalog for astrometric solution.')
-    hd['WCS_QUAD'] = (num, 'Number of stars used for astrometric solution.')
-    return hd
+# def add_to_header(hd,crpix1,crpix2,c1,c2,num):
+#     hd['WCSAXES'] = 2
+#     hd['CRPIX1'] = crpix1
+#     hd['CRPIX2'] = crpix2
+#     hd['CRVAL1'] = c1[2]
+#     hd['CRVAL2'] = c2[2]
+#     hd['CUNIT1'] = 'deg'
+#     hd['CUNIT2'] = 'deg'
+#     hd['CTYPE1'] = 'RA---TNX'
+#     hd['CTYPE2'] = 'DEC--TNX'
+#     hd['CD1_1'] = c1[0]
+#     hd['CD1_2'] = c1[1]
+#     hd['CD2_1'] = c2[0]
+#     hd['CD2_2'] = c2[1]
+#     WAT0_001, WAT1_001, WAT1_002, WAT1_003, WAT1_004, WAT1_005, \
+#         WAT2_001, WAT2_002, WAT2_003, WAT2_004, WAT2_005 = tel.WCS_keywords()
+#     hd['WAT0_001'] = WAT0_001
+#     hd['WAT1_001'] = WAT1_001
+#     hd['WAT1_002'] = WAT1_002
+#     hd['WAT1_003'] = WAT1_003
+#     hd['WAT1_004'] = WAT1_004
+#     hd['WAT1_005'] = WAT1_005
+#     hd['WAT2_001'] = WAT2_001
+#     hd['WAT2_002'] = WAT2_002
+#     hd['WAT2_003'] = WAT2_003
+#     hd['WAT2_004'] = WAT2_004
+#     hd['WAT2_005'] = WAT2_005
+#     hd['RADESYSa'] = 'ICRS'
+#     hd['WCS_REF'] = ('GAIA-DR2', 'Reference catalog for astrometric solution.')
+#     hd['WCS_QUAD'] = (num, 'Number of stars used for astrometric solution.')
+#     return hd
 
 #function to calculate rms on astrometric solution
 #replaced np.median() with dvrms() -David V
@@ -285,18 +293,26 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
     starsx, starsy, gaiastarsra, gaiastarsdec = match_quads(stars,gaiastars,d,gaiad,
             ds,gaiads,ratios,gaiaratios,sky_coords=True)
 
+    #calculate transformation
+    tform = tf.estimate_transform('euclidean', np.c_[starsx, starsy], np.c_[gaiastarsra, gaiastarsdec])
+
+    #apply transformation to header
+    header_new = tel.apply_wcs_transformation(header,tform)
+    header_new['WCS_REF'] = ('GAIA-DR2', 'Reference catalog for astrometric solution.')
+    header_new['WCS_NUM'] = (len(starsx), 'Number of stars used for astrometric solution.')
+
     #load ref pixels
-    crpix1, crpix2 = tel.ref_pix()
+    # crpix1, crpix2 = tel.ref_pix()
 
     #solve plate sol
-    c1 = curve_fit(plate_sol,(starsx-crpix1,starsy-crpix2),gaiastarsra,p0=(0,0,ra))[0]
-    c2 = curve_fit(plate_sol,(starsx-crpix1,starsy-crpix2),gaiastarsdec,p0=(0,0,dec))[0]
+    # c1 = curve_fit(plate_sol,(starsx-crpix1,starsy-crpix2),gaiastarsra,p0=(0,0,ra))[0]
+    # c2 = curve_fit(plate_sol,(starsx-crpix1,starsy-crpix2),gaiastarsdec,p0=(0,0,dec))[0]
 
-    #strip header of WCS
-    hd = strip_header(header)
+    # #strip header of WCS
+    # hd = strip_header(header)
 
-    #add new WCS header keywords
-    header_new = add_to_header(hd,crpix1,crpix2,c1,c2,len(starsx))
+    # #add new WCS header keywords
+    # header_new = add_to_header(hd,crpix1,crpix2,c1,c2,len(starsx))
 
     #match stars
     stars_ra, stars_dec = (wcs.WCS(header_new)).all_pix2world(table[:50]['XWIN_IMAGE'],
