@@ -44,7 +44,7 @@ def WCS_keywords(): #WCS keywords
     return WAT0_001, WAT1_001, WAT1_002, WAT1_003, WAT1_004, WAT1_005, WAT2_001, WAT2_002, WAT2_003, WAT2_004, WAT2_005
 
 def cal_path():
-    return str(os.getenv("PIPELINE_HOME"))+'/Imaging_pipelines/MMIRS_calib/'
+    return None
 
 def raw_format(proc):
     return '*.fits'
@@ -56,7 +56,7 @@ def bias():
     return False
 
 def flat():
-    return False
+    return True
 
 def raw_header_ext():
     return 1
@@ -97,20 +97,28 @@ def time_format(hdr):
 def wavelength():
     return 'NIR'
 
-def flat_name(cpath,fil):
-    return [cpath+'/pixflat_'+fil+'.fits.gz']
+def flat_name(flatpath,fil):
+    return [flatpath+'mflat_'+fil+'.fits']
 
 def load_flat(flat):
-    with fits.open(flat[0]) as hdr:
-        mflat = hdr[1].data
-        mflat[np.isnan(mflat)] = np.nanmedian(mflat)
-        mflat = CCDData(mflat,unit=u.electron)
+    mflat = CCDData.read(flat[0],unit=u.electron/u.second)
     return mflat
 
-def create_flat(flat_list):
-    return None
+def create_flat(flat_list,fil,red_path,mdark=None,mbias=None):
+    flats = []
+    flat_scale = []
+    for flat in flat_list:
+        raw = CCDData.read(flat,hdu=1,unit=u.adu)
+        flat_scale.append(1/np.median(raw.data[1200:1700,700:1300]))
+        red = ccdproc.ccd_process(raw, gain=raw.header['GAIN']*u.electron/u.adu, readnoise=raw.header['RDNOISE']*u.electron)
+        red = ccdproc.subtract_dark(red, mdark, exposure_time='EXPTIME', exposure_unit=u.second)
+        red = ccdproc.subtract_overscan(red, overscan=red[:,0:4], overscan_axis=1, model=models.Chebyshev1D(3))
+        flats.append(red)
+    mflat = ccdproc.combine(flats,method='median',scale=flat_scale,sigma_clip=True)
+    mflat.write(red_path+'mflat_'+fil+'.fits')
+    return mflat
 
-def process_science(sci_list,fil,cal_path,mdark=None,mbias=None,mflat=None,proc=None):
+def process_science(sci_list,fil,mdark=None,mbias=None,mflat=None,proc=None):
     masks = []
     processed = []
     for sci in sci_list:

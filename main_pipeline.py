@@ -29,7 +29,7 @@ import Sort_files
 import align_quads
 import solve_wcs
 
-def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,proc=None):
+def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,proc=None,use_dome_flats=None):
     #start time
     t_start = time.time()
     #import telescope parameter file
@@ -137,23 +137,24 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
         mdark = None
 
     if tel.flat():
-            for cal in cal_list:
-                if 'FLAT' in cal:
-                    if wavelength=='OPT':
-                        for cal in cal_list:
-                            if 'FLAT' in cal:
-                                tel.create_flat(cal_list[cal])
-                    elif wavelength=='NIR':
-                        fil = cal.split('_')[-1]
-                        if use_dome_flats == 'yes' or use_dome_flats == 'True': #use dome flats instead of sky flats for NIR
-                            flat_type = 'dome'
-                            log.info('User set option to use dome flats to create master flat')
-                            log.info(str(len(cal_list[cal]))+' dome flats found for filter '+fil)
-                            tel.create_flat(cal_list[cal])
-                        else: #default to use science files for master flat creation
-                            flat_type = 'sky'
-                            log.info('Using science files to create master flat')
-                            tel.create_flat(sky_list[fil])
+        for cal in cal_list:
+            if 'FLAT' in cal:
+                fil = cal.split('_')[-1]
+                if wavelength=='OPT':
+                    for cal in cal_list:
+                        if 'FLAT' in cal:
+                            tel.create_flat(cal_list[cal],fil,red_path,mdark=mdark,mbias=mbias)
+                elif wavelength=='NIR':
+                    if use_dome_flats == 'yes' or use_dome_flats == 'True': #use dome flats instead of sky flats for NIR
+                        flat_type = 'dome'
+                        log.info('User set option to use dome flats to create master flat')
+                        log.info(str(len(cal_list[cal]))+' dome flats found for filter '+fil)
+                        tel.create_flat(cal_list[cal])
+        if wavelength=='NIR' and use_dome_flats != 'yes' and use_dome_flats != 'True': #default to use science files for master flat creation
+            for fil_list in sky_list:
+                flat_type = 'sky'
+                log.info('Using science files to create master flat')
+                tel.create_flat(sky_list[fil_list],fil_list,red_path,mdark=mdark,mbias=mbias)
 
     if len(sci_list) == 0:
         log.critical('No science files to process, check data before rerunning.')
@@ -179,14 +180,17 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
                 process_data = False
             else:
                 log.error('No reduced image found, processing data.')      
-        if process_data:             
-            master_flat = tel.flat_name(cal_path, fil)
+        if process_data:
+            if cal_path:             
+                master_flat = tel.flat_name(cal_path, fil)
+            else:
+                master_flat = tel.flat_name(red_path, fil)
             if not np.all([os.path.exists(mf) for mf in master_flat]):
                 log.error('No master flat present for filter '+fil+', skipping data reduction for '+tar+'. Check data before rerunning')
                 continue
             flat_data = tel.load_flat(master_flat)
             log.info('Processing data for '+str(tar))
-            processed, masks = tel.process_science(sci_list[tar],fil,cal_path,mdark=mdark,mbias=mbias,mflat=flat_data,proc=proc)
+            processed, masks = tel.process_science(sci_list[tar],fil,mdark=mdark,mbias=mbias,mflat=flat_data,proc=proc)
             log.info('Data processed.')
             if wavelength=='NIR':
                 log.info('NIR data, creating NIR sky maps.')
@@ -253,7 +257,7 @@ def main():
     params.add_argument('--phot', type=str, default=None, help='Option to use IRAF to perform photometry.') #must have pyraf install and access to IRAF to use
     args = params.parse_args()
     
-    main_pipeline(args.telescope,args.data_path,args.cal_path,target=args.target,skip_red=args.skip_red,proc=args.proc)
+    main_pipeline(args.telescope,args.data_path,args.cal_path,target=args.target,skip_red=args.skip_red,proc=args.proc,use_dome_flats=args.use_dome_flats)
 
 if __name__ == "__main__":
     main()
