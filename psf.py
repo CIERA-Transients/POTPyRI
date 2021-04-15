@@ -42,6 +42,26 @@ def write_catalog(catfile, header, catdata):
         for line in catdata:
             f.write(line+'\n')
 
+def import_catalog(catfile):
+
+    hdu = fits.open(catfile)
+    header = hdu[0].header
+
+    colnames = []
+    i=1
+    while True:
+        key='COLUMN'+str(i).zfill(2)
+        if key in header.keys():
+            colnames.append(header[key])
+        else:
+            break
+
+    table = Table.read(catfile, data_start=1, format='ascii')
+    for i,col in enumerate(table.keys()):
+        table.rename_column(col,colnames[i])
+
+    return(header, table)
+
 # Add metadata from a dictionary to a catalog file
 def modify_catalog(catfile, metadata):
 
