@@ -9,7 +9,7 @@ from photutils.psf import BasicPSFPhotometry
 from astropy.io import fits
 from astropy.modeling.fitting import LevMarLSQFitter
 from astropy.nddata import NDData
-from astropy.stats import gaussian_sigma_to_fwhm
+from astropy.stats import gaussian_sigma_to_fwhm, sigma_clipped_stats
 from astropy.table import Table
 from astropy.visualization import simple_norm
 from astropy.wcs import WCS
@@ -23,61 +23,14 @@ import glob
 import copy
 import os
 
+from utilities.util import *
+
 import warnings
 warnings.filterwarnings('ignore')
 
 bkgrms = MADStdBackgroundRMS()
 mmm_bkg = MMMBackground()
 fitter = LevMarLSQFitter()
-
-def write_catalog(catfile, header, catdata):
-
-    # First write out the header to a fits file
-    hdu = fits.PrimaryHDU()
-    hdu.header=header
-    hdu.writeto(catfile, overwrite=True)
-
-    # Next append all catalog data to the file
-    with open(catfile, 'a') as f:
-        for line in catdata:
-            f.write(line+'\n')
-
-def import_catalog(catfile):
-
-    hdu = fits.open(catfile)
-    header = hdu[0].header
-
-    colnames = []
-    i=1
-    while True:
-        key='COLUMN'+str(i).zfill(2)
-        if key in header.keys():
-            colnames.append(header[key])
-        else:
-            break
-
-    table = Table.read(catfile, data_start=1, format='ascii')
-    for i,col in enumerate(table.keys()):
-        table.rename_column(col,colnames[i])
-
-    return(header, table)
-
-# Add metadata from a dictionary to a catalog file
-def modify_catalog(catfile, metadata):
-
-    # Get header and add metadata
-    header = fits.open(catfile)[0].header
-    for key in metadata.keys():
-        header[key] = metadataa[key]
-
-    # Get catalog data
-    catdata = []
-    with open(catfile, 'r') as f:
-        for i,line in enumerate(f):
-            if i==0: continue
-            catdata.append(line)
-
-    write_catalog(catfile, header, catdata)
 
 def generate_epsf(img_file, x, y, size=51, oversampling=2, maxiters=5):
     # Construct stars table from bright
@@ -204,6 +157,11 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
     stars = get_star_catalog(img_file, fwhm_init=star_param['fwhm_init'])
     img_hdu = fits.open(img_file)
 
+    # Get image statistics
+    mask = img_hdu[0].data!=0.0
+    mean, median, std_sky = sigma_clipped_stats(img_hdu[0].data[mask],
+        sigma=5.0)
+
     print('Found {0} stars'.format(len(stars)))
     stars = stars['xcentroid','ycentroid','fwhm','sharpness','roundness',
         'npix','pa','flux','sky']
@@ -223,7 +181,7 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
     fwhm = np.median(bright['fwhm'])
     std_fwhm = np.std(bright['fwhm'])
     print('Initial FWHM={0}+/-{1}'.format('%2.4f'%fwhm,'%2.4f'%std_fwhm))
-    metadata={'FWHM':fwhm, 'EFWHM':std_fwhm}
+    metadata={'FWHM':fwhm, 'EFWHM':std_fwhm, 'SKYADU': std_sky}
 
     mask = (bright['fwhm'] > fwhm-3*std_fwhm) &\
         (bright['fwhm'] < fwhm+3*std_fwhm)
