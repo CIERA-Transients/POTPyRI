@@ -42,11 +42,11 @@ def dvrms(x):
     return rms
 
 #plate solution
-# def plate_sol(starsx, starsy, gaiastarsra, gaiastarsdec):
 def apply_wcs_transformation(header,tform):
     crpix1, crpix2, cd11, cd12, cd21, cd22 = wcs_keyword = tel.WCS_keywords()
-    header[crpix1] = header[crpix1]+tform.translation[0]
-    header[crpix2] = header[crpix2]+tform.translation[1]
+    header[crpix1] = header[crpix1]-tform.translation[0]
+    header[crpix2] = header[crpix2]-tform.translation[1]
+    cd = np.array([header[cd11],header[cd12],header[cd21],header[cd22]]).reshape(2,2)
     cd_matrix = tf.EuclideanTransform(rotation=tform.rotation)
     cd_transformed = tf.warp(cd,cd_matrix)
     header[cd11] = cd_transformed[0][0]
@@ -55,61 +55,17 @@ def apply_wcs_transformation(header,tform):
     header[cd22] = cd_transformed[1][1]
     return header
 
-#function to remove old WCS keywords from header
-# def strip_header(hd):
-#     wcs_obj = wcs.WCS(hd)
-#     wcs_keywords_old = wcs_obj.to_header()
-#     for wcs_keyword in wcs_keywords_old:
-#         try:
-#             del hd[wcs_keyword]
-#         except:
-#             pass
-#     return hd
-
-#function to add new astrometric solution to header
-# def add_to_header(hd,crpix1,crpix2,c1,c2,num):
-#     hd['WCSAXES'] = 2
-#     hd['CRPIX1'] = crpix1
-#     hd['CRPIX2'] = crpix2
-#     hd['CRVAL1'] = c1[2]
-#     hd['CRVAL2'] = c2[2]
-#     hd['CUNIT1'] = 'deg'
-#     hd['CUNIT2'] = 'deg'
-#     hd['CTYPE1'] = 'RA---TNX'
-#     hd['CTYPE2'] = 'DEC--TNX'
-#     hd['CD1_1'] = c1[0]
-#     hd['CD1_2'] = c1[1]
-#     hd['CD2_1'] = c2[0]
-#     hd['CD2_2'] = c2[1]
-#     WAT0_001, WAT1_001, WAT1_002, WAT1_003, WAT1_004, WAT1_005, \
-#         WAT2_001, WAT2_002, WAT2_003, WAT2_004, WAT2_005 = tel.WCS_keywords()
-#     hd['WAT0_001'] = WAT0_001
-#     hd['WAT1_001'] = WAT1_001
-#     hd['WAT1_002'] = WAT1_002
-#     hd['WAT1_003'] = WAT1_003
-#     hd['WAT1_004'] = WAT1_004
-#     hd['WAT1_005'] = WAT1_005
-#     hd['WAT2_001'] = WAT2_001
-#     hd['WAT2_002'] = WAT2_002
-#     hd['WAT2_003'] = WAT2_003
-#     hd['WAT2_004'] = WAT2_004
-#     hd['WAT2_005'] = WAT2_005
-#     hd['RADESYSa'] = 'ICRS'
-#     hd['WCS_REF'] = ('GAIA-DR2', 'Reference catalog for astrometric solution.')
-#     hd['WCS_QUAD'] = (num, 'Number of stars used for astrometric solution.')
-#     return hd
-
 #function to calculate rms on astrometric solution
 #replaced np.median() with dvrms() -David V
-def calculate_error(d, coord1, coord2, hd):
-    rms_total = dvrms(d)
-    sep = [coord1[i].separation(coord2[i]) for i in range(len(coord1))]
+def calculate_error(coord1, coord2, hd):
+    sep = coord1.separation(coord2)
     d_ra = [s.hms[2] for s in sep]
     d_dec = [s.dms[2] for s in sep]
     rms_ra = dvrms(d_ra)
     rms_dec = dvrms(d_dec)
     hd['RA_RMS'] = (rms_ra, 'RMS of RA fit (arsec).')
     hd['DEC_RMS'] = (rms_dec, 'RMS of Dec fit (arcsec).')
+    rms_total = dvrms(sep.arcsec)
     return rms_total
 
 def run_sextractor(input_file, cat_name, tel, sex_config_dir='./Config'):
@@ -236,7 +192,7 @@ def match_quads(stars,gaiastars,d,gaiad,ds,gaiads,ratios,gaiaratios,sky_coords=T
     return np.array(starsx_unq[0:len(gaiastarsra_unq)]), np.array(starsy_unq[0:len(gaiastarsdec_unq)]), np.array(gaiastarsra_unq[0:len(starsx_unq)]), np.array(gaiastarsdec_unq[0:len(starsy_unq)])
 
 #main function to calculate astrometric solution
-def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None):
+def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None, proc=None):
     #start time
     t_start = time.time()
     #import telescope parameter file
@@ -258,7 +214,7 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
 
     #run sextractor
     cat_name = input_file.replace('.fits','.cat')
-    table = run_sextractor(input_file, cat_name, tel, tel.static_mask(), sex_config_dir=sex_config_dir)
+    table = run_sextractor(input_file, cat_name, tel, sex_config_dir=sex_config_dir)
 
     #mask and sort table
     table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
@@ -294,50 +250,19 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
             ds,gaiads,ratios,gaiaratios,sky_coords=True)
 
     #calculate transformation
-    tform = tf.estimate_transform('euclidean', np.c_[starsx, starsy], np.c_[gaiastarsra, gaiastarsdec])
+    gaiax, gaiay = wcs.utils.skycoord_to_pixel(SkyCoord(gaiastarsra,gaiastarsdec, unit='deg'), wcs.WCS(header), 1)
+    tform = tf.estimate_transform('euclidean', np.c_[starsx, starsy], np.c_[gaiax, gaiay])
 
     #apply transformation to header
-    header_new = tel.apply_wcs_transformation(header,tform)
+    header_new = apply_wcs_transformation(header,tform)
     header_new['WCS_REF'] = ('GAIA-DR2', 'Reference catalog for astrometric solution.')
     header_new['WCS_NUM'] = (len(starsx), 'Number of stars used for astrometric solution.')
 
-    #load ref pixels
-    # crpix1, crpix2 = tel.ref_pix()
-
-    #solve plate sol
-    # c1 = curve_fit(plate_sol,(starsx-crpix1,starsy-crpix2),gaiastarsra,p0=(0,0,ra))[0]
-    # c2 = curve_fit(plate_sol,(starsx-crpix1,starsy-crpix2),gaiastarsdec,p0=(0,0,dec))[0]
-
-    # #strip header of WCS
-    # hd = strip_header(header)
-
-    # #add new WCS header keywords
-    # header_new = add_to_header(hd,crpix1,crpix2,c1,c2,len(starsx))
-
-    #match stars
-    stars_ra, stars_dec = (wcs.WCS(header_new)).all_pix2world(table[:50]['XWIN_IMAGE'],
-        table[:50]['YWIN_IMAGE'],1)
-    stars = SkyCoord(stars_ra*u.deg,stars_dec*u.deg)
-    mask = mask_catalog_for_wcs(gaiaorig, wcs.WCS(header_new), 1, data_x, data_y)
-    gaia = gaiaorig[mask]
-    gaia_stars = SkyCoord(gaia['ra'],gaia['dec'], unit='deg')
-
-    idx, d2, d3 = gaia_stars.match_to_catalog_sky(stars)
-    idx_m = {}
-    for i in range(len(idx)):
-        if len(np.where(idx==idx[i])[0]) > 1:
-            idx_db = np.where(idx==idx[i])[0]
-            d2_m = idx_db[d2.arcsec[idx_db]==np.min(d2.arcsec[idx_db])][0]
-        else:
-            d2_m = i
-        if d2[d2_m].arcsec < 15:
-            idx_m.update({idx[i]:d2_m})
-    d2_m = [d2[idx_m[i]].arcsec for i in idx_m]
-    stars_idx = [stars[i] for i in idx_m]
-    gaia_idx = [gaia_stars[idx_m[i]] for i in idx_m]
-
-    #calculate error. This error now uses dvrms() instead of np.median. 
-    error = calculate_error(d2_m, stars_idx, gaia_stars, header_new)
+    #calculate error. This error now uses dvrms() instead of np.median.
+    stars_ra, stars_dec = (wcs.WCS(header_new)).all_pix2world(starsx,starsy,1)
+    stars_radec = SkyCoord(stars_ra*u.deg,stars_dec*u.deg)
+    gaia_radec = SkyCoord(gaiastarsra,gaiastarsdec, unit='deg')
+    error = calculate_error(stars_radec, gaia_radec, header_new)
     print('%7.4f rms error in WCS solution'%error)
 
     #write out new fits
@@ -353,9 +278,11 @@ def main():
     params = argparse.ArgumentParser(description='Path of data.')
     params.add_argument('input_file', default=None, help='Name of file.')
     params.add_argument('--telescope', default=None, help='')
+    params.add_argument('--proc', default=None, help='')
+    params.add_argument('--static_mask', default=None, help='')
     args = params.parse_args()
 
-    solve_wcs(args.input_file,telescope=args.telescope)
+    solve_wcs(args.input_file,telescope=args.telescope,proc=args.proc,static_mask=args.static_mask)
 
 if __name__ == "__main__":
     main()
