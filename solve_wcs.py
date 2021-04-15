@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "3.0" #last updated 14/04/2021
+__version__ = "3.1" #last updated 15/04/2021
 
 import sys
 import numpy as np
@@ -53,6 +53,19 @@ def apply_wcs_transformation(header,tform):
     header[cd12] = cd_transformed[0][1]
     header[cd21] = cd_transformed[1][0]
     header[cd22] = cd_transformed[1][1]
+    WAT0_001, WAT1_001, WAT1_002, WAT1_003, WAT1_004, WAT1_005, \
+        WAT2_001, WAT2_002, WAT2_003, WAT2_004, WAT2_005 = tel.WCS_distortion()
+    header['WAT0_001'] = WAT0_001
+    header['WAT1_001'] = WAT1_001
+    header['WAT1_002'] = WAT1_002
+    header['WAT1_003'] = WAT1_003
+    header['WAT1_004'] = WAT1_004
+    header['WAT1_005'] = WAT1_005
+    header['WAT2_001'] = WAT2_001
+    header['WAT2_002'] = WAT2_002
+    header['WAT2_003'] = WAT2_003
+    header['WAT2_004'] = WAT2_004
+    header['WAT2_005'] = WAT2_005
     return header
 
 #function to calculate rms on astrometric solution
