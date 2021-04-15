@@ -1,11 +1,13 @@
 import numpy as np
 import os
 import sys
-from Vizier_catalogs import find_catalog
+
 from astroquery.vizier import Vizier
 from astropy import units as u
 from astropy.coordinates import SkyCoord
-from psf import *
+from Vizier_catalogs import find_catalog
+
+from utilities.util import *
 
 class absphot(object):
     def __init__(self, iterations=5, sigma=5):
@@ -56,7 +58,7 @@ class absphot(object):
             flux=flux[mask] ; fluxerr=fluxerr[mask]
             mag=mag[mask] ; magerr=magerr[mask]
 
-            m='Iteraction {i}: {N} obj, zpt = {zpt}+/-{zpterr}, {s}-sigma '+\
+            m='Iteration {i}: {N} obj, zpt = {zpt}+/-{zpterr}, {s}-sigma '+\
                 'clip to {M} obj'
             print(m.format(i=i, N=nobj, zpt='%2.4f'%zpt, zpterr='%2.4f'%zpterr,
                 s=self.sigma, M=len(flux)))
@@ -108,7 +110,7 @@ class absphot(object):
                 match_table.add_row(table[i])
 
         metadata = {}
-        metadata['nmatch']=len(match_table)
+        metadata['ZPTNSTAR']=len(match_table)
 
         zpt, zpterr = self.zpt_iteration(match_table['flux'],
             match_table['flux_err'], cat['mag'], cat['mag_err'])
@@ -117,10 +119,13 @@ class absphot(object):
         metadata['ZPTMUCER']=zpterr
 
         # Add limiting magnitudes
-        if 'FWHM' in header.keys():
+        if 'FWHM' in header.keys() and 'SKYADU' in header.keys():
             fwhm = header['FWHM']
+            sky = header['SKYADU']
             Npix_per_FWHM_Area = 2.5 * 2.5 * fwhm * fwhm
+            skysig_per_FWHM_Area = np.sqrt(Npix_per_FWHM_Area * (sky*sky))
+            metadata['M3SIGMA']=-2.5*np.log10(3.0*skysig_per_FWHM_Area)+zpt
+            metadata['M5SIGMA']=-2.5*np.log10(5.0*skysig_per_FWHM_Area)+zpt
+            metadata['M10SIGMA']=-2.5*np.log10(10.0*skysig_per_FWHM_Area)+zpt
 
-        modify_catalog(cmpfile)
-
-        print(zpt, zpterr)
+        modify_catalog(cmpfile, metadata)
