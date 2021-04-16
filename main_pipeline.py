@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.0" #last updated 14/04/2021
+__version__ = "1.0" #last updated 16/04/2021
 
 import sys
 import numpy as np
@@ -226,6 +226,8 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
                 sci_med.header['NFILES'] = len(aligned)
                 sci_med.write(stack[0],overwrite=True)
                 log.info('Median stack made for '+str(tar))
+                log.info('Solving WCS')
+                solve_wcs.solve_wcs(stack[0],telescope)
             else:
                 log.info('Multiple extensions to stack.')
                 suffix = tel.suffix()
@@ -241,7 +243,9 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
                     sci_med.header['RDNOISE'] = tel.rdnoise(sci_med.header)/np.sqrt(len(aligned))
                     sci_med.header['NFILES'] = len(aligned)
                     sci_med.write(stack[k],overwrite=True)
-                    log.info('Median stack made for '+str(tar))                    
+                    log.info('Median stack made for '+str(tar))
+                    log.info('Solving WCS')
+                    solve_wcs.solve_wcs(stack[k],telescope)           
 
 
 def main():
