@@ -697,9 +697,55 @@ def crossmatch_tables(table1, table2, t1name, t2name, radius=2.0 * u.arcsec,
     # Final mtable should contain all information from table1 and table2
     return(mtable)
 
+def write_catalog(catfile, header, catdata):
 
+    # First write out the header to a fits file
+    hdu = fits.PrimaryHDU()
+    hdu.header=header
+    hdu.writeto(catfile, overwrite=True)
 
+    # Next append all catalog data to the file
+    with open(catfile, 'a') as f:
+        for line in catdata:
+            f.write(line+'\n')
 
+def import_catalog(catfile):
+
+    hdu = fits.open(catfile)
+    header = hdu[0].header
+
+    colnames = []
+    j=1
+    while True:
+        key='COLUM'+str(j).zfill(2)
+        if key in header.keys():
+            colnames.append(header[key])
+            j=j+1
+        else:
+            break
+
+    table = Table.read(catfile, data_start=1, format='ascii')
+    for i,col in enumerate(table.keys()):
+        table.rename_column(col,colnames[i])
+
+    return(header, table)
+
+# Add metadata from a dictionary to a catalog file
+def modify_catalog(catfile, metadata):
+
+    # Get header and add metadata
+    header = fits.open(catfile)[0].header
+    for key in metadata.keys():
+        header[key] = metadata[key]
+
+    # Get catalog data
+    catdata = []
+    with open(catfile, 'r') as f:
+        for i,line in enumerate(f):
+            if i==0: continue
+            catdata.append(line)
+
+    write_catalog(catfile, header, catdata)
 
 
 
