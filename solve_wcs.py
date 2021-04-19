@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "3.1" #last updated 15/04/2021
+__version__ = "3.2" #last updated 19/04/2021
 
 import sys
 import numpy as np
@@ -22,6 +22,7 @@ from astropy.table import Table
 from astropy.utils.exceptions import AstropyWarning, AstropyDeprecationWarning
 from astroquery.gaia import Gaia
 from skimage import transform as tf
+from scipy.optimize import curve_fit
 from scipy import stats
 import itertools
 import importlib
@@ -44,28 +45,41 @@ def dvrms(x):
 #plate solution
 def apply_wcs_transformation(header,tform):
     crpix1, crpix2, cd11, cd12, cd21, cd22 = wcs_keyword = tel.WCS_keywords()
-    header[crpix1] = header[crpix1]-tform.translation[0]
-    header[crpix2] = header[crpix2]-tform.translation[1]
+    header['CRPIX1'] = header[crpix1]-tform.translation[0]
+    header['CRPIX2'] = header[crpix2]-tform.translation[1]
     cd = np.array([header[cd11],header[cd12],header[cd21],header[cd22]]).reshape(2,2)
     cd_matrix = tf.EuclideanTransform(rotation=tform.rotation)
     cd_transformed = tf.warp(cd,cd_matrix)
-    header[cd11] = cd_transformed[0][0]
-    header[cd12] = cd_transformed[0][1]
-    header[cd21] = cd_transformed[1][0]
-    header[cd22] = cd_transformed[1][1]
-    WAT0_001, WAT1_001, WAT1_002, WAT1_003, WAT1_004, WAT1_005, \
-        WAT2_001, WAT2_002, WAT2_003, WAT2_004, WAT2_005 = tel.WCS_distortion()
-    header['WAT0_001'] = WAT0_001
-    header['WAT1_001'] = WAT1_001
-    header['WAT1_002'] = WAT1_002
-    header['WAT1_003'] = WAT1_003
-    header['WAT1_004'] = WAT1_004
-    header['WAT1_005'] = WAT1_005
-    header['WAT2_001'] = WAT2_001
-    header['WAT2_002'] = WAT2_002
-    header['WAT2_003'] = WAT2_003
-    header['WAT2_004'] = WAT2_004
-    header['WAT2_005'] = WAT2_005
+    header['CD1_1'] = cd_transformed[0][0]
+    header['CD1_2'] = cd_transformed[0][1]
+    header['CD2_1'] = cd_transformed[1][0]
+    header['CD2_2'] = cd_transformed[1][1]
+    header['CTYPE1'] = 'RA---TPV'
+    header['CTYPE2'] = 'DEC--TPV'
+    old_keywords = tel.WCS_keywords_old()
+    for old in old_keywords:
+        del header[old]
+    return header
+
+def ptv_fit(data,*p):
+    xi,eta=data
+    r = np.sqrt(xi**2+eta**2)
+    d = [1,xi,eta,r,xi**2,xi*eta,eta**2,xi**3,xi**2*eta,xi*eta**2,eta**3,r**3]
+    if len(d) < len(p):
+        return np.sum([p[i]*d[i] for i in range(len(d))])
+    if len(d) > len(p):
+        return np.sum([p[i]*d[i] for i in range(len(p))])
+
+def apply_wcs_distortion(header,starsx,starsy,gaiastarsra,gaiastarsdec):
+    xi = header['CD1_1']*(starsx-header['CRPIX1'])+header['CD1_2']*(starsy-header['CRPIX2'])
+    eta = header['CD2_1']*(starsx-header['CRPIX1'])+header['CD2_2']*(starsy-header['CRPIX2'])
+    dra, ddec = SkyCoord(header['CRVAL1'],header['CRVAL2'],unit='deg').spherical_offsets_to(SkyCoord(gaiastarsra,gaiastarsdec,unit='deg'))
+    p0 = [0,1]+[0]*(len(xi)-2)
+    p1 = curve_fit(ptv_fit,(xi,eta),dra,p0=p0)[0]
+    p2 = curve_fit(ptv_fit,(eta,xi),ddec,p0=p0)[0]
+    for i in range(len(p1)):
+        header['PV1_'+str(int(i))] = p1[i]
+        header['PV2_'+str(int(i))] = p2[i]
     return header
 
 #function to calculate rms on astrometric solution
@@ -271,15 +285,18 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
     header_new['WCS_REF'] = ('GAIA-DR2', 'Reference catalog for astrometric solution.')
     header_new['WCS_NUM'] = (len(starsx), 'Number of stars used for astrometric solution.')
 
+    #calculate polynomial distortion
+    header_dist = apply_wcs_distortion(header_new,starsx,starsy,gaiastarsra,gaiastarsdec)
+
     #calculate error. This error now uses dvrms() instead of np.median.
-    stars_ra, stars_dec = (wcs.WCS(header_new)).all_pix2world(starsx,starsy,1)
+    stars_ra, stars_dec = (wcs.WCS(header_dist)).all_pix2world(starsx,starsy,1)
     stars_radec = SkyCoord(stars_ra*u.deg,stars_dec*u.deg)
     gaia_radec = SkyCoord(gaiastarsra,gaiastarsdec, unit='deg')
-    error = calculate_error(stars_radec, gaia_radec, header_new)
+    error = calculate_error(stars_radec, gaia_radec, header_dist)
     print('%7.4f rms error in WCS solution'%error)
 
     #write out new fits
-    fits.writeto(input_file.replace('.fits','_wcs.fits'),data,header_new,overwrite=True)
+    fits.writeto(input_file.replace('.fits','_wcs.fits'),data,header_dist,overwrite=True)
 
     #end and run time
     t_end = time.time()
