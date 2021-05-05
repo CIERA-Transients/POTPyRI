@@ -17,6 +17,7 @@ import copy
 import pickle
 import requests
 import warnings
+import re
 from contextlib import contextmanager
 
 warnings.filterwarnings('ignore')
@@ -748,7 +749,56 @@ def modify_catalog(catfile, metadata):
     write_catalog(catfile, header, catdata)
 
 
+def get_grb_gcn(grb):
+    url='https://gcn.gsfc.nasa.gov/gcn/other/{0}.gcn3'
+    grb = grb.upper()
+    grb = grb.replace('GRB','')
+    grb = grb.strip()
+    if len(grb)==9:
+        grb=grb[2:]
 
+    url = url.format(grb)
+    r = requests.get(url)
 
+    if r.status_code==200:
+        text = r.text
+        text = text.replace('\n',' ')
+        text = text.replace('\r',' ')
 
+        # GCNs are separated by 72 / characters in a row
+        gcns = text.split('/'*72)
+        # Usually there's a header at the top, so first one will be blank
+        gcns=np.array([g for g in gcns if g.strip()])
+
+        return(gcns)
+
+def get_mag_mask(gcns):
+    # Check each GCN for some indication that there is a magnitude reported
+    mag_str = [' mag ',' mag.','magnitude']
+    mask = np.array([any([m in g for m in mag_str]) for g in gcns])
+    return(mask)
+
+def parse_circular_number(gcn):
+    regex=r'GCN CIRCULAR NUMBER:\s+[0-9]+'
+    result = re.search(regex, gcn)
+
+    if result is not None:
+        num=result.group().replace('GCN CIRCULAR NUMBER:','')
+        num=int(num)
+        return(num)
+
+def parse_circular_subject(gcn):
+    regex=r'SUBJECT: .+DATE:'
+
+    result = re.search(regex, gcn)
+
+    if result is not None:
+        subj=result.group().replace('SUBJECT:','').replace('DATE:','')
+        subj=subj.strip()
+        return(subj)
+
+def get_gcn_url(num):
+    url='https://gcn.gsfc.nasa.gov/gcn/gcn3/{0}.gcn3'
+    url=url.format(num)
+    return(url)
 
