@@ -38,6 +38,8 @@ def generate_epsf(img_file, x, y, size=51, oversampling=2, maxiters=5):
     stars_tbl['x'] = x
     stars_tbl['y'] = y
 
+    print(stars_tbl)
+
     img_hdu = fits.open(img_file)
     ndimage = NDData(data=img_hdu[0].data)
 
@@ -150,9 +152,9 @@ def write_out_catalog(catalog, img_file, columns, sigfig, outfile, metadata):
 
 def do_phot(img_file, write_out_back=False, write_out_residual=False,
     write_out_epsf_img=True, write_out_epsf_file=True, write_out_psf_stars=True,
-    outdir='', subtract_back=False,
-    star_param={'sharp_cut': 1.0, 'round_cut': 0.5, 'snthresh_psf': 20.0,
-        'fwhm_init': 8.0, 'snthresh_final': 5.0}):
+    outdir='', subtract_back=False, fwhm_scale_psf=3.0,
+    star_param={'sharp_cut': 1.0, 'round_cut': 0.5, 'snthresh_psf': 25.0,
+        'fwhm_init': 15.0, 'snthresh_final': 5.0}):
 
     stars = get_star_catalog(img_file, fwhm_init=star_param['fwhm_init'])
     img_hdu = fits.open(img_file)
@@ -210,8 +212,10 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
         backsubhdu.writeto(backsub_file, overwrite=True)
 
     # Instantiate EPSF
+    size=int(fwhm*fwhm_scale_psf)
+    if size%2==0: size=size+1
     epsf = generate_epsf(img_file, bright['xcentroid'],
-        bright['ycentroid'], size=51, oversampling=2, maxiters=5)
+        bright['ycentroid'], size=size, oversampling=2, maxiters=5)
     print('\n')
 
     mask = (stars['flux']/stars['flux_err'] > star_param['snthresh_final'])
