@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.0" #last updated 16/04/2021
+__version__ = "1.0" #last updated 20/04/2021
 
 import sys
 import numpy as np
@@ -28,8 +28,9 @@ import importlib
 import Sort_files
 import align_quads
 import solve_wcs
+import quality_check
 
-def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,proc=None,use_dome_flats=None):
+def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,proc=None,use_dome_flats=None,phot=None):
     #start time
     t_start = time.time()
     #import telescope parameter file
@@ -58,6 +59,11 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
         cal_path = cal_path
     else:
         cal_path = tel.cal_path() #os.getenv("HOME")+'/Pipelines/MMIRS_calib/'
+    if cal_path:             
+        flat_path = cal_path
+    else:
+        flat_path = red_path
+
 
     wavelength = tel.wavelength()
 
@@ -73,12 +79,18 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
     streamhandler.setFormatter(formatter) #add format to log stream
     log.addHandler(streamhandler) #link logger to log stream
 
+    log.info('Running main pipeline version '+str(__version__))
+    log.info('Running telescope paramater file version '+str(tel.__version__))
+
     if os.path.exists(data_path+'/file_list.txt'):
-        cal_list, sci_list, sky_list, time_list = Sort_files.load_files(data_path+'/file_list.txt', telescope)
+        log.info('Previous file list exists, loading lists.')
+        cal_list, sci_list, sky_list, time_list = Sort_files.load_files(data_path+'/file_list.txt', telescope,log)
     else:
+        log.info('Sorting files and creating file lists.')
         files = sorted(glob.glob(data_path+tel.raw_format(proc)))
         if len(files) != 0:
-            cal_list, sci_list, sky_list, time_list = Sort_files.sort_files(files,telescope,data_path)
+            log.info(str(len(files))+' files found.')
+            cal_list, sci_list, sky_list, time_list = Sort_files.sort_files(files,telescope,data_path,log)
         else:
             log.critical('No files found, please check data path and rerun.')
             logging.shutdown()
@@ -87,80 +99,95 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
     if tel.bias():
         if len(cal_list['BIAS']) != 0:
             process_bias = True
-            if skip_red == 'True' or skip_red == 'yes':
+            if skip_red:
+                log.info('User input to skip reduction.')
                 if os.path.exists(red_path+'mbias.fits'):
+                    log.info('Found previous master bias, loading.')
                     mbias = CCDData.read(red_path+'mbias.fits', unit=u.electron)
                     process_bias = False
                 else:
                     log.error('No master bias found, creating master bias.')
             if process_bias:
-                processed = []
-                for bias in cal_list['BIAS']:
-                    try:
-                        raw = CCDData.read(bias, hdu=1, unit='adu')
-                    except astropy.io.registry.IORegistryError:
-                        log.error('File '+bias+' not recognized.')
-                    processed.append(ccdproc.ccd_process(raw, gain=raw.header['GAIN']*u.electron/u.adu, readnoise=raw.header['RDNOISE']*u.electron))
-                mbias = ccdproc.combine(processed,method='median')
-                mbias.write(red_path+'mdark.fits',overwrite=True)
+                t1 = time.time()
+                log.info('Processing bias files.')
+                mbias = tel.create_bias(cal_list,red_path,log)
+                t2 = time.time()
+                log.info('Master bias creation completed in '+str(t2-t1)+' sec')
         else:
-            log.critical('No bias present, check data before rerunning.')
+            log.critical('No bias files present, check data before rerunning.')
             logging.shutdown()
             sys.exit(-1)
     else:
         mbias = None
 
     if tel.dark():
-        if len(cal_list['DARK']) != 0:
-            process_dark = True
-            if skip_red == 'True' or skip_red == 'yes':
-                if os.path.exists(red_path+'mdark.fits'):
-                    mdark = CCDData.read(red_path+'mdark.fits', unit=u.electron)
-                    process_dark = False
-                else:
-                    log.error('No master dark found, creating master dark.')
-            if process_dark:
-                processed = []
-                for dark in cal_list['DARK']:
-                    try:
-                        raw = CCDData.read(dark, hdu=1, unit='adu')
-                    except astropy.io.registry.IORegistryError:
-                        log.error('File '+dark+' not recognized.')
-                    processed.append(ccdproc.ccd_process(raw, gain=raw.header['GAIN']*u.electron/u.adu, readnoise=raw.header['RDNOISE']*u.electron, master_bias=mbias))
-                mdark = ccdproc.combine(processed,method='median')
-                mdark.write(red_path+'mdark.fits',overwrite=True)
-        else:
-            log.critical('No darks present, check data before rerunning.')
-            logging.shutdown()
-            sys.exit(-1)
-    else:
-        mdark = None
+        for cal in cal_list:
+            if 'DARK' in cal:
+                process_dark = True
+                if skip_red:
+                    log.info('User input to skip reduction.')
+                    if os.path.exists(red_path+cal+'.fits'):
+                        log.info('Found previous master dark, loading.')
+                        process_dark = False
+                    else:
+                        log.error('No master dark found, creating master dark.')
+                if process_dark:
+                    t1 = time.time()
+                    tel.create_dark(cal_list,cal,mbias,red_path,log)
+                    t2 = time.time()
+                    log.info('Master dark creation completed in '+str(t2-t1)+' sec')
 
     if tel.flat():
         for cal in cal_list:
             if 'FLAT' in cal:
+                process_flat = True
                 fil = cal.split('_')[-1]
-                if wavelength=='OPT':
-                    for cal in cal_list:
-                        if 'FLAT' in cal:
-                            tel.create_flat(cal_list[cal],fil,red_path,mdark=mdark,mbias=mbias)
-                elif wavelength=='NIR':
-                    if use_dome_flats == 'yes' or use_dome_flats == 'True': #use dome flats instead of sky flats for NIR
-                        flat_type = 'dome'
-                        log.info('User set option to use dome flats to create master flat')
-                        log.info(str(len(cal_list[cal]))+' dome flats found for filter '+fil)
-                        tel.create_flat(cal_list[cal])
-        if wavelength=='NIR' and use_dome_flats != 'yes' and use_dome_flats != 'True': #default to use science files for master flat creation
+                if skip_red:
+                    log.info('User input to skip reduction.')
+                    master_flat = tel.flat_name(flat_path, fil)
+                    if np.all([os.path.exists(mf) for mf in master_flat]):
+                        log.info('Found previous master flat for filter '+fil)
+                        process_flat = False
+                    else:
+                        log.info('No master flat found for filter '+fil+', creating master flat.')
+                if process_flat:
+                    if wavelength=='OPT':
+                        t1 = time.time()
+                        tel.create_flat(cal_list[cal],fil,red_path,mbias=mbias,log=log)
+                        t2 = time.time()
+                        log.info('Master flat creation completed in '+str(t2-t1)+' sec')
+                    elif wavelength=='NIR':
+                        if use_dome_flats: #use dome flats instead of sky flats for NIR
+                            log.info('User input to use dome flats to create master flat')
+                            flat_type = 'dome'
+                            t1 = time.time()
+                            tel.create_flat(cal_list[cal],fil,red_path,mbias=mbias,log=log)
+                            t2 = time.time()
+                            log.info('Master flat creation completed in '+str(t2-t1)+' sec')
+        if wavelength=='NIR' and not use_dome_flats: #default to use science files for master flat creation
             for fil_list in sky_list:
-                flat_type = 'sky'
-                log.info('Using science files to create master flat')
-                tel.create_flat(sky_list[fil_list],fil_list,red_path,mdark=mdark,mbias=mbias)
-
+                process_flat = True
+                if skip_red:
+                    log.info('User input to skip reduction.')
+                    master_flat = tel.flat_name(flat_path, fil_list)
+                    if np.all([os.path.exists(mf) for mf in master_flat]):
+                        log.info('Found previous master flat for filter '+fil_list)
+                        process_flat = False
+                    else:
+                        log.info('No master flat found for filter '+fil_list+', creating master flat.')
+                if process_flat:              
+                    flat_type = 'sky'
+                    log.info('Using science files to create master flat')
+                    t1 = time.time()
+                    tel.create_flat(sky_list[fil_list],fil_list,red_path,mbias=mbias,log=log)
+                    t2 = time.time()
+                    log.info('Master flat creation completed in '+str(t2-t1)+' sec')
+    
     if len(sci_list) == 0:
         log.critical('No science files to process, check data before rerunning.')
         logging.shutdown()
         sys.exit(-1)     
-    log.info('User specified a target for reduction: '+str(target))
+    log.info('User input target for reduction: '+str(target))
     for tar in sci_list:
         stack = tel.stacked_image(tar,red_path)
         target = tar.split('_')[0]
@@ -171,28 +198,30 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
             else:
                 log.info('Matching target found: '+tar)
         process_data = True
-        if skip_red == 'True' or skip_red == 'yes':
+        if skip_red:
+            log.info('User input to skip reduction.')
+            if tel.run_wcs():
+                final_stack = [st.replace('.fits','_wcs.fits') for st in stack]
+            else:
+                final_stack = stack
             if np.all([os.path.exists(st) for st in stack]):
-                # with fits.open(red_path+tar+'.fits',mode='update') as hdr:
-                #     sci_med = hdr[0].data
-                #     wcs_object = wcs.WCS(hdr[0].header)
-                # processed = [x.replace(sci_path,red_path).replace('.fits','_red.fits') for x in sci_list[tar]]
                 process_data = False
             else:
-                log.error('No reduced image found, processing data.')      
+                log.error('Missing stacks, processing data.')   
         if process_data:
-            if cal_path:             
-                master_flat = tel.flat_name(cal_path, fil)
-            else:
-                master_flat = tel.flat_name(red_path, fil)
+            log.info('Loading master flat.')
+            master_flat = tel.flat_name(flat_path, fil)
             if not np.all([os.path.exists(mf) for mf in master_flat]):
                 log.error('No master flat present for filter '+fil+', skipping data reduction for '+tar+'. Check data before rerunning')
                 continue
             flat_data = tel.load_flat(master_flat)
+            t1 = time.time()
             log.info('Processing data for '+str(tar))
-            processed, masks = tel.process_science(sci_list[tar],fil,mdark=mdark,mbias=mbias,mflat=flat_data,proc=proc)
-            log.info('Data processed.')
+            processed, masks = tel.process_science(sci_list[tar],fil,red_path,mbias=mbias,mflat=flat_data,proc=proc,log=log)
+            t2 = time.time()
+            log.info('Data processed in '+str(t2-t1)+' sec')
             if wavelength=='NIR':
+                t1 = time.time()
                 log.info('NIR data, creating NIR sky maps.')
                 for j,n in enumerate(processed):
                     time_diff = sorted([(abs(time_list[tar][j]-n2),k) for k,n2 in enumerate(time_list[tar])])
@@ -213,39 +242,47 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
                     sky.header = sky_hdu.header
                     sky.write(red_path+os.path.basename(sci_list[tar][j]).replace('.fits','_sky.fits'),overwrite=True)
                     processed[j] = n.subtract(sky,propagate_uncertainties=True,handle_meta='first_found')
+                t2 = time.time()
+                log.info('Sky maps complete and subtracted in '+str(t2-t1)+' sec')
+            log.info('Writing out reduced data.')
             dimen = len(stack)
             if dimen == 1:
-                red_list = [red_path+os.path.basename(sci).replace('.fits','_red.fits') for sci in sci_list[tar]]
-                for j,process_data in enumerate(processed):
-                    process_data.write(red_list[j],overwrite=True)
-                log.info('Aligning images.')
-                aligned = align_quads.align_stars(red_list,telescope,hdu=tel.wcs_extension(),mask=tel.static_mask(proc))
-                log.info('Images aligned, creating median stack.')
-                sci_med = ccdproc.combine(aligned,method='median',sigma_clip=True,sigma_clip_func=np.ma.median)
-                sci_med.header['RDNOISE'] = tel.rdnoise(sci_med.header)/np.sqrt(len(aligned))
-                sci_med.header['NFILES'] = len(aligned)
-                sci_med.write(stack[0],overwrite=True)
-                log.info('Median stack made for '+str(tar))
-                log.info('Solving WCS')
-                solve_wcs.solve_wcs(stack[0],telescope)
+                suffix = ['_red.fits']
             else:
                 log.info('Multiple extensions to stack.')
                 suffix = tel.suffix()
-                mask = tel.static_mask(proc)
-                for k in range(dimen):
-                    red_list = [red_path+os.path.basename(sci).replace('.fits',suffix[k]) for sci in sci_list[tar]]
+            mask = tel.static_mask(proc)
+            for k in range(dimen):
+                red_list = [red_path+os.path.basename(sci).replace('.fits',suffix[k]) for sci in sci_list[tar]]
+                if dimen == 1:
+                    for j,process_data in enumerate(processed):
+                        process_data.write(red_list[j],overwrite=True)
+                else:
                     for j,process_data in enumerate(processed[k]):
                         process_data.write(red_list[j],overwrite=True)
-                    log.info('Aligning images.')
-                    aligned = align_quads.align_stars(red_list,telescope,hdu=tel.wcs_extension(),mask=mask[k])
-                    log.info('Images aligned, creating median stack.')
-                    sci_med = ccdproc.combine(aligned,method='median',sigma_clip=True,sigma_clip_func=np.ma.median)
-                    sci_med.header['RDNOISE'] = tel.rdnoise(sci_med.header)/np.sqrt(len(aligned))
-                    sci_med.header['NFILES'] = len(aligned)
-                    sci_med.write(stack[k],overwrite=True)
-                    log.info('Median stack made for '+str(tar))
+                log.info('Aligning images.')
+                aligned_images, aligned_data = align_quads.align_stars(red_list,telescope,hdu=tel.wcs_extension(),mask=mask[k],log=log)
+                log.info('Checking qualty of images.')
+                stacking_data, mid_time = quality_check.quality_check(aligned_images, aligned_data, telescope, log)
+                log.info('Creating median stack.')
+                sci_med = ccdproc.combine(stacking_data,method='median',sigma_clip=True,sigma_clip_func=np.ma.median)
+                sci_med.header['MJD-OBS'] = (mid_time, 'Mid-MJD of the observation sequence calculated using DATE-OBS.')
+                sci_med.header['EXPTIME'] = (1, 'Effective expsoure tiime for the stack in seconds.')
+                sci_med.header['GAIN'] = (1, 'Effecetive gain for stack.')
+                sci_med.header['RDNOISE'] = (tel.rdnoise(sci_med.header)/np.sqrt(len(aligned_images)), 'Readnoise of stack.')
+                sci_med.header['NFILES'] = (len(aligned_images), 'Number of images in stack')
+                sci_med.write(stack[k],overwrite=True)
+                log.info('Median stack made for '+stack[k])
+                if tel.run_wcs():
                     log.info('Solving WCS')
-                    solve_wcs.solve_wcs(stack[k],telescope)           
+                    wcs_error = solve_wcs.solve_wcs(stack[k],telescope,log=log)   
+                    log.info(wcs_error)
+                    stack[k] = stack[k].replace('.fits','_wcs.fits')
+        #do auto phot
+        #if phot: do manual
+    t_end = time.time()
+    log.info('Pipeline finshed.')
+    log.info('Total runtime: '+str(t_end-t_start)+' sec')
 
 
 def main():
@@ -257,11 +294,10 @@ def main():
     params.add_argument('--target', type=str, default=None, help='Option to only reduce this target.') #
     params.add_argument('--proc', type=str, default=None, help='If working with the _proc data from MMT.')
     params.add_argument('--cal_path', type=str, default=None, help='Use dome flats for flat reduction.') #use dome flat instead of sci images to create master flat
-    params.add_argument('--wcs', type=str, default=None, help='Option to use IRAF to apply WCS.') #must have pyraf install and access to IRAF to use
     params.add_argument('--phot', type=str, default=None, help='Option to use IRAF to perform photometry.') #must have pyraf install and access to IRAF to use
     args = params.parse_args()
     
-    main_pipeline(args.telescope,args.data_path,args.cal_path,target=args.target,skip_red=args.skip_red,proc=args.proc,use_dome_flats=args.use_dome_flats)
+    main_pipeline(args.telescope,args.data_path,args.cal_path,target=args.target,skip_red=args.skip_red,proc=args.proc,use_dome_flats=args.use_dome_flats,phot=args.phot)
 
 if __name__ == "__main__":
     main()

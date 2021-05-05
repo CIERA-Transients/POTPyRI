@@ -3,18 +3,19 @@
 "Function to sort files for main_pipeline."
 "Authors: Owen Eskandari, Kerry Paterson"
 
-__version__ = "2.0" #last updated 15/03/2021
+__version__ = "2.1" #last updated 26/04/2021
 
 from astropy.io import fits
 from astropy.table import Table
 import os
+import time
 import shutil
 import importlib
 import tel_params
 import numpy as np
 
 # Sort the calibration files:
-def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=None,
+def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, date=None,
 
     '''
 
@@ -47,6 +48,10 @@ def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=Non
 
     '''
 
+    t_start = time.time()
+    
+    log.info('Running sort_files version: '+str(__version__))
+
     tel = importlib.import_module('tel_params.'+telescope)
 
     ext = tel.raw_header_ext()
@@ -63,13 +68,16 @@ def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=Non
     target_keyword = tel.target_keyword()
     fil_keyword = tel.filter_keyword()
 
-    cal_list = {'BIAS':[],'DARK':[]}
+    cal_list = {'BIAS':[]}
     sci_list = {}
     sky_list = {}
     time_list = {}
 
+    bad_num = 0
+    spec_num = 0
+
     file_list = path+'/file_list.txt'
-    file_table = Table(names=('File','Target','Filter','Type','Time'),dtype=('S','S', 'S', 'S', 'float64'))
+    file_table = Table(names=('File','Target','Filter','Exp','Type','Time'),dtype=('S','S', 'S','S', 'S', 'float64'))
 
     for i, f in enumerate(files):
         with fits.open(f) as file_open:
@@ -82,6 +90,7 @@ def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=Non
                 continue
         target = hdr[target_keyword].replace(' ','')
         fil = hdr[fil_keyword].replace(' ','').split('_')[0]
+        exp = str(hdr['EXPTIME'])
         file_time = None
         if np.all([hdr[science_keyword[j]] == science_files[j] for j in range(len(science_keyword))]):
             file_type = 'SCIENCE'
@@ -122,32 +131,50 @@ def sort_files(files, telescope, path): #manual_filter=None, log2=None, date=Non
             file_type = 'DARK'
             moved_path = path+'raw/'
             shutil.move(f,moved_path)
-            cal_list['DARK'].append(f.replace(path,moved_path))
+            try:
+                cal_list['DARK_'+exp]
+            except KeyError:
+                cal_list.update({'DARK_'+exp:[]}) 
+            cal_list['DARK_'+exp].append(f.replace(path,moved_path))
         elif np.all([hdr[spec_keyword[j]] == spec_files[j] for j in range(len(spec_keyword))]):
             file_type = 'SPEC'
             moved_path = path+'spec/'
             shutil.move(f,moved_path)
+            spec_num += 1
         else:
             file_type = 'BAD'
             moved_path = path+'bad/'
             shutil.move(f,moved_path)
-        file_table.add_row((moved_path+os.path.basename(f),target,fil,file_type,file_time))
+            bad_num += 1
+        file_table.add_row((moved_path+os.path.basename(f),target,fil,exp,file_type,file_time))
     file_table.write(file_list,format='ascii',delimiter='\t')
+
+    for cal in cal_list:
+        log.info(str(len(cal_list[cal]))+' '+cal+' files found.')
+    science_num = np.sum([len(sci_list[sci]) for sci in sci_list])
+    log.info(str(science_num)+' imaging science files found.')
+    log.info(str(spec_num)+' spectroscopic science files found.')
+    log.info(str(bad_num)+' bad files found and removed from reduction.')
+
+    t_end = time.time()
+    log.info('Sort_files ran in '+str(t_end-t_start)+' sec')
 
     return cal_list, sci_list, sky_list, time_list
 
-def load_files(file_list, telescope):
+def load_files(file_list, telescope,log):
+    t_start = time.time()
     tel = importlib.import_module('tel_params.'+telescope)
-    cal_list = {'BIAS':[],'DARK':[]}
+    cal_list = {'BIAS':[]}
     sci_list = {}
     sky_list = {}
     time_list = {}
     file_table = Table.read(file_list,format='ascii',delimiter='\t')
     for i in range(len(file_table)):
         f = file_table['File'][i]
+        target = file_table['Target'][i]
+        fil = file_table['Filter'][i]
+        exp = str(file_table['Exp'][i])
         if file_table['Type'][i] == 'SCIENCE':
-            target = file_table['Target'][i]
-            fil = file_table['Filter'][i]
             try:
                 sci_list[target+'_'+fil]
             except KeyError:
@@ -174,5 +201,18 @@ def load_files(file_list, telescope):
         elif file_table['Type'][i] == 'BIAS':
             cal_list['BIAS'].append(f)
         elif file_table['Type'][i] == 'DARK':
-            cal_list['DARK'].append(f)
+            try:
+                cal_list['DARK_'+exp]
+            except KeyError:
+                cal_list.update({'DARK_'+exp:[]}) 
+            cal_list['DARK_'+exp].append(f)
+    
+    for cal in cal_list:
+        log.info(str(len(cal_list[cal]))+' '+cal+' files found.')
+    science_num = np.sum([len(sci_list[sci]) for sci in sci_list])
+    log.info(str(science_num)+' imaging science files found.')
+
+    t_end = time.time()
+    log.info('Load_files ran in '+str(t_end-t_start)+' sec')
+
     return cal_list, sci_list, sky_list, time_list
