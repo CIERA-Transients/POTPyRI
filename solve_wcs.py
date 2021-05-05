@@ -23,7 +23,6 @@ from astropy.utils.exceptions import AstropyWarning, AstropyDeprecationWarning
 from astroquery.gaia import Gaia
 from skimage import transform as tf
 from scipy.optimize import curve_fit
-from scipy import stats
 import itertools
 import importlib
 import tel_params
@@ -95,13 +94,17 @@ def calculate_error(coord1, coord2, hd):
     rms_total = dvrms(sep.arcsec)
     return rms_total
 
-def run_sextractor(input_file, cat_name, tel, sex_config_dir='./Config'):
+def run_sextractor(input_file, cat_name, tel, sex_config_dir='./Config', log=None):
 
     if not os.path.exists(sex_config_dir+'/config'):
         e = 'ERROR: Could not find source extractor config file!'
+        if log:
+            log.error(e)
         raise Exception(e)
     elif not os.path.exists(sex_config_dir+'/params'):
         e = 'ERROR: Could not find source extractor param file!'
+        if log:
+            log.error(e)
         raise Exception(e)
 
     config = sex_config_dir+'/config'
@@ -117,9 +120,13 @@ def run_sextractor(input_file, cat_name, tel, sex_config_dir='./Config'):
 
     if os.path.exists(cat_name):
         table = ascii.read(cat_name, names=params, comment='#')
+        if log:
+            log.info('SExtracor succesfully run, %d sources extracted.'%len(table))
         return(table)
     else:
         e = 'ERROR: source extractor did not successfully produce {0}'
+        if log:
+            log.error(e)
         raise Exception(e.format(cat_name))
 
 # Make quads for either x,y values or ra,dec under the assumption that x=ra
@@ -219,9 +226,13 @@ def match_quads(stars,gaiastars,d,gaiad,ds,gaiads,ratios,gaiaratios,sky_coords=T
     return np.array(starsx_unq[0:len(gaiastarsra_unq)]), np.array(starsy_unq[0:len(gaiastarsdec_unq)]), np.array(gaiastarsra_unq[0:len(starsx_unq)]), np.array(gaiastarsdec_unq[0:len(starsy_unq)])
 
 #main function to calculate astrometric solution
-def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None, proc=None):
+def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None, proc=None, log=None):
     #start time
     t_start = time.time()
+
+    if log:
+        log.info('Running solve_wcs version: '+str(__version__))
+
     #import telescope parameter file
     global tel
     try:
@@ -240,10 +251,14 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
     dec = header['CRVAL2']
 
     #run sextractor
+    if log:
+        log.info('Running SExtractor.')
     cat_name = input_file.replace('.fits','.cat')
-    table = run_sextractor(input_file, cat_name, tel, sex_config_dir=sex_config_dir)
+    table = run_sextractor(input_file, cat_name, tel, sex_config_dir=sex_config_dir,log=log)
 
     #mask and sort table
+    if log:
+        log.info('Masking sources and applying brightness cuts.')
     table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
     if static_mask:
         with fits.open(static_mask) as mask_hdu:
@@ -251,58 +266,86 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
         table = table[(stat_mask[table['YWIN_IMAGE'].astype(int)-1,table['XWIN_IMAGE'].astype(int)-1]!=0)]
     table.sort('MAG_BEST')
     table = table[table['MAG_BEST']<(np.median(table['MAG_BEST'])-np.std(table['MAG_BEST']))]
+    if log:
+        log.info('Total of %d usable stars'%len(table))
 
     #make quads using brightest stars
+    if log:
+        log.info('Making quads with the brightest 50 stars.')
     ind = list(itertools.combinations(np.arange(4), 2))
     stars, d, ds, ratios = make_quads(table['XWIN_IMAGE'],
         table['YWIN_IMAGE'], use=50)
 
     #query gaia
+    if log:
+        log.info('Searching GAIA DR3 for stars within 10 arcmins of WCS in header.')
     Gaia.ROW_LIMIT = -1
     job = Gaia.cone_search_async(SkyCoord(ra*u.deg, dec*u.deg,frame='icrs'),10*u.arcmin,table_name='gaiaedr3.gaia_source')
     gaiaorig = job.get_results()
     gaiaorig.sort('phot_g_mean_mag')
+    if log:
+        log.info(str(len(gaiaorig))+' GAIA stars found.')
 
     # Mask catalog so all data are inside nominal image
+    if log:
+        log.info('Applying image mask to GAIA sources.')
     mask = mask_catalog_for_wcs(gaiaorig, wcs.WCS(header), 1, data_x, data_y)
     gaia = gaiaorig[mask]
+    if log:
+        log.info(str(len(gaia))+' GAIA stars found within the image footprint.')
 
     #make quads using stars brigher than 19 mag
+    if log:
+        log.info('Making quads with the brightest stars fainter than 20 mag.')
     gaia = gaia[gaia['phot_g_mean_mag']<20]
     gaiastars, gaiad, gaiads, gaiaratios = make_quads(gaia['ra'], gaia['dec'],
         use=50, sky_coords=True)
 
     #match quads
+    if log:
+        log.info('Matching quads between the detected and cataloged stars.')
     starsx, starsy, gaiastarsra, gaiastarsdec = match_quads(stars,gaiastars,d,gaiad,
             ds,gaiads,ratios,gaiaratios,sky_coords=True)
+    if log:
+        log.info('Found '+str(len(starsx))+' unique star matches.')
 
     #calculate transformation
+    if log:
+        log.info('Calculating the transformation between the matched stars.')
     gaiax, gaiay = wcs.utils.skycoord_to_pixel(SkyCoord(gaiastarsra,gaiastarsdec, unit='deg'), wcs.WCS(header), 1)
     tform = tf.estimate_transform('euclidean', np.c_[starsx, starsy], np.c_[gaiax, gaiay])
 
     #apply transformation to header
+    if log:
+        log.info('Applying the transformation to the existing WCS in the header.')
     header_new = apply_wcs_transformation(header,tform)
     header_new['WCS_REF'] = ('GAIA-DR2', 'Reference catalog for astrometric solution.')
     header_new['WCS_NUM'] = (len(starsx), 'Number of stars used for astrometric solution.')
 
     #calculate polynomial distortion
+    if log:
+        log.info('Calculating and applying the higher order polynomial distortion.')
     header_dist = apply_wcs_distortion(header_new,starsx,starsy,gaiastarsra,gaiastarsdec)
 
     #calculate error. This error now uses dvrms() instead of np.median.
+    if log:
+        log.info('Calculating the rms on the astrometry.')
     stars_ra, stars_dec = (wcs.WCS(header_dist)).all_pix2world(starsx,starsy,1)
     stars_radec = SkyCoord(stars_ra*u.deg,stars_dec*u.deg)
     gaia_radec = SkyCoord(gaiastarsra,gaiastarsdec, unit='deg')
     error = calculate_error(stars_radec, gaia_radec, header_dist)
-    print('%7.4f rms error in WCS solution'%error)
 
     #write out new fits
     fits.writeto(input_file.replace('.fits','_wcs.fits'),data,header_dist,overwrite=True)
 
     #end and run time
     t_end = time.time()
-    print('Code ran in '+str(t_end-t_start)+' sec')
+    if log:
+        log.info('Solve_wcs ran in '+str(t_end-t_start)+' sec')
+    else:
+        print('Solve_wcs ran in '+str(t_end-t_start)+' sec')
 
-    return 'Median error on astrometry is %.3f arcsec.'%error
+    return 'Median rms on astrometry is %.3f arcsec.'%error
 
 def main():
     params = argparse.ArgumentParser(description='Path of data.')
@@ -310,9 +353,10 @@ def main():
     params.add_argument('--telescope', default=None, help='')
     params.add_argument('--proc', default=None, help='')
     params.add_argument('--static_mask', default=None, help='')
+    params.add_argument('--log', default=None, help='')
     args = params.parse_args()
 
-    solve_wcs(args.input_file,telescope=args.telescope,proc=args.proc,static_mask=args.static_mask)
+    solve_wcs(args.input_file,telescope=args.telescope,proc=args.proc,static_mask=args.static_mask,log=args.log)
 
 if __name__ == "__main__":
     main()

@@ -1,5 +1,6 @@
 #parameter file for MMIRS/MMT
 import os
+import astropy
 import datetime
 import numpy as np
 from photutils import make_source_mask, Background2D, MeanBackground
@@ -11,11 +12,12 @@ import astropy.units.astrophys as u
 import astropy.units as u
 import ccdproc
 from astropy.modeling import models
+import create_mask
 
+__version__ = 1.0 #last edited 26/04/2021
 
 def static_mask(proc):
-    return None
-    #return './staticmasks/MMIRS.staticmask.fits'
+    return ['./staticmasks/MMIRS.staticmask.fits']
 
 def run_wcs():
     return True
@@ -26,8 +28,8 @@ def wcs_extension():
 def pixscale():
     return 0.202
 
-def ref_pix():
-    return 852.492546082, 851.589035034
+def saturation(hdr):
+    return hdr['DATAMAX']*hdr['GAIN']
 
 def WCS_keywords_old(): #WCS keywords
     return ['PC1_1','PC1_2','PC2_1','PC2_2','PV2_1','PV2_2','PV2_3','PV2_4','PV2_5']
@@ -96,36 +98,59 @@ def load_flat(flat):
     mflat = CCDData.read(flat[0],unit=u.electron/u.second)
     return mflat
 
-def create_flat(flat_list,fil,red_path,mdark=None,mbias=None):
+def create_flat(flat_list,fil,red_path,mbias=None,log=None):
+    log.info('Processing files for filter: '+fil)
+    log.info(str(len(flat_list))+' files found.')
     flats = []
     flat_scale = []
     for flat in flat_list:
+        log.info('Loading file: '+flat)
         raw = CCDData.read(flat,hdu=1,unit=u.adu)
-        flat_scale.append(1/np.median(raw.data[1200:1700,700:1300]))
+        log.info('Median flat level: '+str(np.median(raw)))
+        norm = 1/np.median(raw.data[1200:1700,700:1300])
+        log.info('Flat normalization: '+str(norm))
+        flat_scale.append(norm)
         red = ccdproc.ccd_process(raw, gain=raw.header['GAIN']*u.electron/u.adu, readnoise=raw.header['RDNOISE']*u.electron)
+        log.info('Exposure time of image is '+str(red.header['EXPTIME']))
+        log.info('Loading correct master dark')
+        mdark = CCDData.read(red_path+'DARK_'+str(red.header['EXPTIME'])+'.fits', unit=u.electron)        
         red = ccdproc.subtract_dark(red, mdark, exposure_time='EXPTIME', exposure_unit=u.second)
         red = ccdproc.subtract_overscan(red, overscan=red[:,0:4], overscan_axis=1, model=models.Chebyshev1D(3))
         flats.append(red)
     mflat = ccdproc.combine(flats,method='median',scale=flat_scale,sigma_clip=True)
+    log.info('Created master flat for filter: '+fil)
     mflat.write(red_path+'mflat_'+fil+'.fits',overwrite=True)
-    return mflat
+    log.info('Master flat written to mflat_'+fil+'.fits')
+    return
 
-def process_science(sci_list,fil,mdark=None,mbias=None,mflat=None,proc=None):
+def process_science(sci_list,fil,red_path,mbias=None,mflat=None,proc=None,log=None):
     masks = []
     processed = []
     for sci in sci_list:
+        log.info('Loading file: '+sci)
+        log.info('Applying gain subtraction, dark subtraction, overscan correction, flat correction, and trimming image.')
         raw = CCDData.read(sci,hdu=1,unit=u.adu)
         red = ccdproc.ccd_process(raw, gain=raw.header['GAIN']*u.electron/u.adu, readnoise=raw.header['RDNOISE']*u.electron)
-        red = ccdproc.subtract_dark(red, mdark, exposure_time='EXPTIME', exposure_unit=u.second)
+        log.info('Exposure time of science image is '+str(red.header['EXPTIME']))
+        log.info('Loading correct master dark')
+        mdark = CCDData.read(red_path+'DARK_'+str(red.header['EXPTIME'])+'.fits', unit=u.electron)
+        red = ccdproc.subtract_dark(red, mdark, exposure_time='EXPTIME', exposure_unit=u.second)#dark_exposure=1*u.second, data_exposure=red.header['EXPTIME']*u.second, scale=True)
         red = ccdproc.subtract_overscan(red, overscan=red[:,0:4], overscan_axis=1, model=models.Chebyshev1D(3))
         red = ccdproc.flat_correct(red, mflat)
         processed_data = ccdproc.ccd_process(red, trim=raw.header['DATASEC'])
+        log.info('File proccessed and trimmed.')
+        log.info('Cleaning cosmic rays and creating mask.')
         mask = make_source_mask(processed_data, nsigma=3, npixels=5)
         masks.append(mask)
-        fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_mask.fits'),mask.astype(int),overwrite=True)
+        clean, com_mask = create_mask.create_mask(sci,processed_data,static_mask(proc)[0],mask,saturation(red.header),binning(),red.header['RDNOISE'],cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
+        processed_data.data = clean
+        log.info('Calculating 2D background.')
         bkg = Background2D(processed_data, (510, 510), filter_size=(9, 9),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=mask, exclude_percentile=80)
+        log.info('Median background: '+str(np.median(bkg.background)))
         fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_bkg.fits'),bkg.background,overwrite=True)
         final = processed_data.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found').divide(red.header['EXPTIME']*u.second,propagate_uncertainties=True,handle_meta='first_found')
+        log.info('Background subtracted and image divided by exposure time.')
+        final.write(sci.replace('/raw/','/red/'),overwrite=True)
         processed.append(final)
     return processed, masks
 
@@ -134,3 +159,65 @@ def stacked_image(tar,red_path):
 
 def rdnoise(header):
     return header['RDNOISE']
+
+def binning():
+    return 4
+
+def create_bias(cal_list,red_path,log):
+    images = []
+    processed = []
+    for bias in cal_list['BIAS']:
+        log.info('Loading file: '+bias)
+        try:
+            raw = CCDData.read(bias, hdu=1, unit='adu')
+            images.append(bias)
+        except astropy.io.registry.IORegistryError:
+            log.error('File not recognized.')
+        red = ccdproc.ccd_process(raw, gain=raw.header['GAIN']*u.electron/u.adu, readnoise=raw.header['RDNOISE']*u.electron)
+        log.info('Median bias level: '+str(np.median(red)))
+        processed.append(red)
+    log.info('Creating master bias.')
+    mbias = ccdproc.combine(processed,method='median')
+    log.info('Master bias created. Median bias level: '+str(np.median(mbias)))
+    mbias_hdu = fits.PrimaryHDU(mbias)
+    mbias_hdu.header['VER'] = (__version__, 'Version of telescope parameter file used.')
+    for i,im in enumerate(images):
+        mbias_hdu.header['FILE'+str(i+1)] = im
+    mbias_hdu.header['MED'] = (np.median(mbias), 'Median level of bias.')
+    mbias_hdu.writeto(red_path+'mbias.fits',overwrite=True)
+    log.info('Master bias written to mbias.fits')
+    return mbias
+
+def create_dark(cal_list,cal,mbias,red_path,log):
+    images = []
+    processed = []
+    for dark in cal_list[cal]:
+        log.info('Creating master dark with exposure time: '+cal.split('_')[1])
+        log.info('Loading file: '+dark)
+        try:
+            raw = CCDData.read(dark, hdu=1, unit='adu')
+            images.append(dark)
+        except astropy.io.registry.IORegistryError:
+            log.error('File not recognized.')
+        red = ccdproc.ccd_process(raw, gain=raw.header['GAIN']*u.electron/u.adu, readnoise=raw.header['RDNOISE']*u.electron, master_bias=mbias)
+        processed.append(red)
+    log.info('Creating master dark.')
+    mdark = ccdproc.combine(processed,method='median')
+    log.info('Master dark created.')
+    mdark_hdu = fits.PrimaryHDU(mdark)
+    mdark_hdu.header['VER'] = (__version__, 'Version of telescope parameter file used.')
+    for i,im in enumerate(images):
+        mdark_hdu.header['FILE'+str(i+1)] = im
+    mdark_hdu.header['EXPTIME'] = (np.float(cal.split('_')[1]), 'Exposure time of master dark (sec).')
+    mdark_hdu.writeto(red_path+cal+'.fits',overwrite=True)
+    log.info('Master dark written to '+cal+'.fits')
+    return
+
+def cr_clean_sigclip():
+    return 50
+
+def cr_clean_sigcfrac():
+    return 0.1
+
+def cr_clean_objlim():
+    return 100
