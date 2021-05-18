@@ -14,7 +14,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.0 #last edited 26/04/2021
+__version__ = 1.0 #last edited 18/05/2021
 
 def static_mask(proc):
     return ['./staticmasks/MMIRS.staticmask.fits']
@@ -221,3 +221,9 @@ def cr_clean_sigcfrac():
 
 def cr_clean_objlim():
     return 100
+
+def run_phot():
+    return True
+
+def catalog_zp():
+    return '2MASS'

@@ -712,7 +712,7 @@ def write_catalog(catfile, header, catdata):
 
 def import_catalog(catfile):
 
-    hdu = fits.open(catfile)
+    hdu = fits.open(catfile,ignore_missing_end=True)
     header = hdu[0].header
 
     colnames = []
@@ -735,7 +735,7 @@ def import_catalog(catfile):
 def modify_catalog(catfile, metadata):
 
     # Get header and add metadata
-    header = fits.open(catfile)[0].header
+    header = fits.open(catfile,ignore_missing_end=True)[0].header
     for key in metadata.keys():
         header[key] = metadata[key]
 

@@ -36,7 +36,7 @@ class absphot(object):
 
         return(zpt, zpterr)
 
-    def zpt_iteration(self, flux, fluxerr, mag, magerr):
+    def zpt_iteration(self, flux, fluxerr, mag, magerr, log=None):
 
         flux = np.array(flux)
         fluxerr = np.array(fluxerr)
@@ -60,13 +60,19 @@ class absphot(object):
 
             m='Iteration {i}: {N} obj, zpt = {zpt}+/-{zpterr}, {s}-sigma '+\
                 'clip to {M} obj'
-            print(m.format(i=i, N=nobj, zpt='%2.4f'%zpt, zpterr='%2.4f'%zpterr,
+            if log:
+                log.info(m.format(i=i, N=nobj, zpt='%2.4f'%zpt, zpterr='%2.4f'%zpterr,
+                s=self.sigma, M=len(flux)))
+            else:
+                print(m.format(i=i, N=nobj, zpt='%2.4f'%zpt, zpterr='%2.4f'%zpterr,
                 s=self.sigma, M=len(flux)))
 
         return(zpt, zpterr)
 
-    def get_catalog(self, coords, catalog, filt, size=0.5):
+    def get_catalog(self, coords, catalog, filt, size=0.5, log=None):
 
+        if log:
+            log.info('Searching for catalog '+catalog)
         cat_ID, cat_ra, cat_dec, cat_mag, cat_err = find_catalog(catalog, filt)
         coord_ra = np.median([c.ra.degree for c in coords])
         coord_dec = np.median([c.dec.degree for c in coords])
@@ -78,6 +84,8 @@ class absphot(object):
         else:
             m='ERROR: cat {0}, ra {1}, dec {2} did not return a catalog'
             m=m.format(catalog, coord_ra, coord_dec)
+            if log:
+                log.error(m)
             raise RuntimeError(m)
 
         cat.rename_column(cat_ra, 'ra')
@@ -87,11 +95,11 @@ class absphot(object):
 
         return(cat)
 
-    def find_zeropoint(self, cmpfile, filt, catalog, match_radius=2.0*u.arcsec):
+    def find_zeropoint(self, cmpfile, filt, catalog, match_radius=2.0*u.arcsec, log=None):
 
         header, table = import_catalog(cmpfile)
         coords = SkyCoord(table['RA'], table['Dec'], unit='deg')
-        cat = self.get_catalog(coords, catalog, header['FILTER'])
+        cat = self.get_catalog(coords, catalog, filt, log=log)
 
         coords_cat = SkyCoord(cat['ra'], cat['dec'], unit='deg')
 
@@ -113,7 +121,16 @@ class absphot(object):
         metadata['ZPTNSTAR']=len(match_table)
 
         zpt, zpterr = self.zpt_iteration(match_table['flux'],
-            match_table['flux_err'], cat['mag'], cat['mag_err'])
+            match_table['flux_err'], cat['mag'], cat['mag_err'], log=log)
+        if log:
+            log.info('Calculating AB correction.')
+        cor = self.AB_conversion(catalog,filt)
+        zpt+=cor            
+
+        if log:
+            log.info('Added AB correction of %2.3f mag.'%cor)
+            log.info('Final zeropoint calculated:')
+            log.info('zpt = %2.4f +/- %2.4f AB mag'%(zpt,zpterr))
 
         metadata['ZPTMAG']=zpt
         metadata['ZPTMUCER']=zpterr
@@ -129,3 +146,17 @@ class absphot(object):
             metadata['M10SIGMA']=-2.5*np.log10(10.0*skysig_per_FWHM_Area)+zpt
 
         modify_catalog(cmpfile, metadata)
+    
+    def AB_conversion(self, catalog, fil):
+        if catalog=='2MASS':
+            if fil == 'K' or 'Ks':
+                cor = 1.85
+            elif fil == 'J':
+                cor = 0.91
+            elif fil == 'H':
+                cor = 1.39
+            elif fil == 'Y':
+                cor = 0.634
+        else:
+            cor = 0
+        return cor

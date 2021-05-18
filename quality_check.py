@@ -3,7 +3,7 @@
 "Function to assess image quality for stacking."
 "Author: Kerry Paterson"
 
-__version__ = "1.0" #last updated 20/04/2021
+__version__ = "1.1" #last updated 18/05/2021
 
 import time
 import numpy as np
@@ -37,7 +37,7 @@ def quality_check(aligned_images, aligned_data, telescope, log):
         log.info('Loading catalog for: '+f)
         cat = f.replace('.fits','.cat')
         table = ascii.read(cat, names=params, comment='#')
-        table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
+        table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)&(table['SPREAD_MODEL']>-0.01)&(table['SPREAD_MODEL']<0.01)]
         fwhm_image = np.median(table['FWHM_IMAGE'])*tel.pixscale()
         elong_image = np.median(table['ELONGATION'])
         fwhm.append(fwhm_image)
@@ -48,16 +48,37 @@ def quality_check(aligned_images, aligned_data, telescope, log):
     log.info('Calculating median parameters.')
     fwhm_med = np.median(fwhm)
     fwhm_std = np.std(fwhm)
+    log.info('Median FWHM of images in arcsec = %.3f +/- %.3f'%(fwhm_med,fwhm_std))
     elong_med = np.median(elong)
     elong_std = np.std(elong)
-    log.info('Median FWHM of images in arcsec = %.3f +/- %.3f'%(fwhm_med,fwhm_std))
     log.info('Median Elongation of images = %.3f +/- %.3f'%(elong_med,elong_std))
 
-    log.info('Using 3 sigma cuts.')
+    log.info('Using 3 sigma cuts to calculate the number of bad images.')
+    fwhm = np.array(fwhm)
+    elong = np.array(elong)
+    fwhm_3sigma_cut = fwhm[fwhm>fwhm_med+3*fwhm_std]
+    elong_3sigma_cut = elong[elong>elong_med+3*elong_std]
+    n_fwhm = len(fwhm_3sigma_cut)
+    n_elong = len(elong_3sigma_cut)
+    log.info('Number of images with FWHM > 3sigma = %d'%n_fwhm)
+    log.info('Number of images with elongation > 3sigma = %d'%n_elong)
+    ten_percent = int(len(aligned_images)*0.1)
+    if n_fwhm > ten_percent or n_elong > ten_percent:
+        log.info('More than 10 percent of the images have bad quality.')
+        log.info('Restricting cuts to 10 percent.')
+        fwhm_sorted = sorted(fwhm_3sigma_cut,reverse=True)
+        fwhm_cut = fwhm_sorted[ten_percent-1]
+        elong_sorted = sorted(elong_3sigma_cut,reverse=True)
+        elong_cut = elong_sorted[ten_percent-1]
+        log.info('Using new cuts of %.2f sigma for FWHM and %.2f sigma for elongation'
+            %((fwhm_cut-fwhm_med)/fwhm_std,(elong_cut-elong_med)/elong_std))
+    else:
+        fwhm_cut = fwhm_med+3*fwhm_std
+        elong_cut = elong_med+3*elong_std
     stacking_images = []
     stacking_arrays = []
     for i,f in enumerate(aligned_images):
-        if (fwhm[i]>fwhm_med+3*fwhm_std) or (elong[i]>elong_med+3*elong_std):
+        if (fwhm[i]>fwhm_cut) or (elong[i]>elong_cut):
             log.info('Removing '+f+' from stack due to bad quality.')
         else:
             stacking_images.append(f)
