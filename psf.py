@@ -152,7 +152,7 @@ def write_out_catalog(catalog, img_file, columns, sigfig, outfile, metadata):
 
 def do_phot(img_file, write_out_back=False, write_out_residual=False,
     write_out_epsf_img=True, write_out_epsf_file=True, write_out_psf_stars=True,
-    outdir='', subtract_back=False, fwhm_scale_psf=3.0,
+    outdir='', subtract_back=False, fwhm_scale_psf=3.0, log=None,
     star_param={'sharp_cut': 1.0, 'round_cut': 0.5, 'snthresh_psf': 25.0,
         'fwhm_init': 15.0, 'snthresh_final': 5.0}):
 
@@ -164,7 +164,10 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
     mean, median, std_sky = sigma_clipped_stats(img_hdu[0].data[mask],
         sigma=5.0)
 
-    print('Found {0} stars'.format(len(stars)))
+    if log:
+        log.info('Found {0} stars'.format(len(stars)))
+    else:
+        print('Found {0} stars'.format(len(stars)))
     stars = stars['xcentroid','ycentroid','fwhm','sharpness','roundness',
         'npix','pa','flux','sky']
 
@@ -178,18 +181,27 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
     bright = stars[mask]
 
     m='Masked to {0} PSF stars based on flux, sharpness, roundness'
-    print(m.format(len(bright)))
+    if log:
+        log.info(m.format(len(bright)))
+    else:
+        print(m.format(len(bright)))
 
     fwhm = np.median(bright['fwhm'])
     std_fwhm = np.std(bright['fwhm'])
-    print('Initial FWHM={0}+/-{1}'.format('%2.4f'%fwhm,'%2.4f'%std_fwhm))
+    if log:
+        log.info('Initial FWHM={0}+/-{1}'.format('%2.4f'%fwhm,'%2.4f'%std_fwhm))
+    else:
+        print('Initial FWHM={0}+/-{1}'.format('%2.4f'%fwhm,'%2.4f'%std_fwhm))
     metadata={'FWHM':fwhm, 'EFWHM':std_fwhm, 'SKYADU': std_sky}
 
     mask = (bright['fwhm'] > fwhm-3*std_fwhm) &\
         (bright['fwhm'] < fwhm+3*std_fwhm)
     bright = bright[mask]
 
-    print('Masked to {0} stars based on FWHM'.format(len(bright)))
+    if log:
+        log.info('Masked to {0} stars based on FWHM'.format(len(bright)))
+    else:
+        print('Masked to {0} stars based on FWHM'.format(len(bright)))
     metadata['NPSFSTAR']=len(bright)
 
     if subtract_back:
@@ -202,13 +214,20 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
         ndimage = NDData(data=img_hdu[0].data)
 
     if write_out_back:
-        print('Writing out background and background-subtracted file...')
+        if log:
+            log.info('Writing out background and background-subtracted file...')
+        else:
+            print('Writing out background and background-subtracted file...')
         back_file = img_file.replace('.fits','.back.fits')
         backsub_file = img_file.replace('.fits','.backsub.fits')
 
-        print('Background file:',back_file)
+        if log:
+            log.info('Background file:',back_file)
+            log.info('Background-subtracted file:',backsub_file)
+        else:
+            print('Background file:',back_file)
+            print('Background-subtracted file:',backsub_file)
         backhdu.writeto(back_file, overwrite=True)
-        print('Background-subtracted file:',backsub_file)
         backsubhdu.writeto(backsub_file, overwrite=True)
 
     # Instantiate EPSF
@@ -220,9 +239,12 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
 
     mask = (stars['flux']/stars['flux_err'] > star_param['snthresh_final'])
     bright = stars[mask]
-    print('Final catalog is {0} stars'.format(len(bright)))
-
-    print('Getting final photometry...')
+    if log:
+        log.info('Final catalog is {0} stars'.format(len(bright)))
+        log.info('Getting final photometry...')
+    else:
+        print('Final catalog is {0} stars'.format(len(bright)))
+        print('Getting final photometry...')
     photometry = run_photometry(img_file, epsf, fwhm, bright['xcentroid'],
         bright['ycentroid'], subtract_back=subtract_back)
 
@@ -257,7 +279,10 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
         'FWHM','PA','SHARP','ROUND','NPIX','RA','Dec']
     sigfig=[4,4,4,4,4,4,4,4,4,4,4,4,0,7,7]
 
-    print('Got {0} stars for final photometry'.format(len(photometry)))
+    if log:
+        log.info('Got {0} stars for final photometry'.format(len(photometry)))
+    else:
+        print('Got {0} stars for final photometry'.format(len(photometry)))
     metadata['NOBJECT']=len(photometry)
 
     # We should always write out bright stars

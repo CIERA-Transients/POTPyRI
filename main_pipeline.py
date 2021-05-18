@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.0" #last updated 20/04/2021
+__version__ = "1.0" #last updated 18/05/2021
 
 import sys
 import numpy as np
@@ -21,14 +21,21 @@ import ccdproc
 import glob
 import argparse
 import logging
+import astropy.wcs as wcs
 from astropy.nddata import CCDData
 from photutils import Background2D, MeanBackground
 from astropy.stats import SigmaClip
+from astropy.coordinates import SkyCoord
 import importlib
 import Sort_files
 import align_quads
 import solve_wcs
 import quality_check
+import psf
+import absphot
+import Find_target_phot as tp
+import extinction
+from utilities.util import *
 
 def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,proc=None,use_dome_flats=None,phot=None):
     #start time
@@ -204,7 +211,7 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
                 final_stack = [st.replace('.fits','_wcs.fits') for st in stack]
             else:
                 final_stack = stack
-            if np.all([os.path.exists(st) for st in stack]):
+            if np.all([os.path.exists(st) for st in final_stack]):
                 process_data = False
             else:
                 log.error('Missing stacks, processing data.')   
@@ -274,12 +281,49 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
                 sci_med.write(stack[k],overwrite=True)
                 log.info('Median stack made for '+stack[k])
                 if tel.run_wcs():
-                    log.info('Solving WCS')
+                    log.info('Solving WCS.')
                     wcs_error = solve_wcs.solve_wcs(stack[k],telescope,log=log)   
                     log.info(wcs_error)
                     stack[k] = stack[k].replace('.fits','_wcs.fits')
-        #do auto phot
-        #if phot: do manual
+                if tel.run_phot():
+                    log.info('Running psf photometry.')
+                    epsf, fwhm = psf.do_phot(stack[k])
+                    log.info('FWHM = %2.4f"'%(fwhm*tel.pixscale()))
+                    log.info('Calculating zeropint.')
+                    zp_cal = absphot.absphot()
+                    zp_cal.find_zeropoint(stack[k].replace('.fits','.pcmp'), fil, tel.catalog_zp())
+        if phot:
+            log.info('User input to perform manual aperture photometry.')
+            log.info('List of final stacks: '+str(final_stack))
+            k = int(input('Index (starting from 0) of the stack you want to perform aperture photometry on? '))
+            log.info('Performing aperture photometry on '+final_stack[k])
+            if not os.path.exists(final_stack[k].replace('.fits','.pcmp')):
+                log.info('Running psf photometry.')
+                epsf, fwhm = psf.do_phot(final_stack[k], log=log)
+                log.info('Calculating zeropint.')
+                zp_cal = absphot.absphot()
+                zp_cal.find_zeropoint(final_stack[k].replace('.fits','.pcmp'), fil, tel.catalog_zp(), log=log)
+            header, table = import_catalog(final_stack[k].replace('.fits','.pcmp'))
+            fwhm = header['FWHM']
+            zp = header['ZPTMAG']
+            zp_err = header['ZPTMUCER']
+            log.info('Loading FWHM and zeropoint calculated from psf photometry.')
+            log.info('FWHM = %2.4f pixels'%fwhm)
+            log.info('zpt = %2.4f +/- %2.4f AB mag'%(zp,zp_err))
+            pos = input('Would you like to enter the RA and Dec ("wcs") or x and y ("xy") position of the target? ')
+            if pos == 'wcs':
+                ra = float(input('Enter RA in degrees: '))
+                dec = float(input('Enter Dec in degrees: '))
+                tp.find_target_phot(final_stack[k], fil, fwhm, zp, zp_err, show_phot=True, ra=ra, dec=dec)
+            elif pos == 'xy':
+                x = float(input('Enter x position in pixel: '))
+                y = float(input('Enter y position in pixel: '))
+                tp.find_target_phot(final_stack[k], fil, fwhm, zp, zp_err, show_phot=True, x=x, y=y)
+                ra, dec = (wcs.WCS(header)).all_pix2world(x,y,1)
+            log.info('Calculating extinction correction.')
+            coords = SkyCoord(ra,dec,unit='deg')
+            ext_cor = extinction.calculate_mag_extinction(coords,fil)
+            log.info('Galactic extinction = %2.4f mag'%ext_cor)
     t_end = time.time()
     log.info('Pipeline finshed.')
     log.info('Total runtime: '+str(t_end-t_start)+' sec')

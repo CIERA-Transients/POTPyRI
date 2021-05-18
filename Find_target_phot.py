@@ -19,22 +19,6 @@ from astropy.visualization import simple_norm
 # Function imports
 from Gaussians import fix_x0, twoD_Gaussian
 
-
-# Used for converting Vega magnitudes to AB magnitudes (2MASS uses Vega)
-def AB_conversion(fil):
-    if fil == 'K':
-        cor = 1.85
-    elif fil == 'J':
-        cor = 0.91
-    elif fil == 'H':
-        cor = 1.39
-    elif fil == 'Y':
-        cor = 0.634
-    else:
-        cor = None
-    return cor
-
-
 def onclick(event, new_coords, log=None):
 
     if event.dblclick:
@@ -124,13 +108,13 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, show_phot=False, log=None, lo
         Name of the filter of the stack.
 
     :param fwhm: float
-        FWHM of image (most likely found through `find_zero_point`).
+        FWHM of image.
 
     :param zp: float
-        Zero point of image (most likely found through `find_zero_point`).
+        Zero point of image in AB mag.
 
     :param zp_err: float
-        Error on the zero point of image (most likely found through `find_zero_point`).
+        Error on the zero point of image.
 
     :param show_phot: boolean, optional
         Option to see the cutout of the source with apertures along with its radial profile.
@@ -320,14 +304,14 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, show_phot=False, log=None, lo
         mag += zp  # Apparent magnitude (Vega)
         mag_err = np.sqrt(mag_err ** 2 + zp_err ** 2)
         if log is not None:
-            log.info("Magnitude of target = %.3f +/- %.3f AB mag" % (mag + AB_conversion(fil), mag_err))  # Final mag
+            log.info("Magnitude of target = %.3f +/- %.3f AB mag" % (mag, mag_err))  # Final mag
         if log2 is not None:
-            log2.info("Magnitude of target = %.3f +/- %.3f AB mag" % (mag + AB_conversion(fil), mag_err))  # Final mag
+            log2.info("Magnitude of target = %.3f +/- %.3f AB mag" % (mag, mag_err))  # Final mag
         else:
-            print("Magnitude of target = %.3f +/- %.3f AB mag" % (mag + AB_conversion(fil), mag_err))  # Final magnitude
+            print("Magnitude of target = %.3f +/- %.3f AB mag" % (mag, mag_err))  # Final magnitude
 
         if np.abs(mag_err) < 1/three_sigma:     # Good! No limiting magnitude needed
-            return float(mag + AB_conversion(fil)), float(mag_err)
+            return float(mag), float(mag_err)
         if log is not None:
             log.info("Target was not %s sigma above the background." % three_sigma)
         else:
@@ -414,12 +398,12 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, show_phot=False, log=None, lo
 
                 # Limiting magnitude at the position of the target
                 if log is not None:
-                    log.info("Limiting magnitude = %.3f +/- %.3f AB mag" % (mag + AB_conversion(fil), mag_err))
+                    log.info("Limiting magnitude = %.3f +/- %.3f AB mag" % (mag, mag_err))
                 else:
-                    print("Limiting magnitude = %.3f +/- %.3f AB mag" % (mag + AB_conversion(fil), mag_err))
+                    print("Limiting magnitude = %.3f +/- %.3f AB mag" % (mag, mag_err))
                 if log2 is not None:
-                    log2.info("Limiting magnitude = %.3f +/- %.3f AB mag" % (mag + AB_conversion(fil), mag_err))
-                return float(mag + AB_conversion(fil)), float(mag_err)
+                    log2.info("Limiting magnitude = %.3f +/- %.3f AB mag" % (mag, mag_err))
+                return float(mag), float(mag_err)
 
         d -= gauss_data.reshape(np.shape(d))    # 'Reset' data for next run if limiting magnitude not found
 

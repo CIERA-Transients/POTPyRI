@@ -9,3 +9,4 @@ FLAGS                    Extraction flags
 EXT_NUMBER
 FWHM_IMAGE
 ELONGATION
+SPREAD_MODEL
