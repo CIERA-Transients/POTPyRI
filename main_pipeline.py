@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.0" #last updated 18/05/2021
+__version__ = "1.1" #last updated 19/05/2021
 
 import sys
 import numpy as np
@@ -204,13 +204,13 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
                 continue
             else:
                 log.info('Matching target found: '+tar)
+        if tel.run_wcs():
+            final_stack = [st.replace('.fits','_wcs.fits') for st in stack]
+        else:
+            final_stack = stack
         process_data = True
         if skip_red:
             log.info('User input to skip reduction.')
-            if tel.run_wcs():
-                final_stack = [st.replace('.fits','_wcs.fits') for st in stack]
-            else:
-                final_stack = stack
             if np.all([os.path.exists(st) for st in final_stack]):
                 process_data = False
             else:
