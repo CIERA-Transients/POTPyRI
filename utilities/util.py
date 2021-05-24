@@ -708,7 +708,7 @@ def write_catalog(catfile, header, catdata):
     # Next append all catalog data to the file
     with open(catfile, 'a') as f:
         for line in catdata:
-            f.write(line+'\n')
+            f.write(line)
 
 def import_catalog(catfile):
 
@@ -726,6 +726,7 @@ def import_catalog(catfile):
             break
 
     table = Table.read(catfile, data_start=1, format='ascii')
+
     for i,col in enumerate(table.keys()):
         table.rename_column(col,colnames[i])
 
