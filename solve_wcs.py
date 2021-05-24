@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "3.2" #last updated 19/04/2021
+__version__ = "3.3" #last updated 24/05/2021
 
 import sys
 import numpy as np
@@ -259,7 +259,7 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
     #mask and sort table
     if log:
         log.info('Masking sources and applying brightness cuts.')
-    table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
+    table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)&(table['MAGERR_BEST']!=99)]
     if static_mask:
         with fits.open(static_mask) as mask_hdu:
             stat_mask = mask_hdu[0].data
