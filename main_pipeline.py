@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.1" #last updated 19/05/2021
+__version__ = "1.2" #last updated 24/05/2021
 
 import sys
 import numpy as np
@@ -290,8 +290,12 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
                     epsf, fwhm = psf.do_phot(stack[k])
                     log.info('FWHM = %2.4f"'%(fwhm*tel.pixscale()))
                     log.info('Calculating zeropint.')
+                    zp_catalogs = tel.catalog_zp()
                     zp_cal = absphot.absphot()
-                    zp_cal.find_zeropoint(stack[k].replace('.fits','.pcmp'), fil, tel.catalog_zp())
+                    for zp_cat in zp_catalogs:
+                        zp, zp_err = zp_cal.find_zeropoint(stack[k].replace('.fits','.pcmp'), fil, zp_cat, log=log)
+                        if zp:
+                            break
         if phot:
             log.info('User input to perform manual aperture photometry.')
             log.info('List of final stacks: '+str(final_stack))
@@ -301,15 +305,25 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
                 log.info('Running psf photometry.')
                 epsf, fwhm = psf.do_phot(final_stack[k], log=log)
                 log.info('Calculating zeropint.')
+                zp_catalogs = tel.catalog_zp()
                 zp_cal = absphot.absphot()
-                zp_cal.find_zeropoint(final_stack[k].replace('.fits','.pcmp'), fil, tel.catalog_zp(), log=log)
+                for zp_cat in zp_catalogs:
+                    zp, zp_err = zp_cal.find_zeropoint(final_stack[k].replace('.fits','.pcmp'), fil, zp_cat, log=log)
+                    if zp:
+                        break
+            log.info('Loading FWHM and zeropoint calculated from psf photometry.')
             header, table = import_catalog(final_stack[k].replace('.fits','.pcmp'))
             fwhm = header['FWHM']
-            zp = header['ZPTMAG']
-            zp_err = header['ZPTMUCER']
-            log.info('Loading FWHM and zeropoint calculated from psf photometry.')
             log.info('FWHM = %2.4f pixels'%fwhm)
-            log.info('zpt = %2.4f +/- %2.4f AB mag'%(zp,zp_err))
+            try:
+                zp = header['ZPTMAG']
+                zp_err = header['ZPTMUCER']
+                log.info('zpt = %2.4f +/- %2.4f AB mag'%(zp,zp_err))
+            except:
+                log.info('No zeropint found.')
+                zp = float(input('Please enter zeropoint in AB mag: '))
+                zp_err = float(input('Please enter zeropoint error in AB mag: '))
+                log.info('User entered zpt = %2.4f +/- %2.4f AB mag'%(zp,zp_err))
             pos = input('Would you like to enter the RA and Dec ("wcs") or x and y ("xy") position of the target? ')
             if pos == 'wcs':
                 ra = float(input('Enter RA in degrees: '))

@@ -23,7 +23,7 @@ class absphot(object):
         def magnitude(zpt, flux):
             return(zpt - 2.5*np.log10(flux))
 
-        zpt_guess = np.median(mag + 2.5*np.log10(flux))
+        zpt_guess = np.nanmedian(mag + 2.5*np.log10(flux))
 
         data = RealData(flux, mag, fluxerr, magerr)
         model = Model(magnitude)
@@ -73,7 +73,10 @@ class absphot(object):
 
         if log:
             log.info('Searching for catalog '+catalog)
-        cat_ID, cat_ra, cat_dec, cat_mag, cat_err = find_catalog(catalog, filt)
+        if catalog=='2MASS' and filt=='Y':
+            cat_ID, cat_ra, cat_dec, cat_mag, cat_err = find_catalog(catalog, 'J')
+        else:
+            cat_ID, cat_ra, cat_dec, cat_mag, cat_err = find_catalog(catalog, filt)
         coord_ra = np.median([c.ra.degree for c in coords])
         coord_dec = np.median([c.dec.degree for c in coords])
         med_coord = SkyCoord(coord_ra, coord_dec, unit='deg')
@@ -81,19 +84,27 @@ class absphot(object):
         cat = Vizier.query_region(med_coord, width=0.5*u.degree, catalog=cat_ID)
         if len(cat)>0:
             cat = cat[0]
+            cat = cat[~np.isnan(cat[cat_mag])]
+
+            cat.rename_column(cat_ra, 'ra')
+            cat.rename_column(cat_dec, 'dec')
+            cat.rename_column(cat_mag, 'mag')
+            cat.rename_column(cat_err, 'mag_err')
+
+            if catalog=='2MASS' and filt=='Y':
+                cat = cat[~np.isnan(cat['Kmag'])]
+                cat['mag'], cat['mag_err'] = self.Y_band(cat['mag'], cat['mag_err'], cat['Kmag'], cat['e_Kmag'])
+
+            return(cat)
+
         else:
             m='ERROR: cat {0}, ra {1}, dec {2} did not return a catalog'
             m=m.format(catalog, coord_ra, coord_dec)
             if log:
                 log.error(m)
-            raise RuntimeError(m)
-
-        cat.rename_column(cat_ra, 'ra')
-        cat.rename_column(cat_dec, 'dec')
-        cat.rename_column(cat_mag, 'mag')
-        cat.rename_column(cat_err, 'mag_err')
-
-        return(cat)
+            else:
+                print(m)
+            return(None)
 
     def find_zeropoint(self, cmpfile, filt, catalog, match_radius=2.0*u.arcsec, log=None):
 
@@ -101,51 +112,71 @@ class absphot(object):
         coords = SkyCoord(table['RA'], table['Dec'], unit='deg')
         cat = self.get_catalog(coords, catalog, filt, log=log)
 
-        coords_cat = SkyCoord(cat['ra'], cat['dec'], unit='deg')
+        if cat:
+            if catalog=='PS1':
+                if log:
+                    log.info('Calculating and applying PS1 to SDSS conversion.')
+                if filt=='g':
+                    cat = cat[~np.isnan(cat['rmag'])]
+                    cat['mag'] = self.PS1_correction(filt, cat['mag'], cat['mag'], cat['rmag'])
+                elif filt=='r':
+                    cat = cat[~np.isnan(cat['gmag'])]
+                    cat['mag'] = self.PS1_correction(filt, cat['mag'], cat['gmag'], cat['mag'])
+                else:
+                    cat = cat[~np.isnan(cat['gmag'])]
+                    cat = cat[~np.isnan(cat['rmag'])]
+                    cat['mag'] = self.PS1_correction(filt, cat['mag'], cat['gmag'], cat['rmag'])         
 
-        idx, d2, d3 = coords_cat.match_to_catalog_sky(coords)
+            coords_cat = SkyCoord(cat['ra'], cat['dec'], unit='deg')
 
-        # Get matches from calibration catalog and cmpfile
-        mask = d2 < match_radius
-        cat = cat[mask]
-        idx = idx[mask]
+            idx, d2, d3 = coords_cat.match_to_catalog_sky(coords)
 
-        match_table = None
-        for i in idx:
-            if not match_table:
-                match_table = Table(table[i])
-            else:
-                match_table.add_row(table[i])
+            # Get matches from calibration catalog and cmpfile
+            mask = d2 < match_radius
+            cat = cat[mask]
+            idx = idx[mask]
 
-        metadata = {}
-        metadata['ZPTNSTAR']=len(match_table)
+            match_table = None
+            for i in idx:
+                if not match_table:
+                    match_table = Table(table[i])
+                else:
+                    match_table.add_row(table[i])
+            
+            metadata = {}
+            metadata['ZPTNSTAR']=len(match_table)
 
-        zpt, zpterr = self.zpt_iteration(match_table['flux'],
-            match_table['flux_err'], cat['mag'], cat['mag_err'], log=log)
-        if log:
-            log.info('Calculating AB correction.')
-        cor = self.AB_conversion(catalog,filt)
-        zpt+=cor            
+            zpt, zpterr = self.zpt_iteration(match_table['flux'],
+                match_table['flux_err'], cat['mag'], cat['mag_err'], log=log)
+            if log:
+                log.info('Calculating AB correction.')
+            cor = self.AB_conversion(catalog,filt)
+            zpt+=cor            
 
-        if log:
-            log.info('Added AB correction of %2.3f mag.'%cor)
-            log.info('Final zeropoint calculated:')
-            log.info('zpt = %2.4f +/- %2.4f AB mag'%(zpt,zpterr))
+            if log:
+                log.info('Added AB correction of %2.3f mag.'%cor)
+                log.info('Final zeropoint calculated:')
+                log.info('zpt = %2.4f +/- %2.4f AB mag'%(zpt,zpterr))
 
-        metadata['ZPTMAG']=zpt
-        metadata['ZPTMUCER']=zpterr
+            metadata['ZPTMAG']=zpt
+            metadata['ZPTMUCER']=zpterr
 
-        # Add limiting magnitudes
-        if 'FWHM' in header.keys() and 'SKYADU' in header.keys():
-            fwhm = header['FWHM']
-            sky = header['SKYADU']
-            Npix_per_FWHM_Area = 2.5 * 2.5 * fwhm * fwhm
-            skysig_per_FWHM_Area = np.sqrt(Npix_per_FWHM_Area * (sky*sky))
-            metadata['M3SIGMA']=-2.5*np.log10(3.0*skysig_per_FWHM_Area)+zpt
-            metadata['M5SIGMA']=-2.5*np.log10(5.0*skysig_per_FWHM_Area)+zpt
-            metadata['M10SIGMA']=-2.5*np.log10(10.0*skysig_per_FWHM_Area)+zpt
+            # Add limiting magnitudes
+            if 'FWHM' in header.keys() and 'SKYADU' in header.keys():
+                fwhm = header['FWHM']
+                sky = header['SKYADU']
+                Npix_per_FWHM_Area = 2.5 * 2.5 * fwhm * fwhm
+                skysig_per_FWHM_Area = np.sqrt(Npix_per_FWHM_Area * (sky*sky))
+                metadata['M3SIGMA']=-2.5*np.log10(3.0*skysig_per_FWHM_Area)+zpt
+                metadata['M5SIGMA']=-2.5*np.log10(5.0*skysig_per_FWHM_Area)+zpt
+                metadata['M10SIGMA']=-2.5*np.log10(10.0*skysig_per_FWHM_Area)+zpt
 
-        modify_catalog(cmpfile, metadata)
+            modify_catalog(cmpfile, metadata)
+            return(zpt, zpterr)
+        else:
+            if log:
+                log.info('No zeropoint calculated.')
+            return(None, None)
     
     def AB_conversion(self, catalog, fil):
         if catalog=='2MASS':
@@ -159,4 +190,23 @@ class absphot(object):
                 cor = 0.634
         else:
             cor = 0
-        return cor
+        return(cor)
+
+    def Y_band(self, J, J_err, K, K_err):
+        Y = J+0.46*(J-K)
+        JK_err = np.sqrt(J_err**2+K_err**2)
+        JKY_err = 0.46*(J-K)*np.sqrt((0.02/0.46)**2+(JK_err/(J-K))**2)
+        Y_err = np.sqrt(J_err**2+JKY_err**2)
+        return Y, Y_err
+
+    def PS1_correction(self, fil, mag_ps1, g_ps1, r_ps1):
+        g_r = g_ps1-r_ps1
+        if fil=='g':
+            mag_sdss = 0.013 + 0.1451*g_r + 0.019*g_r**2 + mag_ps1
+        elif fil=='r':
+            mag_sdss = -0.001 + 0.004*g_r + 0.007*g_r**2 + mag_ps1
+        elif fil=='i':
+            mag_sdss = -0.005 + 0.011*g_r + 0.010*g_r**2 + mag_ps1
+        elif fil=='z':
+            mag_sdss = 0.013 - 0.039*g_r - 0.012*g_r**2 + mag_ps1
+        return mag_sdss

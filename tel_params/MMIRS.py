@@ -14,7 +14,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.0 #last edited 18/05/2021
+__version__ = 1.1 #last edited 24/05/2021
 
 def static_mask(proc):
     return ['./staticmasks/MMIRS.staticmask.fits']
@@ -128,7 +128,7 @@ def process_science(sci_list,fil,red_path,mbias=None,mflat=None,proc=None,log=No
     processed = []
     for sci in sci_list:
         log.info('Loading file: '+sci)
-        log.info('Applying gain subtraction, dark subtraction, overscan correction, flat correction, and trimming image.')
+        log.info('Applying gain correction, dark subtraction, overscan correction, flat correction, and trimming image.')
         raw = CCDData.read(sci,hdu=1,unit=u.adu)
         red = ccdproc.ccd_process(raw, gain=raw.header['GAIN']*u.electron/u.adu, readnoise=raw.header['RDNOISE']*u.electron)
         log.info('Exposure time of science image is '+str(red.header['EXPTIME']))
@@ -142,7 +142,7 @@ def process_science(sci_list,fil,red_path,mbias=None,mflat=None,proc=None,log=No
         log.info('Cleaning cosmic rays and creating mask.')
         mask = make_source_mask(processed_data, nsigma=3, npixels=5)
         masks.append(mask)
-        clean, com_mask = create_mask.create_mask(sci,processed_data,static_mask(proc)[0],mask,saturation(red.header),binning(),red.header['RDNOISE'],cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
+        clean, com_mask = create_mask.create_mask(sci,processed_data,'_mask.fits',static_mask(proc)[0],mask,saturation(red.header),binning(),rdnoise(red.header),cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
         processed_data.data = clean
         log.info('Calculating 2D background.')
         bkg = Background2D(processed_data, (510, 510), filter_size=(9, 9),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=mask, exclude_percentile=80)
@@ -161,7 +161,7 @@ def rdnoise(header):
     return header['RDNOISE']
 
 def binning():
-    return 4
+    return [4,4]
 
 def create_bias(cal_list,red_path,log):
     images = []
@@ -226,4 +226,4 @@ def run_phot():
     return True
 
 def catalog_zp():
-    return '2MASS'
+    return ['2MASS']
