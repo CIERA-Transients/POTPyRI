@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "3.3" #last updated 24/05/2021
+__version__ = "3.4" #last updated 26/05/2021
 
 import sys
 import numpy as np
@@ -53,8 +53,8 @@ def apply_wcs_transformation(header,tform):
     header['CD1_2'] = cd_transformed[0][1]
     header['CD2_1'] = cd_transformed[1][0]
     header['CD2_2'] = cd_transformed[1][1]
-    header['CTYPE1'] = 'RA---TPV'
-    header['CTYPE2'] = 'DEC--TPV'
+    header['CTYPE1'] = 'RA---TAN'
+    header['CTYPE2'] = 'DEC--TAN'
     old_keywords = tel.WCS_keywords_old()
     for old in old_keywords:
         del header[old]
@@ -64,18 +64,23 @@ def ptv_fit(data,*p):
     xi,eta=data
     r = np.sqrt(xi**2+eta**2)
     d = [1,xi,eta,r,xi**2,xi*eta,eta**2,xi**3,xi**2*eta,xi*eta**2,eta**3,r**3]
-    if len(d) < len(p):
+    if len(d) <= len(p):
         return np.sum([p[i]*d[i] for i in range(len(d))])
-    if len(d) > len(p):
+    else:
         return np.sum([p[i]*d[i] for i in range(len(p))])
 
 def apply_wcs_distortion(header,starsx,starsy,gaiastarsra,gaiastarsdec):
     xi = header['CD1_1']*(starsx-header['CRPIX1'])+header['CD1_2']*(starsy-header['CRPIX2'])
     eta = header['CD2_1']*(starsx-header['CRPIX1'])+header['CD2_2']*(starsy-header['CRPIX2'])
     dra, ddec = SkyCoord(header['CRVAL1'],header['CRVAL2'],unit='deg').spherical_offsets_to(SkyCoord(gaiastarsra,gaiastarsdec,unit='deg'))
-    p0 = [0,1]+[0]*(len(xi)-2)
+    if len(xi) > 12:
+        p0 = [0,1]+[0]*10
+    else:
+        p0 = [0,1]+[0]*(len(xi)-2)
     p1 = curve_fit(ptv_fit,(xi,eta),dra,p0=p0)[0]
     p2 = curve_fit(ptv_fit,(eta,xi),ddec,p0=p0)[0]
+    header['CTYPE1'] = 'RA---TPV'
+    header['CTYPE2'] = 'DEC--TPV'
     for i in range(len(p1)):
         header['PV1_'+str(int(i))] = p1[i]
         header['PV2_'+str(int(i))] = p2[i]
@@ -309,30 +314,61 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
     if log:
         log.info('Found '+str(len(starsx))+' unique star matches.')
 
-    #calculate transformation
+    #calculate inital transformation
     if log:
-        log.info('Calculating the transformation between the matched stars.')
+        log.info('Calculating the initial transformation between the matched stars.')
     gaiax, gaiay = wcs.utils.skycoord_to_pixel(SkyCoord(gaiastarsra,gaiastarsdec, unit='deg'), wcs.WCS(header), 1)
     tform = tf.estimate_transform('euclidean', np.c_[starsx, starsy], np.c_[gaiax, gaiay])
 
-    #apply transformation to header
+    #apply initial transformation to header
     if log:
-        log.info('Applying the transformation to the existing WCS in the header.')
+        log.info('Applying the initial transformation to the existing WCS in the header.')
     header_new = apply_wcs_transformation(header,tform)
+
+    #matching all stars to catalog
+    if log:
+        log.info('Matching all stars to the catalog.')
+    stars_ra, stars_dec = (wcs.WCS(header_new)).all_pix2world(table['XWIN_IMAGE'],table['YWIN_IMAGE'],1)
+    stars_radec = SkyCoord(stars_ra*u.deg,stars_dec*u.deg)
+    gaia_radec = SkyCoord(gaia['ra'],gaia['dec'], unit='deg')
+    idx, d2, d3 = gaia_radec.match_to_catalog_sky(stars_radec)
+    match = d2<1.*u.arcsec
+    idx = idx[match]
+    starx_match = [table['XWIN_IMAGE'][x] for x in idx]
+    stary_match = [table['YWIN_IMAGE'][x] for x in idx]
+    gaia_radec = SkyCoord(gaia[match]['ra'],gaia[match]['dec'], unit='deg')
+    gaiax_match, gaiay_match = wcs.utils.skycoord_to_pixel(gaia_radec, wcs.WCS(header_new), 1)
+    if log:
+        log.info('Found '+str(len(starsx_match))+' star matches.')
+    
+    #calculate and apply full transformation
+    if log:
+        log.info('Calculating the full transformation between the matched stars.')
+    tform = tf.estimate_transform('euclidean', np.c_[starx_match, stary_match], np.c_[gaiax_match, gaiay_match])
+    if log:
+        log.info('Applying the full transformation to the existing WCS in the header.')
+    header_new['CRPIX1'] = header_new['CRPIX1']-tform.translation[0]
+    header_new['CRPIX2'] = header_new['CRPIX2']-tform.translation[1]
+    cd = np.array([header_new['CD1_1'],header_new['CD1_2'],header_new['CD2_1'],header_new['CD2_2']]).reshape(2,2)
+    cd_matrix = tf.EuclideanTransform(rotation=tform.rotation)
+    cd_transformed = tf.warp(cd,cd_matrix)
+    header_new['CD1_1'] = cd_transformed[0][0]
+    header_new['CD1_2'] = cd_transformed[0][1]
+    header_new['CD2_1'] = cd_transformed[1][0]
+    header_new['CD2_2'] = cd_transformed[1][1]
     header_new['WCS_REF'] = ('GAIA-DR2', 'Reference catalog for astrometric solution.')
-    header_new['WCS_NUM'] = (len(starsx), 'Number of stars used for astrometric solution.')
+    header_new['WCS_NUM'] = (len(starx_match), 'Number of stars used for astrometric solution.')
 
     #calculate polynomial distortion
     if log:
         log.info('Calculating and applying the higher order polynomial distortion.')
-    header_dist = apply_wcs_distortion(header_new,starsx,starsy,gaiastarsra,gaiastarsdec)
+    header_dist = apply_wcs_distortion(header_new, starx_match, stary_match, gaia[match]['ra'],gaia[match]['dec'])
 
     #calculate error. This error now uses dvrms() instead of np.median.
     if log:
         log.info('Calculating the rms on the astrometry.')
-    stars_ra, stars_dec = (wcs.WCS(header_dist)).all_pix2world(starsx,starsy,1)
+    stars_ra, stars_dec = (wcs.WCS(header_dist)).all_pix2world(starx_match,stary_match,1)
     stars_radec = SkyCoord(stars_ra*u.deg,stars_dec*u.deg)
-    gaia_radec = SkyCoord(gaiastarsra,gaiastarsdec, unit='deg')
     error = calculate_error(stars_radec, gaia_radec, header_dist)
 
     #write out new fits
