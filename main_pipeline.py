@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.2" #last updated 24/05/2021
+__version__ = "1.3" #last updated 26/05/2021
 
 import sys
 import numpy as np
@@ -37,7 +37,7 @@ import Find_target_phot as tp
 import extinction
 from utilities.util import *
 
-def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,proc=None,use_dome_flats=None,phot=None):
+def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=None,proc=None,use_dome_flats=None,phot=None):
     #start time
     t_start = time.time()
     #import telescope parameter file
@@ -194,13 +194,13 @@ def main_pipeline(telescope,data_path,cal_path=None,target=None,skip_red=None,pr
         log.critical('No science files to process, check data before rerunning.')
         logging.shutdown()
         sys.exit(-1)     
-    log.info('User input target for reduction: '+str(target))
+    log.info('User input target for reduction: '+str(input_target))
     for tar in sci_list:
         stack = tel.stacked_image(tar,red_path)
         target = tar.split('_')[0]
         fil = tar.split('_')[-1]
-        if target is not None:
-            if target not in tar:
+        if input_target is not None:
+            if input_target not in tar:
                 continue
             else:
                 log.info('Matching target found: '+tar)
@@ -355,7 +355,7 @@ def main():
     params.add_argument('--phot', type=str, default=None, help='Option to use IRAF to perform photometry.') #must have pyraf install and access to IRAF to use
     args = params.parse_args()
     
-    main_pipeline(args.telescope,args.data_path,args.cal_path,target=args.target,skip_red=args.skip_red,proc=args.proc,use_dome_flats=args.use_dome_flats,phot=args.phot)
+    main_pipeline(args.telescope,args.data_path,args.cal_path,input_target=args.target,skip_red=args.skip_red,proc=args.proc,use_dome_flats=args.use_dome_flats,phot=args.phot)
 
 if __name__ == "__main__":
     main()

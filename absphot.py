@@ -182,11 +182,11 @@ class absphot(object):
         if catalog=='2MASS':
             if fil == 'K' or 'Ks':
                 cor = 1.85
-            elif fil == 'J':
+            if fil == 'J':
                 cor = 0.91
-            elif fil == 'H':
+            if fil == 'H':
                 cor = 1.39
-            elif fil == 'Y':
+            if fil == 'Y':
                 cor = 0.634
         else:
             cor = 0
