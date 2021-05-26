@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.3" #last updated 26/05/2021
+__version__ = "1.4" #last updated 26/05/2021
 
 import sys
 import numpy as np
@@ -328,11 +328,11 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
             if pos == 'wcs':
                 ra = float(input('Enter RA in degrees: '))
                 dec = float(input('Enter Dec in degrees: '))
-                tp.find_target_phot(final_stack[k], fil, fwhm, zp, zp_err, show_phot=True, ra=ra, dec=dec)
+                tp.find_target_phot(final_stack[k], fil, fwhm, zp, zp_err, show_phot=True, ra=ra, dec=dec, log=log)
             elif pos == 'xy':
                 x = float(input('Enter x position in pixel: '))
                 y = float(input('Enter y position in pixel: '))
-                tp.find_target_phot(final_stack[k], fil, fwhm, zp, zp_err, show_phot=True, x=x, y=y)
+                tp.find_target_phot(final_stack[k], fil, fwhm, zp, zp_err, show_phot=True, x=x, y=y, log=log)
                 ra, dec = (wcs.WCS(header)).all_pix2world(x,y,1)
             log.info('Calculating extinction correction.')
             coords = SkyCoord(ra,dec,unit='deg')

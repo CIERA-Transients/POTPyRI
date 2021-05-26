@@ -278,7 +278,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, show_phot=False, log=None, lo
 
         if show_phot:
             # Radial profile out to 6 * fwhm (large just to be safe)
-            radial_profile(data, x, y, 0.7, fwhm, rad=6)
+            radial_profile(data, x, y, 0.2, fwhm, rad=6)
             plt.axvline(rad, c='r')
             plt.axvline(r_in)
             plt.axvline(r_out)
