@@ -711,7 +711,8 @@ def write_catalog(catfile, header, catdata):
     # Next append all catalog data to the file
     with open(catfile, 'a') as f:
         for line in catdata:
-            f.write(line)
+            if '\n' in line: line.replace('\n', '')
+            f.write(line+'\n')
 
 def import_catalog(catfile):
 
