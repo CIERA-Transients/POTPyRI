@@ -204,7 +204,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, show_phot=False, log=None, lo
     correct_position = "no"
     while correct_position == "no":
         if show_phot:
-            radial_profile(data, x, y, 0.7, fwhm, rad=6)        # Radial profile
+            radial_profile(data, x, y, 0.2, fwhm, rad=6)        # Radial profile
             plt.axvline(6*fwhm)
 
             print("Double click to set the new center. Do nothing if you are ok with current coordinates.")
@@ -372,9 +372,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, show_phot=False, log=None, lo
                     d -= gauss_data.reshape(np.shape(d))
                     aperture.plot(color='white', lw=2)      # Old data plot
                     annulus_aperture.plot(color='b', lw=2)
-                    plt.imshow(data, norm=norm)
-                    plt.xlim(int(x) - d_x_y, int(x) + d_x_y)
-                    plt.ylim(int(y) - d_x_y, int(y) + d_x_y)
+                    plt.imshow(d, norm=norm)
                     plt.colorbar()
                     plt.title("Target without fake source added in")
 
@@ -382,14 +380,12 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, show_phot=False, log=None, lo
                     d += gauss_data.reshape(np.shape(d))
                     aperture.plot(color='white', lw=2)      # New data plot
                     annulus_aperture.plot(color='b', lw=2)
-                    plt.imshow(data, norm=norm)
-                    plt.xlim(int(x) - d_x_y, int(x) + d_x_y)
-                    plt.ylim(int(y) - d_x_y, int(y) + d_x_y)
+                    plt.imshow(d, norm=norm)
                     plt.colorbar()
                     plt.title("Target after fake source has been added in")
 
                     # Radial profile...only need for good fake source (same process as used to find the FWHM)
-                    radial_profile(data, x, y, 0.7, fwhm, rad=r_out/fwhm)
+                    radial_profile(data, x, y, 0.2, fwhm, rad=r_out/fwhm)
                     plt.axvline(rad, c='r')
                     plt.axvline(r_in)
                     plt.axvline(r_out)
