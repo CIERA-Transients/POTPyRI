@@ -14,7 +14,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.1 #last edited 24/05/2021
+__version__ = 1.2 #last edited 26/05/2021
 
 def static_mask(proc):
     return ['./staticmasks/MMIRS.staticmask.fits']
@@ -106,16 +106,16 @@ def create_flat(flat_list,fil,red_path,mbias=None,log=None):
     for flat in flat_list:
         log.info('Loading file: '+flat)
         raw = CCDData.read(flat,hdu=1,unit=u.adu)
-        log.info('Median flat level: '+str(np.median(raw)))
-        norm = 1/np.median(raw.data[1200:1700,700:1300])
-        log.info('Flat normalization: '+str(norm))
-        flat_scale.append(norm)
         red = ccdproc.ccd_process(raw, gain=raw.header['GAIN']*u.electron/u.adu, readnoise=raw.header['RDNOISE']*u.electron)
         log.info('Exposure time of image is '+str(red.header['EXPTIME']))
         log.info('Loading correct master dark')
         mdark = CCDData.read(red_path+'DARK_'+str(red.header['EXPTIME'])+'.fits', unit=u.electron)        
         red = ccdproc.subtract_dark(red, mdark, exposure_time='EXPTIME', exposure_unit=u.second)
         red = ccdproc.subtract_overscan(red, overscan=red[:,0:4], overscan_axis=1, model=models.Chebyshev1D(3))
+        log.info('Median flat level: '+str(np.median(raw)))
+        norm = 1/np.median(red.data[500:1500,500:1500])
+        log.info('Flat normalization: '+str(norm))
+        flat_scale.append(norm)
         flats.append(red)
     mflat = ccdproc.combine(flats,method='median',scale=flat_scale,sigma_clip=True)
     log.info('Created master flat for filter: '+fil)
@@ -162,31 +162,6 @@ def rdnoise(header):
 
 def binning():
     return [4,4]
-
-def create_bias(cal_list,red_path,log):
-    images = []
-    processed = []
-    for bias in cal_list['BIAS']:
-        log.info('Loading file: '+bias)
-        try:
-            raw = CCDData.read(bias, hdu=1, unit='adu')
-            images.append(bias)
-        except astropy.io.registry.IORegistryError:
-            log.error('File not recognized.')
-        red = ccdproc.ccd_process(raw, gain=raw.header['GAIN']*u.electron/u.adu, readnoise=raw.header['RDNOISE']*u.electron)
-        log.info('Median bias level: '+str(np.median(red)))
-        processed.append(red)
-    log.info('Creating master bias.')
-    mbias = ccdproc.combine(processed,method='median')
-    log.info('Master bias created. Median bias level: '+str(np.median(mbias)))
-    mbias_hdu = fits.PrimaryHDU(mbias)
-    mbias_hdu.header['VER'] = (__version__, 'Version of telescope parameter file used.')
-    for i,im in enumerate(images):
-        mbias_hdu.header['FILE'+str(i+1)] = im
-    mbias_hdu.header['MED'] = (np.median(mbias), 'Median level of bias.')
-    mbias_hdu.writeto(red_path+'mbias.fits',overwrite=True)
-    log.info('Master bias written to mbias.fits')
-    return mbias
 
 def create_dark(cal_list,cal,mbias,red_path,log):
     images = []

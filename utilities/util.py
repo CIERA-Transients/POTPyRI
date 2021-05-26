@@ -19,6 +19,9 @@ import requests
 import warnings
 import re
 from contextlib import contextmanager
+import csv
+import sys
+csv.field_size_limit(sys.maxsize)
 
 warnings.filterwarnings('ignore')
 
