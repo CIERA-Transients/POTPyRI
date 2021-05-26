@@ -168,6 +168,8 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, show_phot=False, log=None, lo
         x = pixel_coords[0]
         y = pixel_coords[1]
     elif x is not None:
+        x-=1
+        y-=1
         coords = np.array([[x, y]], np.float)  # Array of coordinates: [[RA, Dec]] in [deg, deg]
         pixel_coords = w.wcs_pix2world(coords, 1)[0]     # Find the pixel coordinates in the image
         ra = pixel_coords[0]
@@ -251,7 +253,8 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, show_phot=False, log=None, lo
         if input("Would you like to use these radii? Type 'yes or 'no': ") == "yes":
             rad, r_in, r_out = 2.5*fwhm, 3.5*fwhm, 4.5*fwhm
         else:
-            log.info("FWHM = %.3f" % fwhm)
+            if log:
+                log.info("FWHM = %.3f" % fwhm)
             rad = float(input("Pick a radius (in pixels) for the circular aperture: "))
             r_in = float(input("Pick an inner radius (in pixels) for the background annulus: "))
             r_out = float(input("Pick an outer radius (in pixels) for the background annulus: "))
