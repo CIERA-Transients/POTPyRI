@@ -75,7 +75,10 @@ class absphot(object):
             else:
                 print(m.format(i=i, N=nobj, zpt='%2.4f'%zpt, zpterr='%2.4f'%zpterr,
                 s=self.sigma, M=len(flux)))
-
+        
+        if log:
+            log.info('Number of stars used to calculate final zeropoint: '+str(len(flux)))
+        
         master_mask = np.array([i in idx for i in np.arange(nobj_orig)])
 
         return(zpt, zpterr, master_mask)
@@ -185,8 +188,6 @@ class absphot(object):
                 else:
                     match_table.add_row(table[i])
 
-            metadata = {}
-            metadata['ZPTNSTAR']=len(match_table)
 
             # Sort by flux
             flux_idx = np.argsort(match_table['flux'])
@@ -202,6 +203,14 @@ class absphot(object):
             # Do basic data quality cuts to fluxes and catalog magnitudes
             flux, fluxerr, cat_mag, cat_magerr = self.do_cuts(flux, fluxerr,
                 cat_mag, cat_magerr)
+
+            if len(flux)==0:
+                if log:
+                    log.info('No suitable stars to calculate zeropoint .')
+                return(None, None)
+            else:
+                metadata = {}
+                metadata['ZPTNSTAR']=len(flux)
 
             zpt, zpterr, master_mask = self.zpt_iteration(flux, fluxerr,
                 cat_mag, cat_magerr, log=log)
@@ -225,6 +234,8 @@ class absphot(object):
                 inst = np.linspace(np.min(instmag), np.max(instmag), 1000)
 
                 plt.plot(inst, inst+zpt, label=label)
+                plt.xlabel('PSF photometry')
+                plt.ylabel('Catalog photometry')
 
                 plt.legend()
 
@@ -256,6 +267,8 @@ class absphot(object):
                 metadata['M3SIGMA']=-2.5*np.log10(3.0*skysig_per_FWHM_Area)+zpt
                 metadata['M5SIGMA']=-2.5*np.log10(5.0*skysig_per_FWHM_Area)+zpt
                 metadata['M10SIGMA']=-2.5*np.log10(10.0*skysig_per_FWHM_Area)+zpt
+                if log:
+                    log.info('3 sigma limiting mag of image = '+str(-2.5*np.log10(3.0*skysig_per_FWHM_Area)+zpt))
 
             modify_catalog(cmpfile, metadata)
             return(zpt, zpterr)
