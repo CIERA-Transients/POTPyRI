@@ -32,20 +32,30 @@ def nir_extinction(w):
     return a+b/Rv
 
 def filter_wavelength(fil):
+    if fil == 'u':
+        wave = 0.36
+    if fil == 'g':
+        wave = 0.47
+    if fil == 'r':
+        wave = 0.62
+    if fil == 'i':
+        wave = 0.75
+    if fil == 'z':
+        wave = 0.89
     if fil == 'Y':
         wave = 0.99
-    elif fil == 'J':
+    if fil == 'J':
         wave = 1.25
-    elif fil == 'H':
+    if fil == 'H':
         wave = 1.66
-    elif fil == 'K' or 'Ks':
+    if fil == 'K' or 'Ks':
         wave = 2.19
     return wave
 
 def calculate_mag_extinction(coords,fil):
     dustmaps.sfd.fetch()
     sfd = dustmaps.sfd.SFDQuery()
-    AV = sfd(coords)*3.1
+    AV = sfd(coords)*3.1/1.14
     wave = filter_wavelength(fil)
     if wave<=0.303:
         A = uv_extinction(wave)

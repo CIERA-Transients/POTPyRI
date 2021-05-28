@@ -76,6 +76,7 @@ def radial_profile(data, x, y, step_size, fwhm, rad):
     f_fit = sums
     g, _ = curve_fit(fix_x0, w_fit, f_fit)
     plt.figure(1)
+    # plt.plot(x_data, sums, 'o-', alpha=0.5, lw=2, markersize=4)
     plt.plot(x_data, sums, 'o-', alpha=0.5, lw=2, markersize=4)  # Plot the radial profiles
     plt.plot(x_data, fix_x0(x_data, *g), '^-', alpha=0.5, lw=2, markersize=4)
     plt.title("Radial profile of target")
@@ -227,7 +228,56 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, show_phot=False, log=None, lo
                 real_coords = w.wcs_pix2world(np.array([[x, y]], np.float), 1)[0]  # Find the pixel coords in the image
                 ra, dec = real_coords[0], real_coords[1]
 
-        if input("Are you ok with current coordinates? RA = %.5f Dec = %.5f Type 'yes' or 'no': " % (ra, dec)) != "yes":
+                radial_profile(data, x, y, 0.2, fwhm, rad=6)        # Radial profile
+                plt.axvline(6*fwhm)
+
+                print("Showing new position.")
+                fig = plt.figure(2)
+                ap_in = CircularAperture((x, y), 1)  # Aperture to perform photometry
+                ap_out = CircularAperture((x, y), 6*fwhm)  # Aperture to perform photometry
+                ap_in.plot(color='r', lw=1)      # Plot of target with apertures and annulus
+                ap_out.plot(color='b', lw=2)
+                norm = simple_norm(data, 'sqrt', percent=99)
+                plt.imshow(data, norm=norm)
+                plt.xlim(int(x) - d_x_y, int(x) + d_x_y)
+                plt.ylim(int(y) - d_x_y, int(y) + d_x_y)
+                plt.colorbar()
+                plt.show()
+        
+        if input("Would you like to use a centroid? Type 'yes' or 'no': ") == "yes":
+            d_x_y = 50
+            d = data[int(y)-d_x_y:int(y)+d_x_y, int(x)-d_x_y:int(x)+d_x_y]      # Cutout of source; upside down from normal
+            x_mesh, y_mesh = np.meshgrid(np.linspace(0, np.shape(d)[1] - 1, np.shape(d)[1]),
+                                np.linspace(0, np.shape(d)[0] - 1, np.shape(d)[0]))
+            popt, pcov = curve_fit(twoD_Gaussian, (x_mesh, y_mesh), d.ravel(),
+                                p0=(np.max(d), 50, 50, fwhm/2.35482, fwhm/2.35482, 0, 0))
+            x+=popt[1]-d_x_y
+            y+=popt[2]-d_x_y
+            if log:
+                log.info('Centroid calculated position: (%.3f, %.3f)'%(x, y))
+            else:
+                print('Centroid calculated position: (%.3f, %.3f)'%(x, y))
+            
+            real_coords = w.wcs_pix2world(np.array([[x, y]], np.float), 1)[0]  # Find the pixel coords in the image
+            ra, dec = real_coords[0], real_coords[1]
+
+            radial_profile(data, x, y, 0.2, fwhm, rad=6)        # Radial profile
+            plt.axvline(6*fwhm)
+
+            print("Showing centroid position.")
+            fig = plt.figure(2)
+            ap_in = CircularAperture((x, y), 1)  # Aperture to perform photometry
+            ap_out = CircularAperture((x, y), 6*fwhm)  # Aperture to perform photometry
+            ap_in.plot(color='r', lw=1)      # Plot of target with apertures and annulus
+            ap_out.plot(color='b', lw=2)
+            norm = simple_norm(data, 'sqrt', percent=99)
+            plt.imshow(data, norm=norm)
+            plt.xlim(int(x) - d_x_y, int(x) + d_x_y)
+            plt.ylim(int(y) - d_x_y, int(y) + d_x_y)
+            plt.colorbar()
+            plt.show()
+
+        if input("Are you ok with this position? Type 'yes' or 'no': ") != "yes":
             pass
         else:
             correct_position = "yes"
@@ -238,10 +288,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, show_phot=False, log=None, lo
             if log2 is not None:
                 log2.info("Final coordinates: (%.3f, %.3f) at RA = %.5f and Dec = %.5f" % (x, y, ra, dec))
 
-    if log is not None:
-        log.info("You will now get to choose the radii for the circular aperture and the r_in and r_out of the annulus")
-    else:
-        print("You will now get to choose the radii for the circular aperture and the r_in and r_out of the annulus")
+    print("You will now get to choose the radii for the circular aperture and the r_in and r_out of the annulus")
     correct_radii = "no"
     while correct_radii == "no":
         if log is not None:
@@ -254,7 +301,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, show_phot=False, log=None, lo
             rad, r_in, r_out = 2.5*fwhm, 3.5*fwhm, 4.5*fwhm
         else:
             if log:
-                log.info("FWHM = %.3f" % fwhm)
+                log.info("FWHM = %.3f pixels" % fwhm)
             rad = float(input("Pick a radius (in pixels) for the circular aperture: "))
             r_in = float(input("Pick an inner radius (in pixels) for the background annulus: "))
             r_out = float(input("Pick an outer radius (in pixels) for the background annulus: "))
@@ -294,9 +341,9 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, show_phot=False, log=None, lo
 
         correct_radii = input("Are you ok with the previously selected radii? Type 'yes' or 'no': ")
     if log is not None:
-        log.info("Radii chosen: %.3f, %.3f, %.3f" % (rad, r_in, r_out))
+        log.info("Radii chosen in pixels: %.3f, %.3f, %.3f" % (rad, r_in, r_out))
     else:
-        print("Radii chosen: %.3f, %.3f, %.3f" % (rad, r_in, r_out))
+        print("Radii chosen in pixels: %.3f, %.3f, %.3f" % (rad, r_in, r_out))
     if log2 is not None:
         log2.info("Final radii: %.3f, %.3f, %.3f" % (rad, r_in, r_out))
 

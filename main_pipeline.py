@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.4" #last updated 26/05/2021
+__version__ = "1.5" #last updated 27/05/2021
 
 import sys
 import numpy as np
@@ -293,7 +293,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                     zp_catalogs = tel.catalog_zp()
                     zp_cal = absphot.absphot()
                     for zp_cat in zp_catalogs:
-                        zp, zp_err = zp_cal.find_zeropoint(stack[k].replace('.fits','.pcmp'), fil, zp_cat, log=log)
+                        zp, zp_err = zp_cal.find_zeropoint(stack[k].replace('.fits','.pcmp'), fil, zp_cat, plot=True, log=log)
                         if zp:
                             break
         if phot:
@@ -308,22 +308,28 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                 zp_catalogs = tel.catalog_zp()
                 zp_cal = absphot.absphot()
                 for zp_cat in zp_catalogs:
-                    zp, zp_err = zp_cal.find_zeropoint(final_stack[k].replace('.fits','.pcmp'), fil, zp_cat, log=log)
+                    zp, zp_err = zp_cal.find_zeropoint(final_stack[k].replace('.fits','.pcmp'), fil, zp_cat, plot=True, log=log)
                     if zp:
                         break
-            log.info('Loading FWHM and zeropoint calculated from psf photometry.')
+            log.info('Loading FWHM from psf photometry.')
             header, table = import_catalog(final_stack[k].replace('.fits','.pcmp'))
             fwhm = header['FWHM']
             log.info('FWHM = %2.4f pixels'%fwhm)
-            try:
-                zp = header['ZPTMAG']
-                zp_err = header['ZPTMUCER']
-                log.info('zpt = %2.4f +/- %2.4f AB mag'%(zp,zp_err))
-            except:
-                log.info('No zeropint found.')
+            enter_zp = input('Enter user zeropiont instead of loading from psf photometry ("yes" or "no")? ')
+            if enter_zp == 'yes':
                 zp = float(input('Please enter zeropoint in AB mag: '))
                 zp_err = float(input('Please enter zeropoint error in AB mag: '))
                 log.info('User entered zpt = %2.4f +/- %2.4f AB mag'%(zp,zp_err))
+            else:
+                try:
+                    zp = header['ZPTMAG']
+                    zp_err = header['ZPTMUCER']
+                    log.info('zpt = %2.4f +/- %2.4f AB mag'%(zp,zp_err))
+                except:
+                    log.info('No zeropint found.')
+                    zp = float(input('Please enter zeropoint in AB mag: '))
+                    zp_err = float(input('Please enter zeropoint error in AB mag: '))
+                    log.info('User entered zpt = %2.4f +/- %2.4f AB mag'%(zp,zp_err))
             pos = input('Would you like to enter the RA and Dec ("wcs") or x and y ("xy") position of the target? ')
             if pos == 'wcs':
                 ra = float(input('Enter RA in degrees: '))
@@ -334,7 +340,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                 y = float(input('Enter y position in pixel: '))
                 tp.find_target_phot(final_stack[k], fil, fwhm, zp, zp_err, show_phot=True, x=x, y=y, log=log)
                 ra, dec = (wcs.WCS(header)).all_pix2world(x,y,1)
-            log.info('Calculating extinction correction.')
+            log.info('Calculating extinction correction from Schlafly & Finkbeiner (2011).')
             coords = SkyCoord(ra,dec,unit='deg')
             ext_cor = extinction.calculate_mag_extinction(coords,fil)
             log.info('Galactic extinction = %2.4f mag'%ext_cor)
