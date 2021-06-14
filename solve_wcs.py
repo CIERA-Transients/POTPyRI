@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "3.5" #last updated 26/05/2021
+__version__ = "3.6" #last updated 14/06/2021
 
 import sys
 import numpy as np
@@ -332,7 +332,7 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
     stars_radec = SkyCoord(stars_ra*u.deg,stars_dec*u.deg)
     gaia_radec = SkyCoord(gaia['ra'],gaia['dec'], unit='deg')
     idx, d2, d3 = gaia_radec.match_to_catalog_sky(stars_radec)
-    match = d2<2.0*u.arcsec
+    match = d2<3.0*u.arcsec
     idx = idx[match]
     starx_match = [table['XWIN_IMAGE'][x] for x in idx]
     stary_match = [table['YWIN_IMAGE'][x] for x in idx]

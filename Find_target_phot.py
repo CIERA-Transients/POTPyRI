@@ -183,7 +183,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, show_phot=False, log=None, lo
         log.info("Pixel coordinates: (%.3f, %.3f)" % (x, y))
     else:
         print("Pixel coordinates: (%.3f, %.3f)" % (x, y))
-    if input('Would you like to choose the cutout size? Default is 125x125 pixels (50"x50"): ') == "yes":
+    if input('Would you like to choose the cutout size? Default is 50"x50". ') == "yes":
         try:
             d_x_y = int(input("Choose the radius, in arcsec: "))*2.5
         except TypeError:
@@ -293,12 +293,12 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, show_phot=False, log=None, lo
     while correct_radii == "no":
         if log is not None:
             log.info("Automatic radii picked by comparing to FWHM of field: rad = %.3f, r_in = %.3f, r_out = %.3f" %
-                     (2.5 * fwhm, 3.5 * fwhm, 4.5 * fwhm))
+                     (2.5 * fwhm, 2.5 * fwhm, 4.5 * fwhm))
         else:
             print("Automatic radii picked by comparing to FWHM of field: rad = %.3f, r_in = %.3f, r_out = %.3f" %
-                  (2.5 * fwhm, 3.5 * fwhm, 4.5 * fwhm))
+                  (2.5 * fwhm, 2.5 * fwhm, 4.5 * fwhm))
         if input("Would you like to use these radii? Type 'yes or 'no': ") == "yes":
-            rad, r_in, r_out = 2.5*fwhm, 3.5*fwhm, 4.5*fwhm
+            rad, r_in, r_out = 2.5*fwhm, 2.5*fwhm, 4.5*fwhm
         else:
             if log:
                 log.info("FWHM = %.3f pixels" % fwhm)

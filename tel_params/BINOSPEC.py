@@ -14,7 +14,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.0 #last edited 24/05/2021
+__version__ = 1.1 #last edited 14/06/2021
 
 def static_mask(proc):
     if proc:
@@ -74,22 +74,22 @@ def flat_files():
     return ['imaging','deployed']
 
 def bias_keyword():
-    return ['']
+    return []
 
 def bias_files():
-    return [None]
+    return []
 
 def dark_keyword():
-    return ['']
+    return []
 
 def dark_files():
-    return [None]
+    return []
 
 def target_keyword():
     return 'OBJECT'
 
-def filter_keyword():
-    return 'FILTER'
+def filter_keyword(hdr):
+    return hdr['FILTER'].replace(' ','').split('_')[0]
 
 def time_format(hdr):
     return hdr['MJD']
@@ -244,3 +244,6 @@ def run_phot():
 
 def catalog_zp():
     return ['SDSS','PS1']
+
+def exptime(hdr):
+    return hdr['EXPTIME']

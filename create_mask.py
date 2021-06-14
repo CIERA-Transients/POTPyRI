@@ -65,7 +65,7 @@ def create_mask(science_file,red,suffix,static_mask,source_mask,saturation,binni
             fits.writeto(red_path+'/old_mask.fits',mask_binned,overwrite=True)
         else:
             break
-    # os.remove(red_path+'/binned_mask.fits')
+    os.remove(red_path+'/binned_mask.fits')
     if os.path.exists(red_path+'/old_mask.fits'):
         os.remove(red_path+'/old_mask.fits')
     if satellite_fitting == True:

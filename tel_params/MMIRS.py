@@ -14,7 +14,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.2 #last edited 26/05/2021
+__version__ = 1.3 #last edited 14/06/2021
 
 def static_mask(proc):
     return ['./staticmasks/MMIRS.staticmask.fits']
@@ -62,16 +62,16 @@ def science_files():
     return ['imaging','open']
 
 def flat_keyword():
-    return ['']
+    return []
 
 def flat_files():
-    return [None]
+    return []
 
 def bias_keyword():
-    return ['']
+    return []
 
 def bias_files():
-    return [None]
+    return []
 
 def dark_keyword():
     return ['OBJECT']
@@ -82,8 +82,8 @@ def dark_files():
 def target_keyword():
     return 'OBJECT'
 
-def filter_keyword():
-    return 'FILTER'
+def filter_keyword(hdr):
+    return hdr['FILTER'].replace(' ','').split('_')[0]
 
 def time_format(hdr):
     return Time(hdr['DATE-OBS']).mjd
@@ -112,7 +112,7 @@ def create_flat(flat_list,fil,red_path,mbias=None,log=None):
         mdark = CCDData.read(red_path+'DARK_'+str(red.header['EXPTIME'])+'.fits', unit=u.electron)        
         red = ccdproc.subtract_dark(red, mdark, exposure_time='EXPTIME', exposure_unit=u.second)
         red = ccdproc.subtract_overscan(red, overscan=red[:,0:4], overscan_axis=1, model=models.Chebyshev1D(3))
-        log.info('Median flat level: '+str(np.median(raw)))
+        log.info('Median flat level: '+str(np.median(red)))
         norm = 1/np.median(red.data[500:1500,500:1500])
         log.info('Flat normalization: '+str(norm))
         flat_scale.append(norm)
@@ -202,3 +202,6 @@ def run_phot():
 
 def catalog_zp():
     return ['2MASS']
+
+def exptime(hdr):
+    return hdr['EXPTIME']
