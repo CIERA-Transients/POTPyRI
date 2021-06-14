@@ -3,7 +3,7 @@
 "Function to sort files for main_pipeline."
 "Authors: Owen Eskandari, Kerry Paterson"
 
-__version__ = "2.1" #last updated 26/04/2021
+__version__ = "2.2" #last updated 14/06/2021
 
 from astropy.io import fits
 from astropy.table import Table
@@ -59,14 +59,15 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
     flat_keyword = tel.flat_keyword()
     bias_keyword = tel.bias_keyword()
     dark_keyword = tel.dark_keyword()
+    spec_keyword = tel.spec_keyword()
 
     science_files = tel.science_files()
     flat_files = tel.flat_files()
     bias_files = tel.bias_files()
     dark_files = tel.dark_files()
+    spec_files = tel.spec_files()
 
     target_keyword = tel.target_keyword()
-    fil_keyword = tel.filter_keyword()
 
     cal_list = {'BIAS':[]}
     sci_list = {}
@@ -89,10 +90,19 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
                 shutil.move(f,moved_path)
                 continue
         target = hdr[target_keyword].replace(' ','')
-        fil = hdr[fil_keyword].replace(' ','').split('_')[0]
-        exp = str(hdr['EXPTIME'])
+        fil = tel.filter_keyword(hdr)
+        exp = str(tel.exptime(hdr))
         file_time = None
-        if np.all([hdr[science_keyword[j]] == science_files[j] for j in range(len(science_keyword))]):
+        if len(flat_keyword) != 0 and np.all([flat_files[j] in hdr[flat_keyword[j]] for j in range(len(flat_keyword))]):
+            file_type = 'FLAT'
+            moved_path = path+'raw/' 
+            shutil.move(f,moved_path)
+            try:
+                cal_list['FLAT_'+fil]
+            except KeyError:
+                cal_list.update({'FLAT_'+fil:[]}) 
+            cal_list['FLAT_'+fil].append(f.replace(path,moved_path))  
+        elif np.all([hdr[science_keyword[j]] == science_files[j] for j in range(len(science_keyword))]):
             file_type = 'SCIENCE'
             moved_path = path+'raw/'
             shutil.move(f,moved_path)
@@ -113,21 +123,12 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
                 except KeyError:
                     sky_list.update({fil:[]})
                 sky_list[fil].append(f.replace(path,moved_path))
-        elif np.all([hdr[flat_keyword[j]] == flat_files[j] for j in range(len(flat_keyword))]):
-            file_type = 'FLAT'
-            moved_path = path+'raw/' 
-            shutil.move(f,moved_path)
-            try:
-                cal_list['FLAT_'+fil]
-            except KeyError:
-                cal_list.update({'FLAT_'+fil:[]}) 
-            cal_list['FLAT_'+fil].append(f.replace(path,moved_path))   
-        elif np.all([hdr[bias_keyword[j]] == bias_files[j] for j in range(len(bias_keyword))]):
+        elif len(bias_keyword) != 0 and np.all([hdr[bias_keyword[j]] == bias_files[j] for j in range(len(bias_keyword))]):
             file_type = 'BIAS'
             moved_path = path+'raw/'
             shutil.move(f,moved_path)
             cal_list['BIAS'].append(f.replace(path,moved_path))
-        elif np.all([hdr[dark_keyword[j]] == dark_files[j] for j in range(len(dark_keyword))]):
+        elif len(dark_keyword) != 0 and np.all([hdr[dark_keyword[j]] == dark_files[j] for j in range(len(dark_keyword))]):
             file_type = 'DARK'
             moved_path = path+'raw/'
             shutil.move(f,moved_path)

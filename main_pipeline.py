@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.5" #last updated 27/05/2021
+__version__ = "1.6" #last updated 14/06/2021
 
 import sys
 import numpy as np
@@ -247,7 +247,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                         sky_hdu.header['FILE'+str(k+1)] = (os.path.basename(str(m)), 'Name of file used in creation of sky.')
                     sky = ccdproc.combine(sky_masked_data,method='median',sigma_clip=True,sigma_clip_func=np.ma.median,mask=sky_mask)
                     sky.header = sky_hdu.header
-                    sky.write(red_path+os.path.basename(sci_list[tar][j]).replace('.fits','_sky.fits'),overwrite=True)
+                    sky.write(red_path+os.path.basename(sci_list[tar][j]).replace('.fits','_sky.fits').replace('.gz',''),overwrite=True)
                     processed[j] = n.subtract(sky,propagate_uncertainties=True,handle_meta='first_found')
                 t2 = time.time()
                 log.info('Sky maps complete and subtracted in '+str(t2-t1)+' sec')
@@ -260,7 +260,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                 suffix = tel.suffix()
             mask = tel.static_mask(proc)
             for k in range(dimen):
-                red_list = [red_path+os.path.basename(sci).replace('.fits',suffix[k]) for sci in sci_list[tar]]
+                red_list = [red_path+os.path.basename(sci).replace('.fits',suffix[k]).replace('.gz','') for sci in sci_list[tar]]
                 if dimen == 1:
                     for j,process_data in enumerate(processed):
                         process_data.write(red_list[j],overwrite=True)
@@ -282,9 +282,12 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                 log.info('Median stack made for '+stack[k])
                 if tel.run_wcs():
                     log.info('Solving WCS.')
-                    wcs_error = solve_wcs.solve_wcs(stack[k],telescope,log=log)   
-                    log.info(wcs_error)
-                    stack[k] = stack[k].replace('.fits','_wcs.fits')
+                    try:
+                        wcs_error = solve_wcs.solve_wcs(stack[k],telescope,log=log)   
+                        log.info(wcs_error)
+                        stack[k] = stack[k].replace('.fits','_wcs.fits')
+                    except:
+                        log.error('WCS solution failed.')
                 if tel.run_phot():
                     log.info('Running psf photometry.')
                     epsf, fwhm = psf.do_phot(stack[k])
