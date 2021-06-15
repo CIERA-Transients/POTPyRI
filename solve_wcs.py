@@ -301,8 +301,9 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
 
     #make quads using stars brigher than 19 mag
     if log:
-        log.info('Making quads with the brightest stars fainter than 20 mag.')
+        log.info('Making quads with the brightest stars brighter than 20 mag and fainter than 14 mag.')
     gaia = gaia[gaia['phot_g_mean_mag']<20]
+    gaia = gaia[gaia['phot_g_mean_mag']>14]
     gaiastars, gaiad, gaiads, gaiaratios = make_quads(gaia['ra'], gaia['dec'],
         use=50, sky_coords=True)
 
