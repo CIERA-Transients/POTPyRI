@@ -299,7 +299,7 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
     if log:
         log.info(str(len(gaia))+' GAIA stars found within the image footprint.')
 
-    #make quads using stars brigher than 19 mag
+    #make quads using stars brigher than 20 mag
     if log:
         log.info('Making quads with the brightest stars brighter than 20 mag and fainter than 14 mag.')
     gaia = gaia[gaia['phot_g_mean_mag']<20]
@@ -310,21 +310,36 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
     #match quads
     if log:
         log.info('Matching quads between the detected and cataloged stars.')
-    starsx, starsy, gaiastarsra, gaiastarsdec = match_quads(stars,gaiastars,d,gaiad,
-            ds,gaiads,ratios,gaiaratios,sky_coords=True)
-    if log:
-        log.info('Found '+str(len(starsx))+' unique star matches.')
+    try:
+        starsx, starsy, gaiastarsra, gaiastarsdec = match_quads(stars,gaiastars,d,gaiad,
+                ds,gaiads,ratios,gaiaratios,sky_coords=True)
+        if log:
+            log.info('Found '+str(len(starsx))+' unique star matches.')
 
-    #calculate inital transformation
-    if log:
-        log.info('Calculating the initial transformation between the matched stars.')
-    gaiax, gaiay = wcs.utils.skycoord_to_pixel(SkyCoord(gaiastarsra,gaiastarsdec, unit='deg'), wcs.WCS(header), 1)
-    tform = tf.estimate_transform('euclidean', np.c_[starsx, starsy], np.c_[gaiax, gaiay])
+        #calculate inital transformation
+        if log:
+            log.info('Calculating the initial transformation between the matched stars.')
+        gaiax, gaiay = wcs.utils.skycoord_to_pixel(SkyCoord(gaiastarsra,gaiastarsdec, unit='deg'), wcs.WCS(header), 1)
+        tform = tf.estimate_transform('euclidean', np.c_[starsx, starsy], np.c_[gaiax, gaiay])
 
-    #apply initial transformation to header
-    if log:
-        log.info('Applying the initial transformation to the existing WCS in the header.')
-    header_new = apply_wcs_transformation(header,tform)
+        #apply initial transformation to header
+        if log:
+            log.info('Applying the initial transformation to the existing WCS in the header.')
+        header_new = apply_wcs_transformation(header,tform)
+    except:
+        if log:
+            log.error('Unique star matching failed.')
+        crpix1, crpix2, cd11, cd12, cd21, cd22 = wcs_keyword = tel.WCS_keywords()
+        header['CD1_1'] = header[cd11]
+        header['CD1_2'] = header[cd12]
+        header['CD2_1'] = header[cd21]
+        header['CD2_2'] = header[cd22]
+        header['CTYPE1'] = 'RA---TAN'
+        header['CTYPE2'] = 'DEC--TAN'
+        old_keywords = tel.WCS_keywords_old()
+        for old in old_keywords:
+            del header[old]
+        header_new = header
 
     #matching all stars to catalog
     if log:
