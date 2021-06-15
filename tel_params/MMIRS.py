@@ -79,6 +79,12 @@ def dark_keyword():
 def dark_files():
     return ['Dark']
 
+def spec_keyword():
+    return []
+
+def spec_files():
+    return []
+
 def target_keyword():
     return 'OBJECT'
 

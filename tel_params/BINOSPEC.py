@@ -85,6 +85,12 @@ def dark_keyword():
 def dark_files():
     return []
 
+def spec_keyword():
+    return ['GRATMODE']
+
+def spec_files():
+    return ['spectroscopy']
+    
 def target_keyword():
     return 'OBJECT'
 
