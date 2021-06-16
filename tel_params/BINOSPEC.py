@@ -10,11 +10,13 @@ from astropy.time import Time
 from astropy.nddata import CCDData
 import astropy.units.astrophys as u
 import astropy.units as u
+import astropy.wcs as wcs
 import ccdproc
 from astropy.modeling import models
 import create_mask
+from utilities import util
 
-__version__ = 1.1 #last edited 14/06/2021
+__version__ = 1.2 #last edited 16/06/2021
 
 def static_mask(proc):
     if proc:
@@ -177,7 +179,7 @@ def process_science(sci_list,fil,red_path,mbias=None,mflat=None,proc=None,log=No
                 data_list.append(np.asarray(red).astype(np.float32))
             top_left = np.concatenate([data_list[0],np.fliplr(data_list[1])],axis=1)
             bot_left = np.flipud(np.concatenate([data_list[3],np.fliplr(data_list[2])],axis=1))
-            left = CCDData(np.concatenate([top_left,bot_left]),unit=u.electron,header=header_left,wcs=wcs.WCS(header_left))
+            left = CCDData(np.concatenate([top_left,bot_left]),unit=u.electron,header=header_left)
             left = ccdproc.flat_correct(left,flat_left[209:3903,1149:2947])
             log.info('Left image proccessed and trimmed.')
             log.info('Cleaning cosmic rays and creating mask.')
@@ -193,10 +195,25 @@ def process_science(sci_list,fil,red_path,mbias=None,mflat=None,proc=None,log=No
             left = left.divide(left.header['EXPTIME']*u.second,propagate_uncertainties=True,handle_meta='first_found')
             log.info('Background subtracted and image divided by exposure time.')
             left.header['DATASEC'] = '[1:1798,1:3694]'
+            left.header['RADECSYS'] = 'ICRS'
+            left.header['CUNIT1'] = 'deg'
+            left.header['CUNIT2'] = 'deg'
+            left.header['CTYPE1'] = 'RA---TAN'
+            left.header['CTYPE2'] = 'DEC--TAN'
+            left.header['CRPIX1'] = 2301
+            left.header['CRPIX2'] = 1846
+            coord = util.parse_coord(left.header['RA'],left.header['DEC'])
+            left.header['CRVAL1'] = coord.ra.deg
+            left.header['CRVAL2'] = coord.dec.deg
+            left.header['PC1_1'] = -pixscale()/3600*np.sin(np.pi/180.*(left.header['POSANG']+90))
+            left.header['PC1_2'] = pixscale()/3600*np.cos(np.pi/180.*(left.header['POSANG']+90))
+            left.header['PC2_1'] = -pixscale()/3600*np.cos(np.pi/180.*(left.header['POSANG']+90))
+            left.header['PC2_2'] = pixscale()/3600*np.sin(np.pi/180.*(left.header['POSANG']+90))
+            left.write(sci.replace('/raw/','/red/').replace('.fits','_left.fits'),overwrite=True)
             left_list.append(left)
             top_right = np.concatenate([data_list[6],np.fliplr(data_list[7])],axis=1)
             bot_right = np.flipud(np.concatenate([data_list[5],np.fliplr(data_list[4])],axis=1))
-            right = CCDData(np.concatenate([top_right,bot_right]),unit=u.electron,header=header_right,wcs=wcs.WCS(header_right))
+            right = CCDData(np.concatenate([top_right,bot_right]),unit=u.electron,header=header_right)
             right = ccdproc.flat_correct(right,flat_right[209:3903,1149:2947])
             log.info('Right image proccessed and trimmed.')
             log.info('Cleaning cosmic rays and creating mask.')
@@ -212,6 +229,21 @@ def process_science(sci_list,fil,red_path,mbias=None,mflat=None,proc=None,log=No
             right = right.divide(right.header['EXPTIME']*u.second,propagate_uncertainties=True,handle_meta='first_found')
             log.info('Background subtracted and image divided by exposure time.')
             right.header['DATASEC'] = '[1:1798,1:3694]'
+            right.header['RADECSYS'] = 'ICRS'
+            right.header['CUNIT1'] = 'deg'
+            right.header['CUNIT2'] = 'deg'
+            right.header['CTYPE1'] = 'RA---TAN'
+            right.header['CTYPE2'] = 'DEC--TAN'
+            right.header['CRPIX1'] = -504
+            right.header['CRPIX2'] = 1845
+            coord = util.parse_coord(right.header['RA'],right.header['DEC'])
+            right.header['CRVAL1'] = coord.ra.deg
+            right.header['CRVAL2'] = coord.dec.deg
+            right.header['PC1_1'] = -pixscale()/3600*np.sin(np.pi/180.*(right.header['POSANG']+90))
+            right.header['PC1_2'] = pixscale()/3600*np.cos(np.pi/180.*(right.header['POSANG']+90))
+            right.header['PC2_1'] = -pixscale()/3600*np.cos(np.pi/180.*(right.header['POSANG']+90))
+            right.header['PC2_2'] = pixscale()/3600*np.sin(np.pi/180.*(right.header['POSANG']+90))
+            right.write(sci.replace('/raw/','/red/').replace('.fits','_right.fits'),overwrite=True)
             right_list.append(right)
     return [left_list,right_list], None
 
