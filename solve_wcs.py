@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "3.6" #last updated 14/06/2021
+__version__ = "3.7" #last updated 16/06/2021
 
 import sys
 import numpy as np
@@ -57,7 +57,10 @@ def apply_wcs_transformation(header,tform):
     header['CTYPE2'] = 'DEC--TAN'
     old_keywords = tel.WCS_keywords_old()
     for old in old_keywords:
-        del header[old]
+        try:
+            del header[old]
+        except:
+            pass
     return header
 
 def ptv_fit(data,*p):
@@ -338,7 +341,10 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
         header['CTYPE2'] = 'DEC--TAN'
         old_keywords = tel.WCS_keywords_old()
         for old in old_keywords:
-            del header[old]
+            try:
+                del header[old]
+            except:
+                pass
         header_new = header
 
     #matching all stars to catalog
