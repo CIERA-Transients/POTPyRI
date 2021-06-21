@@ -50,6 +50,29 @@ def align_stars(images,telescope,hdu=0,mask=None,log=None):
             ' correct name or this telescope is available.''')
         sys.exit(-1)
     
+    #check for flipped images
+    crpix1, crpix2, cd11, cd12, cd21, cd22 = wcs_keyword = tel.WCS_keywords()
+    for i, f in enumerate(images):
+        rewrite = False
+        with fits.open(f) as fo:
+            header = fo[hdu].header
+            data = fo[hdu].data
+        if i==0:
+            xsign = header[cd11]
+            ysign = header[cd22]
+        else:
+            xflip = header[cd11]
+            yflip = header[cd22]
+            if xsign/xflip < 0:
+                data = np.fliplr(data)
+                rewrite = True
+            if ysign/yflip < 0:
+                data = np.flipud(data)
+                rewrite = True
+            if rewrite:
+                fits.writeto(f.replace('.fits','_flipped.fits'),data,header)
+                images[i] = f.replace('.fits','_flipped.fits')
+    
     #run sextractor
     stars_list = []
     d_list = []
