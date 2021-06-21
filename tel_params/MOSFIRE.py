@@ -1,7 +1,23 @@
 #parameter file for MOSFIRE/Keck
+import os
+import astropy
+import datetime
+import numpy as np
+from photutils import make_source_mask, Background2D, MeanBackground
+from astropy.stats import SigmaClip
+from astropy.io import fits
+from astropy.time import Time
+from astropy.nddata import CCDData
+import astropy.units.astrophys as u
+import astropy.units as u
+import ccdproc
+from astropy.modeling import models
+import create_mask
 
-def static_mask():
-    return './staticmasks/MF.staticmask.fits'
+__version__ = 1.0 #last edited 01/06/2021
+
+def static_mask(proc):
+    return ['./staticmasks/MF.staticmask.fits']
 
 def run_wcs():
     return True
@@ -12,20 +28,167 @@ def wcs_extension():
 def pixscale():
     return 0.1799
 
-def ref_pix():
-    # Sorry this ref pix is so crazy.  Haven't figured out how to set this yet.
-    return 500174.481085049, 134532.194062595
+def saturation(hdr):
+    return hdr['SATURATE']*hdr['SYSGAIN']
 
+def WCS_keywords_old(): #WCS keywords
+    return ['WAT0_001', 'WAT1_001', 'WAT2_001']
+    
 def WCS_keywords(): #WCS keywords
-    WAT0_001= 'system=image'
-    WAT1_001= 'wtype=tnx axtype=ra lngcor = "3. 4. 4. 2. 34.85092507693425 35.04227'
-    WAT2_001= 'wtype=tnx axtype=dec latcor = "3. 5. 5. 2. 34.85092507693425 35.0422'
-    WAT1_002= '412406922 9.103584559568529 9.272725992772539 1074.076305826495 -58.'
-    WAT1_003= '66970631133986 1.6799195420292 -0.01602888260183174 -127.80486101539'
-    WAT1_004= '61 -0.002026891656217711 0. 13.92965631881465 0. -0.5057845760358613'
-    WAT2_002= '7412406922 9.103584559568529 9.272725992772539 1129.122011958748 -61'
-    WAT2_003= '.95924736013845 1.776895554106438 -0.01701646832378952 0. -133.42572'
-    WAT2_004= '85609035 0.01209004508732243 0. 0. 14.46400328733441 0. 0. -0.524309'
-    WAT1_005= ' "      '
-    WAT2_005= '9455921529 0. 0. "'
-    return WAT0_001, WAT1_001, WAT1_002, WAT1_003, WAT1_004, WAT1_005, WAT2_001, WAT2_002, WAT2_003, WAT2_004, WAT2_005
+    return ['CRPIX1','CRPIX2','CD1_1','CD1_2','CD2_1','CD2_2']
+
+def cal_path():
+    return None
+
+def raw_format(proc):
+    return 'MF.*.fits.gz'
+
+def dark():
+    return False
+
+def bias():
+    return False
+
+def flat():
+    return True
+
+def raw_header_ext():
+    return 0
+
+def science_keyword():
+    return ['GRATMODE','MASKNAME']
+
+def science_files():
+    return ['imaging','OPEN']
+
+def flat_keyword():
+    return ['OBJECT']
+
+def flat_files(): #error
+    return ['Flat']
+
+def bias_keyword():
+    return []
+
+def bias_files():
+    return []
+
+def dark_keyword():
+    return ['FILTER']
+
+def dark_files():
+    return ['Dark']
+
+def spec_keyword():
+    return ['GRATMODE']
+
+def spec_files():
+    return ['spectroscopy']
+
+def target_keyword():
+    return 'TARGNAME'
+
+def filter_keyword(hdr):
+    filt = hdr['FILTER'].replace(' ','').split('_')[0]
+    if filt == 'Ks':
+        filt = 'K'
+    return filt
+
+def time_format(hdr):
+    return hdr['MJD-OBS']
+
+def wavelength():
+    return 'NIR'
+
+def flat_name(flatpath,fil):
+    return [flatpath+'mflat_'+fil+'.fits']
+
+def load_flat(flat):
+    mflat = CCDData.read(flat[0],unit=u.electron/u.second)
+    return mflat
+
+def create_flat(flat_list,fil,red_path,mbias=None,log=None):
+    log.info('Processing files for filter: '+fil)
+    log.info(str(len(flat_list))+' files found.')
+    flats = []
+    masks  = []
+    flat_scale = []
+    for flat in flat_list:
+        log.info('Loading file: '+flat)
+        raw = CCDData.read(flat,unit=u.adu)
+        red = ccdproc.ccd_process(raw, gain=raw.header['SYSGAIN']*u.electron/u.adu, readnoise=rdnoise(raw.header)*u.electron)
+        log.info('Exposure time of image is '+str(red.header['TRUITIME']*red.header['COADDONE']))
+        mask = make_source_mask(red, nsigma=3, npixels=5)
+        bkg = Background2D(red, (20, 20), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=mask, exclude_percentile=80)
+        masked = np.array(red)
+        masked[mask] = bkg.background[mask]
+        log.info('Median flat level: '+str(np.median(masked)))
+        norm = 1/np.median(masked[224:1824,224:1824])
+        log.info('Flat normalization: '+str(norm))
+        flat_scale.append(norm)
+        flats.append(CCDData(masked,meta=red.header,unit=u.electron))
+    mflat = ccdproc.combine(flats,method='median',scale=flat_scale,sigma_clip=True) 
+    log.info('Created master flat for filter: '+fil)
+    mflat.write(red_path+'mflat_'+fil+'.fits',overwrite=True)
+    log.info('Master flat written to mflat_'+fil+'.fits')
+    return
+
+def process_science(sci_list,fil,red_path,mbias=None,mflat=None,proc=None,log=None):
+    masks = []
+    processed = []
+    for sci in sci_list:
+        log.info('Loading file: '+sci)
+        log.info('Applying gain correction and flat correction.')
+        with fits.open(sci) as hdr:
+            header = hdr[0].header
+            data = hdr[0].data
+        data[np.isnan(data)] = np.nanmedian(data)
+        raw = CCDData(data,meta=header,unit=u.adu)
+        red = ccdproc.ccd_process(raw, gain=raw.header['SYSGAIN']*u.electron/u.adu, readnoise=rdnoise(raw.header)*u.electron)
+        log.info('Exposure time of science image is '+str(red.header['TRUITIME']*red.header['COADDONE']))
+        flat = np.array(ccdproc.flat_correct(red, mflat))
+        flat[np.isnan(flat)] = np.nanmedian(flat)
+        processed_data = CCDData(flat,unit=u.electron,header=red.header,wcs=red.wcs)
+        log.info('File proccessed.')
+        log.info('Cleaning cosmic rays and creating mask.')
+        mask = make_source_mask(processed_data, nsigma=3, npixels=5)
+        masks.append(mask)
+        clean, com_mask = create_mask.create_mask(sci.replace('.gz',''),processed_data,'_mask.fits',static_mask(proc)[0],mask,saturation(red.header),binning(),rdnoise(raw.header),cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
+        processed_data.data = clean
+        log.info('Calculating 2D background.')
+        bkg = Background2D(processed_data, (128, 128), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=mask, exclude_percentile=80)
+        log.info('Median background: '+str(np.median(bkg.background)))
+        fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_bkg.fits').replace('.gz',''),bkg.background,overwrite=True)
+        final = processed_data.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found').divide(red.header['TRUITIME']*red.header['COADDONE']*u.second,propagate_uncertainties=True,handle_meta='first_found')
+        log.info('Background subtracted and image divided by exposure time.')
+        final.write(sci.replace('/raw/','/red/').replace('.gz',''),overwrite=True)
+        processed.append(final)
+    return processed, masks
+
+def stacked_image(tar,red_path):
+    return [red_path+tar+'.fits']
+
+def rdnoise(header):
+    readnoise = {1:21,4:10.8,8:7.7,16:5.8,32:4.2,64:3.5,128:3.0}
+    return readnoise[header['NUMREADS']]
+
+def binning():
+    return [4,4]
+
+def cr_clean_sigclip():
+    return 50
+
+def cr_clean_sigcfrac():
+    return 0.1
+
+def cr_clean_objlim():
+    return 100
+
+def run_phot():
+    return True
+
+def catalog_zp():
+    return ['2MASS']
+
+def exptime(hdr):
+    return hdr['TRUITIME']*hdr['COADDONE']

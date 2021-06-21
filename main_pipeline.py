@@ -232,11 +232,11 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                 log.info('NIR data, creating NIR sky maps.')
                 for j,n in enumerate(processed):
                     time_diff = sorted([(abs(time_list[tar][j]-n2),k) for k,n2 in enumerate(time_list[tar])])
-                    sky_list = [sci_list[tar][k] for _,k in time_diff[0:3]]
-                    sky_data = [processed[k] for _,k in time_diff[0:3]]
-                    sky_mask = [masks[k] for _,k in time_diff[0:3]]
+                    sky_list = [sci_list[tar][k] for _,k in time_diff[0:5]]
+                    sky_data = [processed[k] for _,k in time_diff[0:5]]
+                    sky_mask = [masks[k] for _,k in time_diff[0:5]]
                     sky_masked_data = []
-                    for k in range(3): 
+                    for k in range(5): 
                         bkg = Background2D(sky_data[k], (20, 20), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=sky_mask[k], exclude_percentile=80)
                         masked = np.array(sky_data[k])
                         masked[sky_mask[k]] = bkg.background[sky_mask[k]]
