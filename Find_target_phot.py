@@ -9,12 +9,13 @@ import numpy as np
 from astropy.io import fits
 import matplotlib.pyplot as plt
 import astropy.wcs as wcs
-from photutils import CircularAperture, CircularAnnulus, aperture_photometry, \
+from photutils import make_source_mask, CircularAperture, CircularAnnulus, aperture_photometry, \
     Background2D, MedianBackground
 from astropy.stats import SigmaClip, sigma_clipped_stats
 from photutils.utils import calc_total_error
 from scipy.optimize import curve_fit
 from astropy.visualization import simple_norm
+import random
 
 # Function imports
 from Gaussians import fix_x0, twoD_Gaussian
@@ -86,7 +87,7 @@ def radial_profile(data, x, y, step_size, fwhm, rad):
 
 # This function finds the target's photometry and thus its magnitude, but in the case that the target is not found,
 # the function finds the limiting magnitude using a false source at the target's location
-def find_target_phot(stack, fil, fwhm, zp, zp_err, show_phot=False, log=None, log2=None,
+def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, log=None, log2=None,
                      ra=None, dec=None, x=None, y=None):
 
     '''
@@ -377,89 +378,47 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, show_phot=False, log=None, lo
         if log2 is not None:
             log2.info("Target not found")
 
-    # Finding the limiting magnitude where the target was supposed to be located
+    # Finding the limiting magnitude in the area 30" around where the target is supposed to be located
     if log is not None:
         log.info("Now finding the limiting magnitude to %s sigma." % three_sigma)
     else:
         print("Now finding the limiting magnitude to %s sigma." % three_sigma)
-    d_x_y = 50
-    d = data[int(y)-d_x_y:int(y)+d_x_y, int(x)-d_x_y:int(x)+d_x_y]      # Cutout of source; upside down from normal
+    d_x_y = int(np.round(30/pixscale,-1)/2)
+    d = data[int(y)-d_x_y:int(y)+d_x_y, int(x)-d_x_y:int(x)+d_x_y]       # Cutout of source; upside down from normal
+    d_error = error[int(y)-d_x_y:int(y)+d_x_y, int(x)-d_x_y:int(x)+d_x_y]
     x_mesh, y_mesh = np.meshgrid(np.linspace(0, np.shape(d)[1] - 1, np.shape(d)[1]),
                                  np.linspace(0, np.shape(d)[0] - 1, np.shape(d)[0]))
-
-    amplitudes = np.arange(0, 5, 0.1)       # Amplitudes to consider
-    for i, j in enumerate(amplitudes):
-        gauss_data = twoD_Gaussian((x_mesh, y_mesh), j, d_x_y, d_x_y, fwhm/2.35482, fwhm/2.35482, 0, 0)  # Fake source
-
-        norm = simple_norm(data, 'sqrt', percent=99)        # Find this before changing data
-        d += gauss_data.reshape(np.shape(d))    # Adding the Gaussian to the data
-
-        # Photometry on source with resulting limiting magnitude
-        aperture = CircularAperture((x, y), rad)  # Aperture to perform photometry
-        annulus_aperture = CircularAnnulus((x, y), r_in=r_in, r_out=r_out)  # Annulus of target
-        annulus_mask = annulus_aperture.to_mask(method='center')  # Create masks to highlight pixels in annuli
-
-        annulus_data = annulus_mask.multiply(data)
+    
+    source_mask = make_source_mask(d, nsigma=3, npixels=5)
+    ind = np.ma.nonzero(~source_mask)
+    inds = [(x,y) for x, y in zip(ind[0],ind[1]) if x > 2*fwhm and y > 2*fwhm and x < 2*d_x_y-2*fwhm and y < 2*d_x_y-2*fwhm]
+    mag_list = []
+    mag_err_list = []
+    for i in range(50):
+        xy_fake = random.choice(inds)
+        gauss_data = twoD_Gaussian((x_mesh, y_mesh), 3*error[xy_fake[1],xy_fake[0]], xy_fake[0],xy_fake[1], fwhm/2.35482, fwhm/2.35482, 0, 0)
+        d += gauss_data.reshape(np.shape(d))
+        aperture = CircularAperture((xy_fake[0],xy_fake[1]), 2.5*fwhm)
+        annulus_aperture = CircularAnnulus((xy_fake[0],xy_fake[1]), r_in=2.5*fwhm, r_out=3.5*fwhm)
+        annulus_mask = annulus_aperture.to_mask(method='center')
+        annulus_data = annulus_mask.multiply(d)
         annulus_data_1d = annulus_data[annulus_mask.data > 0]
         _, median_sigclip, stddev = sigma_clipped_stats(annulus_data_1d)
-
-        phot_table = aperture_photometry(data, aperture, error=error)  # Photometry, error accounted for (found earlier)
+        phot_table = aperture_photometry(d, aperture, error=d_error)
         bkg_aper = median_sigclip * aperture.area
-
         if (phot_table['aperture_sum']) - bkg_aper > 0:
-            mag_err = 2.5 / np.log(10.) * (phot_table['aperture_sum_err']) / (phot_table['aperture_sum'])
-            if np.abs(mag_err) < 1/three_sigma:
-                if log is not None:
-                    log.info("Amplitude: %.3f Magnitude Error: %.3f" % (j, mag_err))
-                else:
-                    print("Amplitude: %.3f Magnitude Error: %.3f" % (j, mag_err))
-
-                if show_phot:
-                    plt.figure(2)
-                    d -= gauss_data.reshape(np.shape(d))
-                    aperture.plot(color='white', lw=2)      # Old data plot
-                    annulus_aperture.plot(color='b', lw=2)
-                    plt.imshow(d, norm=norm)
-                    plt.colorbar()
-                    plt.title("Target without fake source added in")
-
-                    plt.figure(3)
-                    d += gauss_data.reshape(np.shape(d))
-                    aperture.plot(color='white', lw=2)      # New data plot
-                    annulus_aperture.plot(color='b', lw=2)
-                    plt.imshow(d, norm=norm)
-                    plt.colorbar()
-                    plt.title("Target after fake source has been added in")
-
-                    # Radial profile...only need for good fake source (same process as used to find the FWHM)
-                    radial_profile(data, x, y, 0.2, fwhm, rad=r_out/fwhm)
-                    plt.axvline(rad, c='r')
-                    plt.axvline(r_in)
-                    plt.axvline(r_out)
-                    plt.show()
-
-                mag = -2.5 * np.log10((phot_table['aperture_sum']) - bkg_aper)  # Instrumental magnitude
-                mag += zp  # Apparent magnitude (Vega)
-                mag_err = np.sqrt(mag_err ** 2 + zp_err ** 2)
-
-                # Limiting magnitude at the position of the target
-                if log is not None:
-                    log.info("Limiting magnitude = %.3f +/- %.3f AB mag" % (mag, mag_err))
-                else:
-                    print("Limiting magnitude = %.3f +/- %.3f AB mag" % (mag, mag_err))
-                if log2 is not None:
-                    log2.info("Limiting magnitude = %.3f +/- %.3f AB mag" % (mag, mag_err))
-                return float(mag), float(mag_err)
-
-        d -= gauss_data.reshape(np.shape(d))    # 'Reset' data for next run if limiting magnitude not found
-
+            mag = -2.5 * np.log10((phot_table['aperture_sum']) - bkg_aper)
+            mag_err = 2.5 / np.log(10.) * (phot_table['aperture_sum_err'])/(phot_table['aperture_sum'])
+            mag_list.append(mag[0])
+            mag_err_list.append(mag_err[0])
+        d -= gauss_data.reshape(np.shape(d))
+    mag_list = [mi for i,mi in enumerate(mag_list) if mag_err_list[i] > 0.2 and mag_err_list[i] < 0.5]
+    mag_err_list = [mi for i,mi in enumerate(mag_err_list) if mag_err_list[i] > 0.2 and mag_err_list[i] < 0.5]
+    mag_list = [x for _, x in sorted(zip(mag_err_list, mag_list))]
+    mag_err_list = sorted(mag_err_list)
+    limit3 = np.interp(0.333,mag_err_list,mag_list)+zp
     if log is not None:
-        log.info("False source with amplitude of 5 (adu/sec/pixel) was not %s sigma above the background."
-                 % three_sigma)
-        log.info("Limiting magnitude not found")
+        log.info("Limiting magnitude = %.3f +/- %.3f AB mag" % (limit3, 0.333))
     else:
-        print("False source with amplitude of 5 (adu/sec/pixel) was not %s sigma above the background." % three_sigma)
-        print("Limiting magnitude not found")
-    if log2 is not None:
-        log2.info("Limiting magnitude not found")
-    return None, None
+        print("Limiting magnitude = %.3f +/- %.3f AB mag" % (limit3, 0.333))
+    return float(limit3), float(0.333)
