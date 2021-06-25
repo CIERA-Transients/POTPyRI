@@ -3,12 +3,13 @@
 "Function to assess image quality for stacking."
 "Author: Kerry Paterson"
 
-__version__ = "1.1" #last updated 18/05/2021
+__version__ = "1.2" #last updated 25/06/2021
 
 import time
 import numpy as np
 from astropy.io import fits, ascii
 import importlib
+import solve_wcs
 import tel_params
 
 def quality_check(aligned_images, aligned_data, telescope, log):
@@ -23,25 +24,34 @@ def quality_check(aligned_images, aligned_data, telescope, log):
     except ImportError:
         print('No such telescope file, please check that you have entered the'+\
             ' correct name or this telescope is available.''')
-        sys.exit(-1)
+        sys.exit(-1)   
 
-    param_file = './Config/params'
-    params = []
-    with open(param_file) as f:
-        for line in f:
-            params.append(line.split()[0].strip())
-    
     fwhm = []
     elong = []
-    for f in aligned_images:
+    stars = []
+    for i,f in enumerate(aligned_images):
         log.info('Loading catalog for: '+f)
         cat = f.replace('.fits','.cat')
-        table = ascii.read(cat, names=params, comment='#')
-        table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)&(table['SPREAD_MODEL']>-0.01)&(table['SPREAD_MODEL']<0.01)]
+        table = solve_wcs.run_sextractor(f, cat, tel, sex_config_dir='./Config', log=log)
+        if i==0:
+            table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)&(table['MAGERR_BEST']!=99)]#&(table['SPREAD_MODEL']>-0.01)&(table['SPREAD_MODEL']<0.01)]
+            table.sort('MAG_BEST')
+            x_pos = table['XWIN_IMAGE'][0:20]
+            y_pos = table['YWIN_IMAGE'][0:20]
+            match = 20
+        else:
+            matches = []
+            for j in range(20):
+                x_pos_search = table['XWIN_IMAGE'][(table['XWIN_IMAGE']>x_pos[j]-5)&(table['XWIN_IMAGE']<x_pos[j]+5)&(table['YWIN_IMAGE']>y_pos[j]-5)&(table['YWIN_IMAGE']<y_pos[j]+5)]
+                y_pos_search = table['YWIN_IMAGE'][(table['XWIN_IMAGE']>x_pos[j]-5)&(table['XWIN_IMAGE']<x_pos[j]+5)&(table['YWIN_IMAGE']>y_pos[j]-5)&(table['YWIN_IMAGE']<y_pos[j]+5)]
+                if len(x_pos_search)!=0 and len(y_pos_search)!=0:
+                    matches.append(x_pos_search[0])
+            match = len(matches)
         fwhm_image = np.median(table['FWHM_IMAGE'])*tel.pixscale()
         elong_image = np.median(table['ELONGATION'])
         fwhm.append(fwhm_image)
         elong.append(elong_image)
+        stars.append(match)
         log.info('FWHM of image in arcsec: '+str(fwhm_image))
         log.info('Elongation of image: '+str(elong_image))
     
@@ -77,9 +87,12 @@ def quality_check(aligned_images, aligned_data, telescope, log):
         elong_cut = elong_med+3*elong_std
     stacking_images = []
     stacking_arrays = []
+    log.info('Checking alignment of images.')
     for i,f in enumerate(aligned_images):
         if (fwhm[i]>fwhm_cut) or (elong[i]>elong_cut):
             log.info('Removing '+f+' from stack due to bad quality.')
+        elif stars[i] < 5:
+            log.info('Removing '+f+' from stack due to bad alignment.')
         else:
             stacking_images.append(f)
             stacking_arrays.append(aligned_data[i])
