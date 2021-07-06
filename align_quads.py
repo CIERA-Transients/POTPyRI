@@ -3,7 +3,7 @@
 "Function to pixel align a list of images using quads."
 "Author: Kerry Paterson"
 
-__version__ = "1.5" #last updated 25/06/2021
+__version__ = "1.6" #last updated 06/07/2021
 
 import time
 import numpy as np
@@ -106,7 +106,7 @@ def align_stars(images,telescope,hdu=0,mask=None,log=None):
     shift_x = []
     shift_y = []
     aligned_images = []
-    aligned_images.append(images[0].replace('.fits','_aligned.fits'))
+    aligned_images.append(images[0])
     for i in range(len(stars_list)-1):
         try:
             starsx1, starsy1, starsx2, starsy2 = solve_wcs.match_quads(stars_list[0],stars_list[i+1],
@@ -125,7 +125,7 @@ def align_stars(images,telescope,hdu=0,mask=None,log=None):
         shift_y.append(y_shift)
         if log:
             log.info('Shifts: (x,y) = %.3f, %.3f'%(x_shift,y_shift))
-        aligned_images.append(images[i+1].replace('.fits','_aligned.fits'))
+        aligned_images.append(images[i+1])
 
     #apply shifts
     if log:
@@ -147,7 +147,8 @@ def align_stars(images,telescope,hdu=0,mask=None,log=None):
         log.info('Writing out aligned images.')
 
     for i in range(len(aligned_arrays)):
-        aligned_arrays[i].write(aligned_images[i].replace('.fits','_aligned.fits'),overwrite=True)
+        aligned_images[i] = aligned_images[i].replace('.fits','_aligned.fits')
+        aligned_arrays[i].write(aligned_images[i],overwrite=True)
 
     t_end = time.time()
     if log:
