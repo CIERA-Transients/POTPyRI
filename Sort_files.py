@@ -185,7 +185,7 @@ def load_files(file_list, telescope,log):
                 time_list[target+'_'+fil]
             except KeyError:
                 time_list.update({target+'_'+fil:[]})
-            file_time = np.float(file_table['Time'][i])
+            file_time = float(file_table['Time'][i])
             time_list[target+'_'+fil].append(file_time)
             if tel.wavelength() == 'NIR':
                 try:
