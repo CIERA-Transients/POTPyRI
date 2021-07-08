@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "3.7" #last updated 16/06/2021
+__version__ = "3.8" #last updated 16/06/2021
 
 import sys
 import numpy as np
@@ -354,14 +354,14 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
     stars_radec = SkyCoord(stars_ra*u.deg,stars_dec*u.deg)
     gaia_radec = SkyCoord(gaia['ra'],gaia['dec'], unit='deg')
     idx, d2, d3 = gaia_radec.match_to_catalog_sky(stars_radec)
-    match = d2<3.0*u.arcsec
+    match = d2<5.0*u.arcsec
     idx = idx[match]
     starx_match = [table['XWIN_IMAGE'][x] for x in idx]
     stary_match = [table['YWIN_IMAGE'][x] for x in idx]
     gaia_radec = SkyCoord(gaia[match]['ra'],gaia[match]['dec'], unit='deg')
     gaiax_match, gaiay_match = wcs.utils.skycoord_to_pixel(gaia_radec, wcs.WCS(header_new), 1)
     if log:
-        log.info('Found '+str(len(starx_match))+' star matches within 2".')
+        log.info('Found '+str(len(starx_match))+' star matches within 5".')
     
     #calculate and apply full transformation
     if log:
