@@ -3,7 +3,7 @@
 "Function to sort files for main_pipeline."
 "Authors: Owen Eskandari, Kerry Paterson"
 
-__version__ = "2.3" #last updated 06/07/2021
+__version__ = "2.4" #last updated 08/07/2021
 
 from astropy.io import fits
 from astropy.table import Table
@@ -85,69 +85,73 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
             try:
                 hdr = file_open[ext].header
             except IndexError:
+                log.error('Moving file '+f+' to bad due to error opening the file.')
                 file_type = 'BAD'
                 moved_path = path+'bad/'
                 shutil.move(f,moved_path)
                 continue
-        target = hdr[target_keyword].replace(' ','')
-        fil = tel.filter_keyword(hdr)
-        exp = str(tel.exptime(hdr))
-        file_time = None
-        if len(flat_keyword) != 0 and np.all([flat_files[j] in hdr[flat_keyword[j]] for j in range(len(flat_keyword))]):
-            file_type = 'FLAT'
-            moved_path = path+'raw/' 
-            shutil.move(f,moved_path)
-            try:
-                cal_list['FLAT_'+fil]
-            except KeyError:
-                cal_list.update({'FLAT_'+fil:[]}) 
-            cal_list['FLAT_'+fil].append(f.replace(path,moved_path))  
-        elif np.all([hdr[science_keyword[j]] == science_files[j] for j in range(len(science_keyword))]):
-            file_type = 'SCIENCE'
-            moved_path = path+'raw/'
-            shutil.move(f,moved_path)
-            try:
-                sci_list[target+'_'+fil]
-            except KeyError:
-                sci_list.update({target+'_'+fil:[]})
-            sci_list[target+'_'+fil].append(f.replace(path,moved_path))
-            try:
-                time_list[target+'_'+fil]
-            except KeyError:
-                time_list.update({target+'_'+fil:[]})
-            file_time = tel.time_format(hdr)
-            time_list[target+'_'+fil].append(file_time)
-            if tel.wavelength() == 'NIR':
+        try:
+            target = hdr[target_keyword].replace(' ','')
+            fil = tel.filter_keyword(hdr)
+            exp = str(tel.exptime(hdr))
+            file_time = None
+            if len(flat_keyword) != 0 and np.all([flat_files[j] in hdr[flat_keyword[j]] for j in range(len(flat_keyword))]):
+                file_type = 'FLAT'
+                moved_path = path+'raw/' 
+                shutil.move(f,moved_path)
                 try:
-                    sky_list[fil]
+                    cal_list['FLAT_'+fil]
                 except KeyError:
-                    sky_list.update({fil:[]})
-                sky_list[fil].append(f.replace(path,moved_path))
-        elif len(bias_keyword) != 0 and np.all([hdr[bias_keyword[j]] == bias_files[j] for j in range(len(bias_keyword))]):
-            file_type = 'BIAS'
-            moved_path = path+'raw/'
-            shutil.move(f,moved_path)
-            cal_list['BIAS'].append(f.replace(path,moved_path))
-        elif len(dark_keyword) != 0 and np.all([hdr[dark_keyword[j]] == dark_files[j] for j in range(len(dark_keyword))]):
-            file_type = 'DARK'
-            moved_path = path+'raw/'
-            shutil.move(f,moved_path)
-            try:
-                cal_list['DARK_'+exp]
-            except KeyError:
-                cal_list.update({'DARK_'+exp:[]}) 
-            cal_list['DARK_'+exp].append(f.replace(path,moved_path))
-        elif np.all([hdr[spec_keyword[j]] == spec_files[j] for j in range(len(spec_keyword))]):
-            file_type = 'SPEC'
-            moved_path = path+'spec/'
-            shutil.move(f,moved_path)
-            spec_num += 1
-        else:
-            file_type = 'BAD'
-            moved_path = path+'bad/'
-            shutil.move(f,moved_path)
-            bad_num += 1
-        file_table.add_row((moved_path+os.path.basename(f),target,fil,exp,file_type,file_time))
+                    cal_list.update({'FLAT_'+fil:[]}) 
+                cal_list['FLAT_'+fil].append(f.replace(path,moved_path))  
+            elif np.all([hdr[science_keyword[j]] == science_files[j] for j in range(len(science_keyword))]):
+                file_type = 'SCIENCE'
+                moved_path = path+'raw/'
+                shutil.move(f,moved_path)
+                try:
+                    sci_list[target+'_'+fil]
+                except KeyError:
+                    sci_list.update({target+'_'+fil:[]})
+                sci_list[target+'_'+fil].append(f.replace(path,moved_path))
+                try:
+                    time_list[target+'_'+fil]
+                except KeyError:
+                    time_list.update({target+'_'+fil:[]})
+                file_time = tel.time_format(hdr)
+                time_list[target+'_'+fil].append(file_time)
+                if tel.wavelength() == 'NIR':
+                    try:
+                        sky_list[fil]
+                    except KeyError:
+                        sky_list.update({fil:[]})
+                    sky_list[fil].append(f.replace(path,moved_path))
+            elif len(bias_keyword) != 0 and np.all([hdr[bias_keyword[j]] == bias_files[j] for j in range(len(bias_keyword))]):
+                file_type = 'BIAS'
+                moved_path = path+'raw/'
+                shutil.move(f,moved_path)
+                cal_list['BIAS'].append(f.replace(path,moved_path))
+            elif len(dark_keyword) != 0 and np.all([hdr[dark_keyword[j]] == dark_files[j] for j in range(len(dark_keyword))]):
+                file_type = 'DARK'
+                moved_path = path+'raw/'
+                shutil.move(f,moved_path)
+                try:
+                    cal_list['DARK_'+exp]
+                except KeyError:
+                    cal_list.update({'DARK_'+exp:[]}) 
+                cal_list['DARK_'+exp].append(f.replace(path,moved_path))
+            elif np.all([hdr[spec_keyword[j]] == spec_files[j] for j in range(len(spec_keyword))]):
+                file_type = 'SPEC'
+                moved_path = path+'spec/'
+                shutil.move(f,moved_path)
+                spec_num += 1
+            else:
+                file_type = 'BAD'
+                moved_path = path+'bad/'
+                shutil.move(f,moved_path)
+                bad_num += 1
+            file_table.add_row((moved_path+os.path.basename(f),target,fil,exp,file_type,file_time))
+        except Exception as e:
+            log.error('Moving file '+f+' to bad due to error: '+e)
     file_table.write(file_list,format='ascii',delimiter='\t')
 
     for cal in cal_list:
