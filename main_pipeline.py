@@ -6,13 +6,14 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.7" #last updated 22/06/2021
+__version__ = "1.8" #last updated 07/07/2021
 
 import sys
 import numpy as np
 import os
 import datetime
 import time
+import shutil
 import astropy
 import astropy.units.astrophys as u
 import astropy.units as u
@@ -37,7 +38,7 @@ import Find_target_phot as tp
 import extinction
 from utilities.util import *
 
-def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=None,proc=None,use_dome_flats=None,phot=None):
+def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=None,proc=None,use_dome_flats=None,phot=None,reset=None):
     #start time
     t_start = time.time()
     #import telescope parameter file
@@ -71,7 +72,6 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
     else:
         flat_path = red_path
 
-
     wavelength = tel.wavelength()
 
     log_file_name = red_path+telescope+'_log_'+datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')+'.log' #create log file name
@@ -89,6 +89,16 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
     log.info('Running main pipeline version '+str(__version__))
     log.info('Running telescope paramater file version '+str(tel.__version__))
 
+    if reset is not None:
+        if os.path.exists(data_path+'/file_list.txt'):
+            os.remove(data_path+'/file_list.txt')
+        if reset=='all':
+            files = glob.glob(raw_path+'*')+glob.glob(bad_path+'*')+glob.glob(spec_path+'*')
+        if reset=='raw':
+            files = glob.glob(raw_path+'*')
+        for f in files:
+            shutil.move(f,data_path)
+    
     if os.path.exists(data_path+'/file_list.txt'):
         log.info('Previous file list exists, loading lists.')
         cal_list, sci_list, sky_list, time_list = Sort_files.load_files(data_path+'/file_list.txt', telescope,log)
@@ -359,12 +369,13 @@ def main():
     params.add_argument('--use_dome_flats', type=str, default=None, help='Use dome flats for flat reduction.') #use dome flat instead of sci images to create master flat
     params.add_argument('--skip_red', type=str, default=None, help='Option to skip reduction.') #
     params.add_argument('--target', type=str, default=None, help='Option to only reduce this target.') #
-    params.add_argument('--proc', type=str, default=None, help='If working with the _proc data from MMT.')
+    params.add_argument('--proc', type=str, default=True, help='If working with the _proc data from MMT.')
     params.add_argument('--cal_path', type=str, default=None, help='Use dome flats for flat reduction.') #use dome flat instead of sci images to create master flat
-    params.add_argument('--phot', type=str, default=None, help='Option to use IRAF to perform photometry.') #must have pyraf install and access to IRAF to use
+    params.add_argument('--phot', type=str, default=None, help='Option to perform aperture photometry.') #must have pyraf install and access to IRAF to use
+    params.add_argument('--reset', type=str, default=None, help='Option to reset data files.') #must have pyraf install and access to IRAF to use
     args = params.parse_args()
     
-    main_pipeline(args.telescope,args.data_path,args.cal_path,input_target=args.target,skip_red=args.skip_red,proc=args.proc,use_dome_flats=args.use_dome_flats,phot=args.phot)
+    main_pipeline(args.telescope,args.data_path,args.cal_path,input_target=args.target,skip_red=args.skip_red,proc=args.proc,use_dome_flats=args.use_dome_flats,phot=args.phot,reset=args.reset)
 
 if __name__ == "__main__":
     main()
