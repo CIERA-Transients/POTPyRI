@@ -3,7 +3,7 @@
 "Function to assess image quality for stacking."
 "Author: Kerry Paterson"
 
-__version__ = "1.2" #last updated 25/06/2021
+__version__ = "1.3" #last updated 15/07/2021
 
 import time
 import numpy as np
@@ -29,31 +29,39 @@ def quality_check(aligned_images, aligned_data, telescope, log):
     fwhm = []
     elong = []
     stars = []
-    for i,f in enumerate(aligned_images):
+    i = 0
+    for f in aligned_images:
         log.info('Loading catalog for: '+f)
         cat = f.replace('.fits','.cat')
         table = solve_wcs.run_sextractor(f, cat, tel, sex_config_dir='./Config', log=log)
-        if i==0:
-            table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)&(table['MAGERR_BEST']!=99)]#&(table['SPREAD_MODEL']>-0.01)&(table['SPREAD_MODEL']<0.01)]
-            table.sort('MAG_BEST')
-            x_pos = table['XWIN_IMAGE'][0:20]
-            y_pos = table['YWIN_IMAGE'][0:20]
-            match = 20
+        if len(table)==0:
+            log.info('No sources found by SExtractor.')
+            fwhm.append(0)
+            elong.append(0)
+            stars.append(0)
         else:
-            matches = []
-            for j in range(20):
-                x_pos_search = table['XWIN_IMAGE'][(table['XWIN_IMAGE']>x_pos[j]-5)&(table['XWIN_IMAGE']<x_pos[j]+5)&(table['YWIN_IMAGE']>y_pos[j]-5)&(table['YWIN_IMAGE']<y_pos[j]+5)]
-                y_pos_search = table['YWIN_IMAGE'][(table['XWIN_IMAGE']>x_pos[j]-5)&(table['XWIN_IMAGE']<x_pos[j]+5)&(table['YWIN_IMAGE']>y_pos[j]-5)&(table['YWIN_IMAGE']<y_pos[j]+5)]
-                if len(x_pos_search)!=0 and len(y_pos_search)!=0:
-                    matches.append(x_pos_search[0])
-            match = len(matches)
-        fwhm_image = np.median(table['FWHM_IMAGE'])*tel.pixscale()
-        elong_image = np.median(table['ELONGATION'])
-        fwhm.append(fwhm_image)
-        elong.append(elong_image)
-        stars.append(match)
-        log.info('FWHM of image in arcsec: '+str(fwhm_image))
-        log.info('Elongation of image: '+str(elong_image))
+            i += 1
+            if i==1:
+                table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)&(table['MAGERR_BEST']!=99)]#&(table['SPREAD_MODEL']>-0.01)&(table['SPREAD_MODEL']<0.01)]
+                table.sort('MAG_BEST')
+                x_pos = table['XWIN_IMAGE'][0:20]
+                y_pos = table['YWIN_IMAGE'][0:20]
+                match = 20
+            else:
+                matches = []
+                for j in range(20):
+                    x_pos_search = table['XWIN_IMAGE'][(table['XWIN_IMAGE']>x_pos[j]-5)&(table['XWIN_IMAGE']<x_pos[j]+5)&(table['YWIN_IMAGE']>y_pos[j]-5)&(table['YWIN_IMAGE']<y_pos[j]+5)]
+                    y_pos_search = table['YWIN_IMAGE'][(table['XWIN_IMAGE']>x_pos[j]-5)&(table['XWIN_IMAGE']<x_pos[j]+5)&(table['YWIN_IMAGE']>y_pos[j]-5)&(table['YWIN_IMAGE']<y_pos[j]+5)]
+                    if len(x_pos_search)!=0 and len(y_pos_search)!=0:
+                        matches.append(x_pos_search[0])
+                match = len(matches)
+            fwhm_image = np.median(table['FWHM_IMAGE'])*tel.pixscale()
+            elong_image = np.median(table['ELONGATION'])
+            fwhm.append(fwhm_image)
+            elong.append(elong_image)
+            stars.append(match)
+            log.info('FWHM of image in arcsec: '+str(fwhm_image))
+            log.info('Elongation of image: '+str(elong_image))
     
     log.info('Calculating median parameters.')
     fwhm_med = np.median(fwhm)
