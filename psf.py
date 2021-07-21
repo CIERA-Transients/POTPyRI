@@ -5,6 +5,7 @@ from photutils.psf import IntegratedGaussianPRF, DAOGroup, EPSFModel
 from photutils.psf import extract_stars, EPSFBuilder, subtract_psf
 from photutils.psf import IterativelySubtractedPSFPhotometry
 from photutils.psf import BasicPSFPhotometry
+from photutils import CircularAperture, CircularAnnulus, aperture_photometry
 
 from astropy.io import fits
 from astropy.modeling.fitting import LevMarLSQFitter
@@ -16,12 +17,16 @@ from astropy.wcs import WCS
 
 import matplotlib.pyplot as plt
 
+from scipy.optimize import curve_fit
 from scipy.ndimage import rotate
+from scipy.stats import sigmaclip
 import numpy as np
 import sys
 import glob
 import copy
 import os
+
+from Gaussians import fix_x0
 
 from utilities.util import *
 
@@ -154,7 +159,7 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
     write_out_epsf_img=True, write_out_epsf_file=True, write_out_psf_stars=True,
     outdir='', subtract_back=False, fwhm_scale_psf=3.0, log=None,
     star_param={'sharp_cut': 1.0, 'round_cut': 0.5, 'snthresh_psf': 25.0,
-        'fwhm_init': 15.0, 'snthresh_final': 5.0}):
+        'fwhm_init': 5.0, 'snthresh_final': 5.0}):
 
     stars = get_star_catalog(img_file, fwhm_init=star_param['fwhm_init'])
     img_hdu = fits.open(img_file)
@@ -174,35 +179,59 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
     # Estimate the uncertainty from sky and flux values
     stars['flux_err'] = np.sqrt(stars['flux']+stars['npix']*stars['sky'])
 
-    mask = (stars['flux']/stars['flux_err'] > star_param['snthresh_psf']) &\
-           (stars['sharpness'] < star_param['sharp_cut']) &\
-           (stars['roundness'] < star_param['round_cut'])
+    mask = ((stars['sharpness'] < np.median(stars['sharpness'])+np.std(stars['sharpness'])) &\
+                (stars['roundness'] < np.median(stars['roundness'])+3*np.std(stars['roundness'])) &\
+                (stars['roundness'] > np.median(stars['roundness'])-3*np.std(stars['roundness'])))
 
-    bright = stars[mask]
+    fwhm_stars = stars[mask]
 
-    m='Masked to {0} PSF stars based on flux, sharpness, roundness'
+    m='Masked to {0} stars based on sharpness, roundness'
     if log:
-        log.info(m.format(len(bright)))
+        log.info(m.format(len(fwhm_stars)))
     else:
-        print(m.format(len(bright)))
+        print(m.format(len(fwhm_stars)))
 
-    fwhm = np.median(bright['fwhm'])
-    std_fwhm = np.std(bright['fwhm'])
+    fwhm_clipped, _, _ = sigmaclip(fwhm_stars['fwhm'])
+    fwhm = np.median(fwhm_clipped)
+    std_fwhm = np.std(fwhm_clipped)
+    mask = (fwhm_stars['fwhm'] > fwhm-3*std_fwhm) &\
+        (fwhm_stars['fwhm'] < fwhm+3*std_fwhm)
+    fwhm_stars = fwhm_stars[mask]
+    fwhm = np.median(fwhm_stars['fwhm'])
+
     if log:
-        log.info('Initial FWHM={0}+/-{1}'.format('%2.4f'%fwhm,'%2.4f'%std_fwhm))
+        log.info('Masked to {0} stars based on FWHM'.format(len(fwhm_stars)))
     else:
-        print('Initial FWHM={0}+/-{1}'.format('%2.4f'%fwhm,'%2.4f'%std_fwhm))
+        print('Masked to {0} stars based on FWHM'.format(len(fwhm_stars)))
+
+    step_size = 0.5
+    radii = np.arange(step_size, 2.5*fwhm, step_size)
+    x_data = np.arange(0, 2.5*fwhm, step_size)
+    apers_area = [np.pi*(step_size**2)]
+    for r in radii:
+        apers_area.append(np.pi*((r+step_size)**2 - r**2))
+    coords = [(fwhm_stars['xcentroid'][i],fwhm_stars['ycentroid'][i]) for i in range(len(fwhm_stars))]
+    apertures = [CircularAperture(coords, r=step_size)]     # For circle aperture around center
+    for r in radii:
+        apertures.append(CircularAnnulus(coords, r_in=r, r_out=r+step_size))  # Annuli apertures
+    phot_table = aperture_photometry(img_hdu[0].data, apertures)
+    sigmas = []
+    for i, source in enumerate(phot_table):
+        sums = np.array([source[i] / apers_area[i - 3] for i in range(3, len(source))])
+        if median+10*std_sky <= sums[0] <= 60000 and median-3*std_sky < sums[-1] < median+3*std_sky:
+            w_fit = x_data[~np.isnan(sums)]
+            f_fit = sums[~np.isnan(sums)]
+            g, _ = curve_fit(fix_x0, w_fit, f_fit)
+            sigmas.append(np.abs(g[1]))
+    sigmas_post_clipping, _, _ = sigmaclip(sigmas, low=3, high=3)
+    fwhm = 2.35482*np.median(sigmas_post_clipping)
+    std_fwhm = np.std(sigmas_post_clipping)
+    
+    if log:
+        log.info('FWHM={0}+/-{1}'.format('%2.4f'%fwhm,'%2.4f'%std_fwhm))
+    else:
+        print('FWHM={0}+/-{1}'.format('%2.4f'%fwhm,'%2.4f'%std_fwhm))
     metadata={'FWHM':fwhm, 'EFWHM':std_fwhm, 'SKYADU': std_sky}
-
-    mask = (bright['fwhm'] > fwhm-3*std_fwhm) &\
-        (bright['fwhm'] < fwhm+3*std_fwhm)
-    bright = bright[mask]
-
-    if log:
-        log.info('Masked to {0} stars based on FWHM'.format(len(bright)))
-    else:
-        print('Masked to {0} stars based on FWHM'.format(len(bright)))
-    metadata['NPSFSTAR']=len(bright)
 
     if subtract_back:
         bkg = Background2D(img_hdu[0].data, (21,21), filter_size=(3,3))
@@ -230,6 +259,16 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
         backhdu.writeto(back_file, overwrite=True)
         backsubhdu.writeto(backsub_file, overwrite=True)
 
+    mask = (fwhm_stars['flux']/fwhm_stars['flux_err'] > star_param['snthresh_psf'])
+    bright = fwhm_stars[mask]
+
+    m='Masked to {0} PSF stars based on flux.'
+    if log:
+        log.info(m.format(len(bright)))
+    else:
+        print(m.format(len(bright)))
+    metadata['NPSFSTAR']=len(bright)
+
     # Instantiate EPSF
     size=int(fwhm*fwhm_scale_psf)
     if size%2==0: size=size+1
@@ -238,27 +277,27 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
     print('\n')
 
     mask = (stars['flux']/stars['flux_err'] > star_param['snthresh_final'])
-    bright = stars[mask]
+    all_stars = stars[mask]
     if log:
-        log.info('Final catalog is {0} stars'.format(len(bright)))
+        log.info('Final catalog is {0} stars'.format(len(all_stars)))
         log.info('Getting final photometry...')
     else:
-        print('Final catalog is {0} stars'.format(len(bright)))
+        print('Final catalog is {0} stars'.format(len(all_stars)))
         print('Getting final photometry...')
-    photometry = run_photometry(img_file, epsf, fwhm, bright['xcentroid'],
-        bright['ycentroid'], subtract_back=subtract_back)
+    photometry = run_photometry(img_file, epsf, fwhm, all_stars['xcentroid'],
+        all_stars['ycentroid'], subtract_back=subtract_back)
 
     # Get RA/Dec from final positions
     w = WCS(img_hdu[0].header)
     coords = w.pixel_to_world(photometry['x_fit'], photometry['y_fit'])
 
-    # Join the photometry and bright catalogs and rename columns
-    photometry['FWHM'] = bright['fwhm']
-    photometry['PA'] = bright['pa']
-    photometry['NPIX'] = bright['npix']
-    photometry['SKY'] = bright['sky']
-    photometry['SHARP'] = bright['sharpness']
-    photometry['ROUND'] = bright['roundness']
+    # Join the photometry and all star catalogs and rename columns
+    photometry['FWHM'] = all_stars['fwhm']
+    photometry['PA'] = all_stars['pa']
+    photometry['NPIX'] = all_stars['npix']
+    photometry['SKY'] = all_stars['sky']
+    photometry['SHARP'] = all_stars['sharpness']
+    photometry['ROUND'] = all_stars['roundness']
     photometry['SN'] = photometry['flux_fit']/photometry['flux_unc']
     photometry['mag'] = -2.5*np.log10(photometry['flux_fit'])
     photometry['mag_err'] = 2.5/np.log(10) * 1./photometry['SN']
@@ -285,15 +324,15 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
         print('Got {0} stars for final photometry'.format(len(photometry)))
     metadata['NOBJECT']=len(photometry)
 
-    # We should always write out bright stars
+    # We should always write out catalog for stars
     phot_file = os.path.join(outdir,img_file.replace('.fits','.pcmp'))
     write_out_catalog(photometry, img_file, colnames, sigfig, phot_file,
         metadata)
 
     if write_out_psf_stars:
-        bright.sort('flux')
+        all_stars.sort('flux')
         outname = os.path.join(outdir,img_file.replace('.fits','.psf.stars'))
-        bright.write(outname, format='ascii.no_header', overwrite=True)
+        all_stars.write(outname, format='ascii.no_header', overwrite=True)
 
     if write_out_residual:
         subdata = img_hdu[0].data
