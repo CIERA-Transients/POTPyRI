@@ -70,7 +70,7 @@ def align_stars(images,telescope,hdu=0,mask=None,log=None):
                 data = np.flipud(data)
                 rewrite = True
             if rewrite:
-                fits.writeto(f.replace('.fits','_flipped.fits'),data,header)
+                fits.writeto(f.replace('.fits','_flipped.fits'),data,header,overwrite=True)
                 images[i] = f.replace('.fits','_flipped.fits')
     
     #run sextractor
