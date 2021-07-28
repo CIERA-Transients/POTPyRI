@@ -17,7 +17,7 @@ import create_mask
 __version__ = 1.0 #last edited 01/06/2021
 
 def static_mask(proc):
-    return ['./staticmasks/MF.staticmask.fits']
+    return ['']#'./staticmasks/MF.staticmask.fits']
 
 def run_wcs():
     return True
@@ -85,6 +85,12 @@ def spec_keyword():
 def spec_files():
     return ['spectroscopy']
 
+def bad_keyword():
+    return ['MASKNAME','PONAME']
+
+def bad_files():
+    return ['CLOSED','MIRA']
+
 def target_keyword():
     return 'TARGNAME'
 
@@ -94,20 +100,26 @@ def filter_keyword(hdr):
         filt = 'K'
     return filt
 
+def amp_keyword(hdr):
+    return '1'
+
+def bin_keyword(hdr):
+    return '11'
+
 def time_format(hdr):
     return hdr['MJD-OBS']
 
 def wavelength():
     return 'NIR'
 
-def flat_name(flatpath,fil):
-    return [flatpath+'mflat_'+fil+'.fits']
+def flat_name(flatpath,fil,amp,binn):
+    return [flatpath+'mflat_'+fil+'_'+amp+'_'+binn+'.fits']
 
 def load_flat(flat):
     mflat = CCDData.read(flat[0],unit=u.electron/u.second)
     return mflat
 
-def create_flat(flat_list,fil,red_path,mbias=None,log=None):
+def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
     log.info('Processing files for filter: '+fil)
     log.info(str(len(flat_list))+' files found.')
     flats = []
@@ -128,12 +140,12 @@ def create_flat(flat_list,fil,red_path,mbias=None,log=None):
         flat_scale.append(norm)
         flats.append(CCDData(masked,meta=red.header,unit=u.electron))
     mflat = ccdproc.combine(flats,method='median',scale=flat_scale,sigma_clip=True) 
-    log.info('Created master flat for filter: '+fil)
-    mflat.write(red_path+'mflat_'+fil+'.fits',overwrite=True)
-    log.info('Master flat written to mflat_'+fil+'.fits')
+    log.info('Created master flat for filter '+fil+' and '+amp+' amps and '+binn+' binning.')
+    mflat.write(red_path+'mflat_'+fil+'_'+amp+'_'+binn+'.fits',overwrite=True)
+    log.info('Master flat written to mflat_'+fil+'_'+amp+'_'+binn+'.fits')
     return
 
-def process_science(sci_list,fil,red_path,mbias=None,mflat=None,proc=None,log=None):
+def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=None,log=None):
     masks = []
     processed = []
     for sci in sci_list:
@@ -153,12 +165,12 @@ def process_science(sci_list,fil,red_path,mbias=None,mflat=None,proc=None,log=No
         log.info('Cleaning cosmic rays and creating mask.')
         mask = make_source_mask(processed_data, nsigma=3, npixels=5)
         masks.append(mask)
-        clean, com_mask = create_mask.create_mask(sci.replace('.gz',''),processed_data,'_mask.fits',static_mask(proc)[0],mask,saturation(red.header),binning(),rdnoise(raw.header),cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
-        processed_data.data = clean
+        # clean, com_mask = create_mask.create_mask(sci.replace('.gz',''),processed_data,'_mask.fits',static_mask(proc)[0],mask,saturation(red.header),binning(),rdnoise(raw.header),cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
+        # processed_data.data = clean
         log.info('Calculating 2D background.')
         bkg = Background2D(processed_data, (128, 128), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=mask, exclude_percentile=80)
         log.info('Median background: '+str(np.median(bkg.background)))
-        fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_bkg.fits').replace('.gz',''),bkg.background,overwrite=True)
+        fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_bkg.fits').replace('.gz',''),np.array(bkg.background),overwrite=True)
         final = processed_data.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found').divide(red.header['TRUITIME']*red.header['COADDONE']*u.second,propagate_uncertainties=True,handle_meta='first_found')
         log.info('Background subtracted and image divided by exposure time.')
         final.write(sci.replace('/raw/','/red/').replace('.gz',''),overwrite=True)

@@ -20,9 +20,9 @@ __version__ = 1.2 #last edited 16/06/2021
 
 def static_mask(proc):
     if proc:
-        return ['./staticmasks/bino_proc_left.trim.staticmask.fits','./staticmasks/bino_proc_right.trim.staticmask.fits']
+        return ['','']#'./staticmasks/bino_proc_left.trim.staticmask.fits','./staticmasks/bino_proc_right.trim.staticmask.fits']
     else:
-        return ['./staticmasks/bino_left.staticmask.fits','./staticmasks/bino_right.staticmask.fits']
+        return ['','']#'./staticmasks/bino_left.staticmask.fits','./staticmasks/bino_right.staticmask.fits']
 
 def run_wcs():
     return True
@@ -88,16 +88,28 @@ def dark_files():
     return []
 
 def spec_keyword():
-    return ['GRATMODE']
+    return ['MASK']
 
 def spec_files():
     return ['spectroscopy']
-    
+
+def bad_keyword():
+    return ['MASK']
+
+def bad_files():
+    return ['mira']
+
 def target_keyword():
     return 'OBJECT'
 
 def filter_keyword(hdr):
     return hdr['FILTER'].replace(' ','').split('_')[0]
+
+def amp_keyword(hdr):
+    return '1'
+
+def bin_keyword(hdr):
+    return hdr['CCDSUM'].replace(' ','')
 
 def time_format(hdr):
     return hdr['MJD']
@@ -105,7 +117,7 @@ def time_format(hdr):
 def wavelength():
     return 'OPT'
 
-def flat_name(cpath,fil):
+def flat_name(cpath,fil,amp,binn):
     return [cpath+'/mflat_'+fil+'_left.fits',cpath+'/mflat_'+fil+'_right.fits']
 
 def load_flat(flat):
@@ -117,7 +129,7 @@ def load_flat(flat):
 def gain():
     return [1.085, 1.04649118, 1.04159151, 0.97505369, 1.028, 1.16341855, 1.04742053, 1.0447564]
 
-def process_science(sci_list,fil,red_path,mbias=None,mflat=None,proc=None,log=None):
+def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=None,log=None):
     masks = []
     processed = []
     flat_left = mflat[0]
@@ -134,12 +146,12 @@ def process_science(sci_list,fil,red_path,mbias=None,mflat=None,proc=None,log=No
             log.info('Left image proccessed and trimmed.')
             log.info('Cleaning cosmic rays and creating mask.')
             mask = make_source_mask(left, nsigma=3, npixels=5)
-            clean, com_mask = create_mask.create_mask(sci,left,'_mask_left.fits',static_mask(proc)[0],mask,saturation(left.header),binning(proc,'left'),rdnoise(left.header),cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
-            left.data = clean
+            # clean, com_mask = create_mask.create_mask(sci,left,'_mask_left.fits',static_mask(proc)[0],mask,saturation(left.header),binning(proc,'left'),rdnoise(left.header),cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
+            # left.data = clean
             log.info('Calculating 2D background.')
             bkg = Background2D(left, (120, 120), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=mask, exclude_percentile=80)
             log.info('Median background for left iamge: '+str(np.median(bkg.background)))
-            fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_bkg_left.fits'),bkg.background,overwrite=True)
+            fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_bkg_left.fits'),np.array(bkg.background),overwrite=True)
             left = left.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found')
             log.info('Exposure time of left image is '+str(left.header['EXPTIME']))
             left = left.divide(left.header['EXPTIME'],propagate_uncertainties=True,handle_meta='first_found')
@@ -153,12 +165,12 @@ def process_science(sci_list,fil,red_path,mbias=None,mflat=None,proc=None,log=No
             log.info('Right image proccessed and trimmed.')
             log.info('Cleaning cosmic rays and creating mask.')
             mask = make_source_mask(right, nsigma=3, npixels=5)
-            clean, com_mask = create_mask.create_mask(sci,right,'_mask_right.fits',static_mask(proc)[1],mask,saturation(right.header),binning(proc,'right'),rdnoise(right.header),cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
-            right.data = clean
+            # clean, com_mask = create_mask.create_mask(sci,right,'_mask_right.fits',static_mask(proc)[1],mask,saturation(right.header),binning(proc,'right'),rdnoise(right.header),cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
+            # right.data = clean
             log.info('Calculating 2D background.')
             bkg = Background2D(right, (120, 120), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=mask, exclude_percentile=80)
             log.info('Median background for right image : '+str(np.median(bkg.background)))
-            fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_bkg_right.fits'),bkg.background,overwrite=True)
+            fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_bkg_right.fits'),np.array(bkg.background),overwrite=True)
             right = right.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found')
             log.info('Exposure time of right image is '+str(right.header['EXPTIME']))
             right = right.divide(right.header['EXPTIME'],propagate_uncertainties=True,handle_meta='first_found')
@@ -285,3 +297,9 @@ def catalog_zp():
 
 def exptime(hdr):
     return hdr['EXPTIME']
+
+def fringe_correction(fil):
+    if fil == 'z':
+        return True
+    else:
+        return False

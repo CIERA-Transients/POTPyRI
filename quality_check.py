@@ -3,7 +3,7 @@
 "Function to assess image quality for stacking."
 "Author: Kerry Paterson"
 
-__version__ = "1.3" #last updated 15/07/2021
+__version__ = "1.4" #last updated 16/07/2021
 
 import time
 import numpy as np
@@ -42,7 +42,7 @@ def quality_check(aligned_images, aligned_data, telescope, log):
         else:
             i += 1
             if i==1:
-                table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)&(table['MAGERR_BEST']!=99)]#&(table['SPREAD_MODEL']>-0.01)&(table['SPREAD_MODEL']<0.01)]
+                table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)&(table['MAGERR_BEST']!=99)]
                 table.sort('MAG_BEST')
                 x_pos = table['XWIN_IMAGE'][0:20]
                 y_pos = table['YWIN_IMAGE'][0:20]
@@ -105,10 +105,12 @@ def quality_check(aligned_images, aligned_data, telescope, log):
             stacking_images.append(f)
             stacking_arrays.append(aligned_data[i])
 
-    log.info('Calculating mid-time of images.')
+    log.info('Calculating mid-time and total exposure time of stack.')
     time_list = []
+    total_time = 0
     for image in stacking_arrays:
         time_list.append(tel.time_format(image.header))
+        total_time += tel.exptime(image.header)
 
     sorted_times = sorted(time_list)
     mid_time = sorted_times[0]+(sorted_times[-1]-sorted_times[0])/2
@@ -116,4 +118,4 @@ def quality_check(aligned_images, aligned_data, telescope, log):
     t_end = time.time()
     log.info('Quailty check completed in '+str(t_end-t_start)+' sec')
 
-    return stacking_arrays, mid_time
+    return stacking_arrays, mid_time, total_time

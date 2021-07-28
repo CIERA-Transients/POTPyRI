@@ -114,33 +114,39 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
             sys.exit(-1)
     
     if tel.bias():
-        if len(cal_list['BIAS']) != 0:
-            process_bias = True
-            if skip_red:
-                log.info('User input to skip reduction.')
-                if os.path.exists(red_path+'mbias.fits'):
-                    log.info('Found previous master bias, loading.')
-                    mbias = CCDData.read(red_path+'mbias.fits', unit=u.electron)
-                    process_bias = False
-                else:
-                    log.error('No master bias found, creating master bias.')
-            if process_bias:
-                t1 = time.time()
-                log.info('Processing bias files.')
-                mbias = tel.create_bias(cal_list,red_path,log)
-                t2 = time.time()
-                log.info('Master bias creation completed in '+str(t2-t1)+' sec')
-        else:
+        bias_num = 0
+        for cal in cal_list:
+            if 'BIAS' in cal:
+                bias_num += 1
+                process_bias = True
+                amp = cal.split('_')[1]
+                binn = cal.split('_')[2]
+                if skip_red:
+                    log.info('User input to skip reduction.')
+                    if os.path.exists(red_path+'mbias_'+amp+'_'+binn+'.fits'):
+                        log.info('Found previous master bias, loading.')
+                        # mbias = CCDData.read(red_path+'mbias_'+amp+'.fits', unit=u.electron)
+                        process_bias = False
+                    else:
+                        log.error('No master bias found, creating master bias.')
+                if process_bias:
+                    t1 = time.time()
+                    log.info('Processing bias files.')
+                    tel.create_bias(cal_list,cal,red_path,log)
+                    t2 = time.time()
+                    log.info('Master bias creation completed in '+str(t2-t1)+' sec')
+        if bias_num==0:
             log.critical('No bias files present, check data before rerunning.')
             logging.shutdown()
             sys.exit(-1)
-    else:
-        mbias = None
 
     if tel.dark():
         for cal in cal_list:
             if 'DARK' in cal:
                 process_dark = True
+                exp = cal.split('_')[1]
+                amp = cal.split('_')[2]
+                binn = cal.split('_')[3]
                 if skip_red:
                     log.info('User input to skip reduction.')
                     if os.path.exists(red_path+cal+'.fits'):
@@ -149,6 +155,15 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                     else:
                         log.error('No master dark found, creating master dark.')
                 if process_dark:
+                    if tel.bias():
+                        log.info('Loading master bias.')
+                        try:
+                            mbias = tel.load_bias(red_path,amp,binn)
+                        except:
+                            log.error('No master bias found for this configuration, skipping master dark creation for exposure '+exp+', '+amp+' amps and '+binn+' binning.')
+                            continue
+                    else:
+                        mbias = None
                     t1 = time.time()
                     tel.create_dark(cal_list,cal,mbias,red_path,log)
                     t2 = time.time()
@@ -158,19 +173,30 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
         for cal in cal_list:
             if 'FLAT' in cal:
                 process_flat = True
-                fil = cal.split('_')[-1]
+                fil = cal.split('_')[1]
+                amp = cal.split('_')[2]
+                binn = cal.split('_')[3]
                 if skip_red:
                     log.info('User input to skip reduction.')
-                    master_flat = tel.flat_name(flat_path, fil)
+                    master_flat = tel.flat_name(flat_path, fil, amp, binn)
                     if np.all([os.path.exists(mf) for mf in master_flat]):
-                        log.info('Found previous master flat for filter '+fil)
+                        log.info('Found previous master flat for filter '+fil+', '+amp+' amps and '+binn+' binning.')
                         process_flat = False
                     else:
-                        log.info('No master flat found for filter '+fil+', creating master flat.')
+                        log.info('No master flat found for filter '+fil+', '+amp+' amps and '+binn+' binning, creating master flat.')
                 if process_flat:
+                    if tel.bias():
+                        log.info('Loading master bias.')
+                        try:
+                            mbias = tel.load_bias(red_path,amp,binn)
+                        except:
+                            log.error('No master bias found for this configuration, skipping master flat creation for filter '+fil+', '+amp+' amps and '+binn+' binning.')
+                            continue
+                    else:
+                        mbias = None
                     if wavelength=='OPT':
                         t1 = time.time()
-                        tel.create_flat(cal_list[cal],fil,red_path,mbias=mbias,log=log)
+                        tel.create_flat(cal_list[cal],fil,amp,binn,red_path,mbias=mbias,log=log)
                         t2 = time.time()
                         log.info('Master flat creation completed in '+str(t2-t1)+' sec')
                     elif wavelength=='NIR':
@@ -178,25 +204,37 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                             log.info('User input to use dome flats to create master flat')
                             flat_type = 'dome'
                             t1 = time.time()
-                            tel.create_flat(cal_list[cal],fil,red_path,mbias=mbias,log=log)
+                            tel.create_flat(cal_list[cal],fil,amp,binn,red_path,mbias=mbias,log=log)
                             t2 = time.time()
                             log.info('Master flat creation completed in '+str(t2-t1)+' sec')
         if wavelength=='NIR' and not use_dome_flats: #default to use science files for master flat creation
             for fil_list in sky_list:
+                fil = fil_list.split('_')[0]
+                amp = fil_list.split('_')[1]
+                binn = fil_list.split('_')[2]           
                 process_flat = True
                 if skip_red:
                     log.info('User input to skip reduction.')
-                    master_flat = tel.flat_name(flat_path, fil_list)
+                    master_flat = tel.flat_name(flat_path, fil, amp, binn)
                     if np.all([os.path.exists(mf) for mf in master_flat]):
-                        log.info('Found previous master flat for filter '+fil_list)
+                        log.info('Found previous master flat for filter '+fil+', '+amp+' amps and '+binn+' binning.')
                         process_flat = False
                     else:
-                        log.info('No master flat found for filter '+fil_list+', creating master flat.')
-                if process_flat:              
+                        log.info('No master flat found for filter '+fil+', '+amp+' amps and '+binn+' binning, creating master flat.')
+                if process_flat:
+                    if tel.bias():
+                        log.info('Loading master bias.')
+                        try:
+                            mbias = tel.load_bias(red_path,amp,binn)
+                        except:
+                            log.error('No master bias found for this configuration, skipping master flat creation for filter '+fil+', '+amp+' amps and '+binn+' binning.')
+                            continue
+                    else:
+                        mbias = None
                     flat_type = 'sky'
                     log.info('Using science files to create master flat')
                     t1 = time.time()
-                    tel.create_flat(sky_list[fil_list],fil_list,red_path,mbias=mbias,log=log)
+                    tel.create_flat(sky_list[fil_list],fil,amp,binn,red_path,mbias=mbias,log=log)
                     t2 = time.time()
                     log.info('Master flat creation completed in '+str(t2-t1)+' sec')
     
@@ -208,7 +246,9 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
     for tar in sci_list:
         stack = tel.stacked_image(tar,red_path)
         target = tar.split('_')[0]
-        fil = tar.split('_')[-1]
+        fil = tar.split('_')[-3]
+        amp = tar.split('_')[-2]
+        binn = tar.split('_')[-1]
         if input_target is not None:
             if input_target not in tar:
                 continue
@@ -226,15 +266,24 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
             else:
                 log.error('Missing stacks, processing data.')   
         if process_data:
+            if tel.bias():
+                log.info('Loading master bias.')
+                try:
+                    mbias = tel.load_bias(red_path,amp,binn)
+                except:
+                    log.error('No master bias found for this configuration, skipping reduction for: '+tar)
+                    continue
+            else:
+                mbias = None
             log.info('Loading master flat.')
-            master_flat = tel.flat_name(flat_path, fil)
+            master_flat = tel.flat_name(flat_path, fil, amp, binn)
             if not np.all([os.path.exists(mf) for mf in master_flat]):
-                log.error('No master flat present for filter '+fil+', skipping data reduction for '+tar+'. Check data before rerunning')
+                log.error('No master flat present for filter '+fil+', skipping data reduction for '+tar+'. Check data before rerunning.')
                 continue
             flat_data = tel.load_flat(master_flat)
             t1 = time.time()
             log.info('Processing data for '+str(tar))
-            processed, masks = tel.process_science(sci_list[tar],fil,red_path,mbias=mbias,mflat=flat_data,proc=proc,log=log)
+            processed, masks = tel.process_science(sci_list[tar],fil,amp,binn,red_path,mbias=mbias,mflat=flat_data,proc=proc,log=log)
             t2 = time.time()
             log.info('Data processed in '+str(t2-t1)+' sec')
             if wavelength=='NIR':
@@ -246,7 +295,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                     sky_data = [processed[k] for _,k in time_diff[0:5]]
                     sky_mask = [masks[k] for _,k in time_diff[0:5]]
                     sky_masked_data = []
-                    for k in range(5): 
+                    for k in range(len(sky_data)): 
                         bkg = Background2D(sky_data[k], (20, 20), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=sky_mask[k], exclude_percentile=80)
                         masked = np.array(sky_data[k])
                         masked[sky_mask[k]] = bkg.background[sky_mask[k]]
@@ -261,6 +310,21 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                     processed[j] = n.subtract(sky,propagate_uncertainties=True,handle_meta='first_found')
                 t2 = time.time()
                 log.info('Sky maps complete and subtracted in '+str(t2-t1)+' sec')
+            if wavelength=='OPT':
+                t1 = time.time()
+                if tel.fringe_correction(fil):
+                    fringe_data = []
+                    for k,n in enumerate(processed):
+                        bkg = Background2D(n, (20, 20), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=masks[k], exclude_percentile=80)
+                        masked = np.array(n)
+                        masked[masks[k]] = bkg.background[masks[k]]
+                        fringe_data.append(CCDData(masked,unit=u.electron/u.second))
+                    fringe_map = ccdproc.combine(fringe_data,method='median',sigma_clip=True,sigma_clip_func=np.ma.median,mask=masks)
+                    fringe_map.write(red_path+'fringe_map_'+fil+'_'+amp+'.fits',overwrite=True)
+                    for j,n in enumerate(processed):
+                        processed[j] = n.subtract(fringe_map,propagate_uncertainties=True,handle_meta='first_found')
+                    t2 = time.time()
+                    log.info('Fringe correction complete and subtracted in '+str(t2-t1)+' sec')
             log.info('Writing out reduced data.')
             dimen = len(stack)
             if dimen == 1:
@@ -280,11 +344,12 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                 log.info('Aligning images.')
                 aligned_images, aligned_data = align_quads.align_stars(red_list,telescope,hdu=tel.wcs_extension(),mask=mask[k],log=log)
                 log.info('Checking qualty of images.')
-                stacking_data, mid_time = quality_check.quality_check(aligned_images, aligned_data, telescope, log)
+                stacking_data, mid_time, total_time = quality_check.quality_check(aligned_images, aligned_data, telescope, log)
                 log.info('Creating median stack.')
                 sci_med = ccdproc.combine(stacking_data,method='median',sigma_clip=True,sigma_clip_func=np.ma.median)
                 sci_med.header['MJD-OBS'] = (mid_time, 'Mid-MJD of the observation sequence calculated using DATE-OBS.')
                 sci_med.header['EXPTIME'] = (1, 'Effective expsoure tiime for the stack in seconds.')
+                sci_med.header['EXPTOT'] = (total_time, 'Total exposure time of stack in seconds')
                 sci_med.header['GAIN'] = (1, 'Effecetive gain for stack.')
                 sci_med.header['RDNOISE'] = (tel.rdnoise(sci_med.header)/np.sqrt(len(aligned_images)), 'Readnoise of stack.')
                 sci_med.header['NFILES'] = (len(aligned_images), 'Number of images in stack')
@@ -300,15 +365,18 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                         log.error('WCS solution failed.')
                 if tel.run_phot():
                     log.info('Running psf photometry.')
-                    epsf, fwhm = psf.do_phot(stack[k])
-                    log.info('FWHM = %2.4f"'%(fwhm*tel.pixscale()))
-                    log.info('Calculating zeropint.')
-                    zp_catalogs = tel.catalog_zp()
-                    zp_cal = absphot.absphot()
-                    for zp_cat in zp_catalogs:
-                        zp, zp_err = zp_cal.find_zeropoint(stack[k].replace('.fits','.pcmp'), fil, zp_cat, plot=True, log=log)
-                        if zp:
-                            break
+                    try:
+                        epsf, fwhm = psf.do_phot(stack[k])
+                        log.info('FWHM = %2.4f"'%(fwhm*tel.pixscale()))
+                        log.info('Calculating zeropint.')
+                        zp_catalogs = tel.catalog_zp()
+                        zp_cal = absphot.absphot()
+                        for zp_cat in zp_catalogs:
+                            zp, zp_err = zp_cal.find_zeropoint(stack[k].replace('.fits','.pcmp'), fil, zp_cat, plot=True, log=log)
+                            if zp:
+                                break
+                    except Exception as e:
+                        log.error('PSF photometry failed due to: '+str(e))
         if phot:
             log.info('User input to perform manual aperture photometry.')
             log.info('List of final stacks: '+str(final_stack))
