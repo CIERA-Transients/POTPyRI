@@ -16,7 +16,7 @@ from astropy.modeling import models
 import create_mask
 from utilities import util
 
-__version__ = 1.2 #last edited 16/06/2021
+__version__ = 1.3 #last edited 28/07/2021
 
 def static_mask(proc):
     if proc:
@@ -136,6 +136,8 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
     flat_right = mflat[1]
     left_list = []
     right_list = []
+    left_mask = []
+    right_mask = []
     if proc:  
         for j,sci in enumerate(sci_list):
             log.info('Loading file: '+sci)
@@ -146,6 +148,7 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
             log.info('Left image proccessed and trimmed.')
             log.info('Cleaning cosmic rays and creating mask.')
             mask = make_source_mask(left, nsigma=3, npixels=5)
+            left_mask.append(mask)
             # clean, com_mask = create_mask.create_mask(sci,left,'_mask_left.fits',static_mask(proc)[0],mask,saturation(left.header),binning(proc,'left'),rdnoise(left.header),cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
             # left.data = clean
             log.info('Calculating 2D background.')
@@ -154,7 +157,7 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
             fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_bkg_left.fits'),np.array(bkg.background),overwrite=True)
             left = left.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found')
             log.info('Exposure time of left image is '+str(left.header['EXPTIME']))
-            left = left.divide(left.header['EXPTIME'],propagate_uncertainties=True,handle_meta='first_found')
+            left = left.divide(left.header['EXPTIME']*u.second,propagate_uncertainties=True,handle_meta='first_found')
             log.info('Background subtracted and image divided by exposure time.')
             left.header['DATASEC'] = '[1:'+str(np.shape(left)[1])+',1:'+str(np.shape(left)[0])+']'
             left_list.append(left)
@@ -165,6 +168,7 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
             log.info('Right image proccessed and trimmed.')
             log.info('Cleaning cosmic rays and creating mask.')
             mask = make_source_mask(right, nsigma=3, npixels=5)
+            right_mask.append(mask)
             # clean, com_mask = create_mask.create_mask(sci,right,'_mask_right.fits',static_mask(proc)[1],mask,saturation(right.header),binning(proc,'right'),rdnoise(right.header),cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
             # right.data = clean
             log.info('Calculating 2D background.')
@@ -173,7 +177,7 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
             fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_bkg_right.fits'),np.array(bkg.background),overwrite=True)
             right = right.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found')
             log.info('Exposure time of right image is '+str(right.header['EXPTIME']))
-            right = right.divide(right.header['EXPTIME'],propagate_uncertainties=True,handle_meta='first_found')
+            right = right.divide(right.header['EXPTIME']*u.second,propagate_uncertainties=True,handle_meta='first_found')
             log.info('Background subtracted and image divided by exposure time.')
             right.header['DATASEC'] = '[1:'+str(np.shape(right)[1])+',1:'+str(np.shape(right)[0])+']'
             right_list.append(right)
@@ -196,6 +200,7 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
             log.info('Left image proccessed and trimmed.')
             log.info('Cleaning cosmic rays and creating mask.')
             mask = make_source_mask(left, nsigma=3, npixels=5)
+            left_mask.append(mask)
             # clean, com_mask = create_mask.create_mask(sci,left,static_mask(proc)[0],mask,saturation(left.header),binning(proc,'left'),rdnoise(left.header),cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
             # processed_data.data = clean
             log.info('Calculating 2D background.')
@@ -230,6 +235,7 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
             log.info('Right image proccessed and trimmed.')
             log.info('Cleaning cosmic rays and creating mask.')
             mask = make_source_mask(right, nsigma=3, npixels=5)
+            right_mask.append(mask)
             # clean, com_mask = create_mask.create_mask(sci,right,static_mask(proc)[1],mask,saturation(right.header),binning(proc,'right'),rdnoise(right.header),cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
             # processed_data.data = clean
             log.info('Calculating 2D background.')
@@ -257,7 +263,7 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
             right.header['PC2_2'] = pixscale()/3600*np.sin(np.pi/180.*(right.header['POSANG']+90))
             right.write(sci.replace('/raw/','/red/').replace('.fits','_right.fits'),overwrite=True)
             right_list.append(right)
-    return [left_list,right_list], None
+    return [left_list,right_list], [left_mask,right_mask]
 
 def stacked_image(tar,red_path):
     return [red_path+tar+'_left.fits',red_path+tar+'_right.fits']

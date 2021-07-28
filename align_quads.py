@@ -3,7 +3,7 @@
 "Function to pixel align a list of images using quads."
 "Author: Kerry Paterson"
 
-__version__ = "1.6" #last updated 06/07/2021
+__version__ = "1.7" #last updated 28/07/2021
 
 import time
 import numpy as np
