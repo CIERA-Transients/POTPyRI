@@ -3,7 +3,7 @@
 "Function to assess image quality for stacking."
 "Author: Kerry Paterson"
 
-__version__ = "1.4" #last updated 16/07/2021
+__version__ = "1.5" #last updated 28/07/2021
 
 import time
 import numpy as np

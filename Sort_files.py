@@ -3,7 +3,7 @@
 "Function to sort files for main_pipeline."
 "Authors: Owen Eskandari, Kerry Paterson"
 
-__version__ = "2.4" #last updated 08/07/2021
+__version__ = "2.5" #last updated 28/07/2021
 
 from astropy.io import fits
 from astropy.table import Table

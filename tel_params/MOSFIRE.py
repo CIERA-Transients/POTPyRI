@@ -14,7 +14,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.0 #last edited 01/06/2021
+__version__ = 1.1 #last edited 28/07/2021
 
 def static_mask(proc):
     return ['']#'./staticmasks/MF.staticmask.fits']

@@ -14,7 +14,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.3 #last edited 14/06/2021
+__version__ = 1.4 #last edited 28/07/2021
 
 def static_mask(proc):
     return ['./staticmasks/MMIRS.staticmask.fits']
