@@ -155,7 +155,7 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
         red = ccdproc.ccd_process(raw, gain=raw.header['GAIN']*u.electron/u.adu, readnoise=raw.header['RDNOISE']*u.electron)
         log.info('Exposure time of science image is '+str(red.header['EXPTIME']))
         log.info('Loading correct master dark')
-        mdark = CCDData.read(red_path+'DARK_'+str(red.header['EXPTIME'])+'.fits', unit=u.electron)
+        mdark = CCDData.read(red_path+'DARK_'+str(red.header['EXPTIME'])+'_'+amp+'_'+binn+'.fits', unit=u.electron)
         red = ccdproc.subtract_dark(red, mdark, exposure_time='EXPTIME', exposure_unit=u.second)#dark_exposure=1*u.second, data_exposure=red.header['EXPTIME']*u.second, scale=True)
         red = ccdproc.subtract_overscan(red, overscan=red[:,0:4], overscan_axis=1, model=models.Chebyshev1D(3))
         red = ccdproc.flat_correct(red, mflat)
