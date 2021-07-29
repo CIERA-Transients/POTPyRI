@@ -127,7 +127,7 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
         red = ccdproc.ccd_process(raw, gain=raw.header['GAIN']*u.electron/u.adu, readnoise=raw.header['RDNOISE']*u.electron)
         log.info('Exposure time of image is '+str(red.header['EXPTIME']))
         log.info('Loading correct master dark')
-        mdark = CCDData.read(red_path+'DARK_'+str(red.header['EXPTIME'])+'.fits', unit=u.electron)        
+        mdark = CCDData.read(red_path+'DARK_'+str(red.header['EXPTIME'])+'_'+amp+'_'+binn+'.fits', unit=u.electron)        
         red = ccdproc.subtract_dark(red, mdark, exposure_time='EXPTIME', exposure_unit=u.second)
         red = ccdproc.subtract_overscan(red, overscan=red[:,0:4], overscan_axis=1, model=models.Chebyshev1D(3))
         mask = make_source_mask(red, nsigma=3, npixels=5)
