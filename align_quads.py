@@ -3,7 +3,7 @@
 "Function to pixel align a list of images using quads."
 "Author: Kerry Paterson"
 
-__version__ = "1.7" #last updated 28/07/2021
+__version__ = "1.8" #last updated 30/07/2021
 
 import time
 import numpy as np
@@ -63,12 +63,18 @@ def align_stars(images,telescope,hdu=0,mask=None,log=None):
         else:
             xflip = header[cd11]
             yflip = header[cd22]
-            if xsign/xflip < 0:
-                data = np.fliplr(data)
-                rewrite = True
-            if ysign/yflip < 0:
-                data = np.flipud(data)
-                rewrite = True
+            try:
+                if xsign/xflip < 0:
+                    data = np.fliplr(data)
+                    rewrite = True
+            except ZeroDivisionError:
+                pass
+            try:
+                if ysign/yflip < 0:
+                    data = np.flipud(data)
+                    rewrite = True
+            except ZeroDivisionError:
+                pass
             if rewrite:
                 fits.writeto(f.replace('.fits','_flipped.fits'),data,header,overwrite=True)
                 images[i] = f.replace('.fits','_flipped.fits')
