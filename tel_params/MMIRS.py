@@ -14,7 +14,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.5 #last edited 29/07/2021
+__version__ = 1.6 #last edited 16/08/2021
 
 def static_mask(proc):
     return ['./staticmasks/MMIRS.staticmask.fits']
@@ -77,7 +77,7 @@ def dark_keyword():
     return ['OBJECT']
 
 def dark_files():
-    return ['Dark']
+    return ['ark']
 
 def spec_keyword():
     return ['OBSMODE','APERTURE']

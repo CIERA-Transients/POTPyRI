@@ -3,7 +3,7 @@
 "Function to sort files for main_pipeline."
 "Authors: Owen Eskandari, Kerry Paterson"
 
-__version__ = "2.5" #last updated 28/07/2021
+__version__ = "2.6" #last updated 16/08/2021
 
 from astropy.io import fits
 from astropy.table import Table
@@ -148,7 +148,7 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
                     except KeyError:
                         sky_list.update({fil+'_'+amp+'_'+binn:[]})
                     sky_list[fil+'_'+amp+'_'+binn].append(f.replace(path,moved_path))
-            elif len(dark_keyword) != 0 and np.all([hdr[dark_keyword[j]] == dark_files[j] for j in range(len(dark_keyword))]):
+            elif len(dark_keyword) != 0 and np.all([hdr[dark_keyword[j] in dark_files[j]] for j in range(len(dark_keyword))]):
                 file_type = 'DARK'
                 moved_path = path+'raw/'
                 shutil.move(f,moved_path)
