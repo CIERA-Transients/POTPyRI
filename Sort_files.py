@@ -92,6 +92,14 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
                 moved_path = path+'bad/'
                 shutil.move(f,moved_path)
                 continue
+            try:
+                check_data = file_open[ext].data
+            except TypeError:
+                log.error('Moving file '+f+' to bad due to corrupted data.')
+                file_type = 'BAD'
+                moved_path = path+'bad/'
+                shutil.move(f,moved_path)
+                continue
         try:
             target = hdr[target_keyword].replace(' ','')
             fil = tel.filter_keyword(hdr)
