@@ -15,7 +15,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.0 #last edited 28/07/2021
+__version__ = 1.1 #last edited 18/08/2021
 
 def static_mask(proc):
     return ['']
@@ -210,12 +210,23 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
         with fits.open(sci) as hdr:
             header = hdr[0].header
         raw = [CCDData.read(sci, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
-        red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=x.header['DATASEC'], gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
+        if hdr[1].header['DATASEC'] != '[52:1075,1:4096]':
+            window = True
+            if hdr[1].header['DATASEC'] == mbias[0].header['DATASEC']:
+                trim_sec = [mbias[k].header['DATASEC'] for k in range(len(mbias))]
+            else:
+                trim_sec = [hdr[k+1].header['DATASEC'] for k in range(len(mbias))]
+                for k,x in enumerate(mbias)):
+                    x.data = x.data[0:int(trim_sec[k].split(':')[-1].rstrip(']')),0:int(trim_sec[k].split(':')[1].split(',')[0])]
+                    mbias[k] = x
+        red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=trim_sec[k], gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
         if amp == '4B':
             sci_full = CCDData(np.concatenate([red[0],np.fliplr(red[1]),np.zeros([np.shape(red[1])[0],111]),red[2],np.fliplr(red[3])],axis=1),header=header,unit=u.electron)
             sci_full = ccdproc.trim_image(sci_full[700:3315,350:3940])
         if amp == '4R':
             sci_full = CCDData(np.concatenate([red[1],np.fliplr(red[0]),np.zeros([np.shape(red[0])[0],200]),red[3],np.fliplr(red[2])],axis=1),header=header,unit=u.electron)
+            if window:
+                mflat.data = mflat.data[1250:2500,400:3600]
         if amp == '1R':
             sci_full = red[0]
         log.info('Exposure time of science image is '+str(sci_full.header['ELAPTIME']))
