@@ -14,10 +14,10 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.1 #last edited 28/07/2021
+__version__ = 1.3 #last edited 18/08/2021
 
 def static_mask(proc):
-    return ['']#'./staticmasks/MF.staticmask.fits']
+    return ['./staticmasks/MF.staticmask.fits']
 
 def run_wcs():
     return True
@@ -130,7 +130,9 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
         raw = CCDData.read(flat,unit=u.adu)
         red = ccdproc.ccd_process(raw, gain=raw.header['SYSGAIN']*u.electron/u.adu, readnoise=rdnoise(raw.header)*u.electron)
         log.info('Exposure time of image is '+str(red.header['TRUITIME']*red.header['COADDONE']))
-        mask = make_source_mask(red, nsigma=3, npixels=5)
+        with fits.open(static_mask(False)[0]) as hdr:
+            mask_bp = -~-hdr[0].data
+        mask = make_source_mask(red, nsigma=3, npixels=5)+mask_bp
         bkg = Background2D(red, (20, 20), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=mask, exclude_percentile=80)
         masked = np.array(red)
         masked[mask] = bkg.background[mask]
@@ -163,7 +165,9 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
         processed_data = CCDData(flat,unit=u.electron,header=red.header,wcs=red.wcs)
         log.info('File proccessed.')
         log.info('Cleaning cosmic rays and creating mask.')
-        mask = make_source_mask(processed_data, nsigma=3, npixels=5)
+        with fits.open(static_mask(False)[0]) as hdr:
+            mask_bp = -~-hdr[0].data
+        mask = make_source_mask(processed_data, nsigma=3, npixels=5)+mask_bp
         masks.append(mask)
         # clean, com_mask = create_mask.create_mask(sci.replace('.gz',''),processed_data,'_mask.fits',static_mask(proc)[0],mask,saturation(red.header),binning(),rdnoise(raw.header),cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
         # processed_data.data = clean
