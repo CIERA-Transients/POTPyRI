@@ -3,7 +3,7 @@
 "Function to sort files for main_pipeline."
 "Authors: Owen Eskandari, Kerry Paterson"
 
-__version__ = "2.6" #last updated 17/08/2021
+__version__ = "2.7" #last updated 18/08/2021
 
 from astropy.io import fits
 from astropy.table import Table
@@ -220,7 +220,7 @@ def load_files(file_list, telescope,log):
             time_list[target+'_'+fil+'_'+amp+'_'+binn].append(file_time)
             if tel.wavelength() == 'NIR':
                 try:
-                    sky_list[fil+'_'+amp+'_'+binn+'_'+binn]
+                    sky_list[fil+'_'+amp+'_'+binn]
                 except KeyError:
                     sky_list.update({fil+'_'+amp+'_'+binn:[]})
                 sky_list[fil+'_'+amp+'_'+binn].append(f)
