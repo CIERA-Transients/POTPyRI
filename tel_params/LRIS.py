@@ -209,16 +209,16 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
         log.info('Applying bias correction, gain correction and flat correction.')
         with fits.open(sci) as hdr:
             header = hdr[0].header
+            if hdr[1].header['DATASEC'] != '[52:1075,1:4096]':
+                window = True
+                if hdr[1].header['DATASEC'] == mbias[0].header['DATASEC']:
+                    trim_sec = [mbias[k].header['DATASEC'] for k in range(len(mbias))]
+                else:
+                    trim_sec = [hdr[k+1].header['DATASEC'] for k in range(len(mbias))]
+                    for k,x in enumerate(mbias):
+                        x.data = x.data[0:int(trim_sec[k].split(':')[-1].rstrip(']')),0:int(trim_sec[k].split(':')[1].split(',')[0])]
+                        mbias[k] = x
         raw = [CCDData.read(sci, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
-        if hdr[1].header['DATASEC'] != '[52:1075,1:4096]':
-            window = True
-            if hdr[1].header['DATASEC'] == mbias[0].header['DATASEC']:
-                trim_sec = [mbias[k].header['DATASEC'] for k in range(len(mbias))]
-            else:
-                trim_sec = [hdr[k+1].header['DATASEC'] for k in range(len(mbias))]
-                for k,x in enumerate(mbias):
-                    x.data = x.data[0:int(trim_sec[k].split(':')[-1].rstrip(']')),0:int(trim_sec[k].split(':')[1].split(',')[0])]
-                    mbias[k] = x
         red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=trim_sec[k], gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
         if amp == '4B':
             sci_full = CCDData(np.concatenate([red[0],np.fliplr(red[1]),np.zeros([np.shape(red[1])[0],111]),red[2],np.fliplr(red[3])],axis=1),header=header,unit=u.electron)
