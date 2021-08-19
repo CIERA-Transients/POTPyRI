@@ -148,6 +148,7 @@ class absphot(object):
         header, table = import_catalog(cmpfile)
         coords = SkyCoord(table['RA'], table['Dec'], unit='deg')
 
+        filt = self.convert_filter_name(filt)
         if log:
             log.info('Downloading {0} catalog in {1}'.format(
                 catalog, filt))
@@ -309,3 +310,15 @@ class absphot(object):
         elif fil=='z':
             mag_sdss = 0.013 - 0.039*g_r - 0.012*g_r**2 + mag_ps1
         return mag_sdss
+
+    def convert_filter_name(self, filt):
+        if filt=='uG0308' or filt=='uG0332':
+            return 'u'        
+        if filt=='gG0301' or filt=='gG0325':
+            return 'g'
+        if filt=='rG0303' or filt=='rG0326':
+            return 'r'
+        if filt=='iG0302' or filt=='iG0327':
+            return 'i'
+        if filt=='zG0304' or filt=='zG0328':
+            return 'z'
