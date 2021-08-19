@@ -15,7 +15,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.1 #last edited 18/08/2021
+__version__ = 1.1 #last edited 19/08/2021
 
 def static_mask(proc):
     return ['']
@@ -218,6 +218,8 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
                     for k,x in enumerate(mbias):
                         x.data = x.data[0:int(trim_sec[k].split(':')[-1].rstrip(']')),0:int(trim_sec[k].split(':')[1].split(',')[0])]
                         mbias[k] = x
+            else:
+                trim_sec = [hdr[k+1].header['DATASEC'] for k in range(len(mbias))]
         raw = [CCDData.read(sci, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
         red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=trim_sec[k], gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
         if amp == '4B':
@@ -308,7 +310,7 @@ def cr_clean_objlim():
     return 100
 
 def run_phot():
-    return False
+    return True
 
 def catalog_zp():
     return ['SDSS','PS1']
