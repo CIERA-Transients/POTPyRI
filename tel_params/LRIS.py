@@ -209,8 +209,13 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
         log.info('Applying bias correction, gain correction and flat correction.')
         with fits.open(sci) as hdr:
             header = hdr[0].header
-            if hdr[1].header['DATASEC'] != '[52:1075,1:4096]':
+            if amp == '4B' and hdr[1].header['DATASEC'] != '[52:1075,1:4096]':
                 window = True
+            elif amp == '4R' and hdr[1].header['DATASEC'] != '[8:1031,1:2500]':
+                window = True
+            else:
+                window = False
+            if window:
                 if hdr[1].header['DATASEC'] == mbias[0].header['DATASEC']:
                     trim_sec = [mbias[k].header['DATASEC'] for k in range(len(mbias))]
                 else:
@@ -219,21 +224,23 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
                         x.data = x.data[0:int(trim_sec[k].split(':')[-1].rstrip(']')),0:int(trim_sec[k].split(':')[1].split(',')[0])]
                         mbias[k] = x
             else:
-                window = False
                 trim_sec = [hdr[k+1].header['DATASEC'] for k in range(len(mbias))]
         raw = [CCDData.read(sci, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
         red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=trim_sec[k], gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
+        flat_image = CCDData(np.copy(mflat),unit=u.electron,meta=mflat.meta,mask=mflat.mask,uncertainty=mflat.uncertainty)
         if amp == '4B':
             sci_full = CCDData(np.concatenate([red[0],np.fliplr(red[1]),np.zeros([np.shape(red[1])[0],111]),red[2],np.fliplr(red[3])],axis=1),header=header,unit=u.electron)
             sci_full = ccdproc.trim_image(sci_full[700:3315,350:3940])
         if amp == '4R':
             sci_full = CCDData(np.concatenate([red[1],np.fliplr(red[0]),np.zeros([np.shape(red[0])[0],200]),red[3],np.fliplr(red[2])],axis=1),header=header,unit=u.electron)
-            # if window:
-            #     mflat.data = mflat.data[1250:2500,400:3600]
+            if window:
+                flat_image.data = mflat.data[1250:2500,0:3600]
+                flat_image.mask = mflat.mask[1250:2500,0:3600]
+                flat_image.uncertainty = mflat.uncertainty[1250:2500,0:3600]           
         if amp == '1R':
             sci_full = red[0]
         log.info('Exposure time of science image is '+str(sci_full.header['ELAPTIME']))
-        processed_data = ccdproc.flat_correct(sci_full, mflat)
+        processed_data = ccdproc.flat_correct(sci_full, flat_image)
         log.info('File proccessed.')
         log.info('Cleaning cosmic rays and creating mask.')
         mask = make_source_mask(processed_data, nsigma=3, npixels=5)
