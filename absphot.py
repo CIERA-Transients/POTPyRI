@@ -9,7 +9,9 @@ from Vizier_catalogs import find_catalog
 
 import matplotlib.pyplot as plt
 
+from psf import write_out_catalog as woc
 from utilities.util import *
+import catreg
 
 class absphot(object):
     def __init__(self, iterations=5, sigma=5):
@@ -136,7 +138,7 @@ class absphot(object):
         cat_mag=cat_mag[mask]
         cat_magerr=cat_magerr[mask]
 
-        return(flux, fluxerr, cat_mag, cat_magerr)
+        return(flux, fluxerr, cat_mag, cat_magerr, mask)
 
     def find_zeropoint(self, cmpfile, filt, catalog, match_radius=2.0*u.arcsec,
         plot=False, log=None):
@@ -194,7 +196,6 @@ class absphot(object):
             flux_idx = np.argsort(match_table['flux'])
             match_table = match_table[flux_idx]
             cat = cat[flux_idx]
-
             # Do basic cuts on flux, fluxerr, catalog magnitude, cat magerr
             flux = match_table['flux']
             fluxerr = match_table['flux_err']
@@ -202,7 +203,7 @@ class absphot(object):
             cat_magerr = cat['mag_err']
 
             # Do basic data quality cuts to fluxes and catalog magnitudes
-            flux, fluxerr, cat_mag, cat_magerr = self.do_cuts(flux, fluxerr,
+            flux, fluxerr, cat_mag, cat_magerr, flux_mask = self.do_cuts(flux, fluxerr,
                 cat_mag, cat_magerr)
 
             if len(flux)==0:
@@ -215,6 +216,18 @@ class absphot(object):
 
             zpt, zpterr, master_mask = self.zpt_iteration(flux, fluxerr,
                 cat_mag, cat_magerr, log=log)
+
+            zp_catalog = match_table[flux_mask]
+            zp_catalog = zp_catalog[master_mask]
+            img_file = cmpfile.replace('.pcmp','.fits')
+            columns = ['Xpos','Ypos','mag','mag_err','flux','flux_err','SN','SKY',
+                            'FWHM','PA','SHARP','ROUND','NPIX','RA','Dec']
+            sigfig=[4,4,4,4,4,4,4,4,4,4,4,4,0,7,7]
+            outfile = cmpfile.replace('.pcmp','.zpt')
+
+            woc(zp_catalog, img_file, columns, sigfig, outfile, metadata)
+
+            catreg.secat(outfile,'zpt')
 
             if plot:
                 label='zpt = %2.4f +/- %2.4f mag'%(zpt,zpterr)
@@ -322,3 +335,5 @@ class absphot(object):
             return 'i'
         if filt=='zG0304' or filt=='zG0328':
             return 'z'
+        else:
+            return filt
