@@ -16,7 +16,7 @@ from astropy.modeling import models
 import create_mask
 from utilities import util
 
-__version__ = 1.3 #last edited 28/07/2021
+__version__ = 1.4 #last edited 24/08/2021
 
 def static_mask(proc):
     if proc:
@@ -309,3 +309,6 @@ def fringe_correction(fil):
         return True
     else:
         return False
+
+def trim(f):
+    return False

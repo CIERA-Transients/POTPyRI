@@ -14,7 +14,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.6 #last edited 16/08/2021
+__version__ = 1.7 #last edited 24/08/2021
 
 def static_mask(proc):
     return ['./staticmasks/MMIRS.staticmask.fits']
@@ -227,3 +227,6 @@ def catalog_zp():
 
 def exptime(hdr):
     return hdr['EXPTIME']
+
+def trim(f):
+    return False

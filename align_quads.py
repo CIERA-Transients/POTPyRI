@@ -3,7 +3,7 @@
 "Function to pixel align a list of images using quads."
 "Author: Kerry Paterson"
 
-__version__ = "1.8" #last updated 30/07/2021
+__version__ = "1.9" #last updated 24/08/2021
 
 import time
 import numpy as np
@@ -88,6 +88,13 @@ def align_stars(images,telescope,hdu=0,mask=None,log=None):
         if log:
             log.info('Loading file: '+f)
             log.info('Running SExtracor.')
+        if tel.trim(f):
+            with fits.open(f) as fo:
+                header = fo[hdu].header
+                data = fo[hdu].data
+            data = tel.trim_section(data)
+            f = f.replace('.fits','_trim.fits')
+            fits.writeto(f,data,header,overwrite=True)
         cat_name = f.replace('.fits','.cat')
         table = solve_wcs.run_sextractor(f, cat_name, tel, sex_config_dir='./Config', log=log)
         table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
