@@ -16,7 +16,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.0 #last edited 18/08/2021
+__version__ = 1.1 #last edited 24/08/2021
 
 def static_mask(proc):
     return ['']
@@ -261,3 +261,6 @@ def fringe_correction(fil):
         return True
     else:
         return False
+    
+def trim(f):
+    return False

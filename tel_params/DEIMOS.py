@@ -15,7 +15,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.1 #last edited 18/08/2021
+__version__ = 1.2 #last edited 24/08/2021
 
 def static_mask(proc):
     return ['']
@@ -271,4 +271,7 @@ def readnoise(amp):
     return readnoise
 
 def fringe_correction(fil):
+    return False
+
+def trim(f):
     return False

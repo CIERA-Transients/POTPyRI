@@ -15,7 +15,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.2 #last edited 23/08/2021
+__version__ = 1.3 #last edited 24/08/2021
 
 def static_mask(proc):
     return ['']
@@ -232,11 +232,15 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
             sci_full = CCDData(np.concatenate([red[0],np.fliplr(red[1]),np.zeros([np.shape(red[1])[0],111]),red[2],np.fliplr(red[3])],axis=1),header=header,unit=u.electron)
             sci_full = ccdproc.trim_image(sci_full[700:3315,350:3940])
         if amp == '4R':
+            # if window:
+            #     trimmed_data = np.concatenate([red[1],np.fliplr(red[0]),np.zeros([np.shape(red[0])[0],200]),red[3],np.fliplr(red[2])],axis=1)
+            #     sci_full = CCDData(np.concatenate([trimmed_data,np.zeros([1250,np.shape(trimmed_data)[1]])],axis=0),header=header,unit=u.electron)
+            # else:
             sci_full = CCDData(np.concatenate([red[1],np.fliplr(red[0]),np.zeros([np.shape(red[0])[0],200]),red[3],np.fliplr(red[2])],axis=1),header=header,unit=u.electron)
             if window:
-                flat_image.data = mflat.data[1250:2500,0:3600]
-                flat_image.mask = mflat.mask[1250:2500,0:3600]
-                flat_image.uncertainty = mflat.uncertainty[1250:2500,0:3600]           
+                flat_image.data = mflat.data[625:1875,0:3600]
+                flat_image.mask = mflat.mask[625:1875,0:3600]
+                flat_image.uncertainty = mflat.uncertainty[625:1875,0:3600]           
         if amp == '1R':
             sci_full = red[0]
         log.info('Exposure time of science image is '+str(sci_full.header['ELAPTIME']))
@@ -253,6 +257,10 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
         fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_bkg.fits').replace('.gz',''),np.array(bkg.background),overwrite=True)
         final = processed_data.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found').divide(processed_data.header['ELAPTIME']*u.second,propagate_uncertainties=True,handle_meta='first_found')
         log.info('Background subtracted and image divided by exposure time.')
+        if window:
+            log.info('Image windowed, adding padding.')
+            if amp == '4R':
+                final = CCDData(np.concatenate([np.zeros([625,np.shape(final)[1]]),final,np.zeros([625,np.shape(final)[1]])],axis=0),header=final.header,unit=u.electron/u.second)
         log.info('Writing WCS to file.')
         ra = final.header['RA'].split(':')
         dec = final.header['DEC'].split(':')
@@ -355,3 +363,17 @@ def overscan_region(amp):
 
 def fringe_correction(fil):
     return False
+
+def trim(f):
+    if 'LB' in f:
+        return False
+    with fits.open(f) as fo:
+        hdr = fo[0].header
+    amp = amp_keyword(hdr)
+    if amp=='4R':
+        return True
+    else:
+        return False
+
+def trim_section(data):
+    return data[625:1875,0:3600]
