@@ -14,7 +14,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.4 #last edited 24/08/2021
+__version__ = 1.5 #last edited 24/08/2021
 
 def static_mask(proc):
     return ['./staticmasks/MF.staticmask.fits']
@@ -137,10 +137,13 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
         masked = np.array(red)
         masked[mask] = bkg.background[mask]
         log.info('Median flat level: '+str(np.median(masked)))
-        norm = 1/np.median(masked[224:1824,224:1824])
-        log.info('Flat normalization: '+str(norm))
-        flat_scale.append(norm)
-        flats.append(CCDData(masked,meta=red.header,unit=u.electron))
+        if np.median(masked)==0:
+            log.info('Removing file from flat creation.')
+        else:
+            norm = 1/np.median(masked[224:1824,224:1824])
+            log.info('Flat normalization: '+str(norm))
+            flat_scale.append(norm)
+            flats.append(CCDData(masked,meta=red.header,unit=u.electron))
     mflat = ccdproc.combine(flats,method='median',scale=flat_scale,sigma_clip=True) 
     log.info('Created master flat for filter '+fil+' and '+amp+' amps and '+binn+' binning.')
     mflat.write(red_path+'mflat_'+fil+'_'+amp+'_'+binn+'.fits',overwrite=True)
@@ -167,7 +170,7 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
         log.info('Cleaning cosmic rays and creating mask.')
         with fits.open(static_mask(False)[0]) as hdr:
             mask_bp = -~-hdr[0].data
-        mask = make_source_mask(processed_data, nsigma=3, npixels=5)+mask_bp
+        mask = make_source_mask(processed_data, nsigma=5, npixels=5)+mask_bp
         masks.append(mask)
         # clean, com_mask = create_mask.create_mask(sci.replace('.gz',''),processed_data,'_mask.fits',static_mask(proc)[0],mask,saturation(red.header),binning(),rdnoise(raw.header),cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
         # processed_data.data = clean
