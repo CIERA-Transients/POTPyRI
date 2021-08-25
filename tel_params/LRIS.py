@@ -15,7 +15,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.3 #last edited 24/08/2021
+__version__ = 1.4 #last edited 24/08/2021
 
 def static_mask(proc):
     return ['']
@@ -178,20 +178,21 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
         log.info('Loading file: '+flat)
         with fits.open(flat) as hdr:
             header = hdr[0].header
-        raw = [CCDData.read(flat, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
-        red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=x.header['DATASEC'], gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
-        if amp == '4B':
-            flat_full = CCDData(np.concatenate([red[0],np.fliplr(red[1]),np.zeros([np.shape(red[1])[0],111]),red[2],np.fliplr(red[3])],axis=1),header=header,unit=u.electron)
-            flat_full = ccdproc.trim_image(flat_full[700:3315,350:3940])
-        if amp == '4R':
-            flat_full = CCDData(np.concatenate([red[1],np.fliplr(red[0]),np.zeros([np.shape(red[0])[0],200]),red[3],np.fliplr(red[2])],axis=1),header=header,unit=u.electron)
-        if amp == '1R':
-            flat_full = red[0]
-        log.info('Exposure time of image is '+str(flat_full.header['ELAPTIME']))
-        norm = 1/np.median(flat_full[1200:1600,1200:1600]) #check for binning
-        log.info('Flat normalization: '+str(norm))
-        scale.append(norm)
-        flats.append(flat_full)
+        if header['NPIXSAT'] < 10000:
+            raw = [CCDData.read(flat, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
+            red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=x.header['DATASEC'], gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
+            if amp == '4B':
+                flat_full = CCDData(np.concatenate([red[0],np.fliplr(red[1]),np.zeros([np.shape(red[1])[0],111]),red[2],np.fliplr(red[3])],axis=1),header=header,unit=u.electron)
+                flat_full = ccdproc.trim_image(flat_full[700:3315,350:3940])
+            if amp == '4R':
+                flat_full = CCDData(np.concatenate([red[1],np.fliplr(red[0]),np.zeros([np.shape(red[0])[0],200]),red[3],np.fliplr(red[2])],axis=1),header=header,unit=u.electron)
+            if amp == '1R':
+                flat_full = red[0]
+            log.info('Exposure time of image is '+str(flat_full.header['ELAPTIME']))
+            norm = 1/np.median(flat_full[1200:1600,1200:1600]) #check for binning
+            log.info('Flat normalization: '+str(norm))
+            scale.append(norm)
+            flats.append(flat_full)
     mflat = ccdproc.combine(flats,method='median',scale=scale,sigma_clip=True)
     log.info('Created master flat for filter: '+fil+' and '+amp+' amp '+binn+' biinning.')
     mflat.write(red_path+'mflat_'+fil+'_'+amp+'_'+binn+'.fits',overwrite=True)
@@ -232,12 +233,8 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
             sci_full = CCDData(np.concatenate([red[0],np.fliplr(red[1]),np.zeros([np.shape(red[1])[0],111]),red[2],np.fliplr(red[3])],axis=1),header=header,unit=u.electron)
             sci_full = ccdproc.trim_image(sci_full[700:3315,350:3940])
         if amp == '4R':
-            # if window:
-            #     trimmed_data = np.concatenate([red[1],np.fliplr(red[0]),np.zeros([np.shape(red[0])[0],200]),red[3],np.fliplr(red[2])],axis=1)
-            #     sci_full = CCDData(np.concatenate([trimmed_data,np.zeros([1250,np.shape(trimmed_data)[1]])],axis=0),header=header,unit=u.electron)
-            # else:
             sci_full = CCDData(np.concatenate([red[1],np.fliplr(red[0]),np.zeros([np.shape(red[0])[0],200]),red[3],np.fliplr(red[2])],axis=1),header=header,unit=u.electron)
-            if window:
+            if window and np.shape(sci_full)!=np.shape(flat_image):
                 flat_image.data = mflat.data[625:1875,0:3600]
                 flat_image.mask = mflat.mask[625:1875,0:3600]
                 flat_image.uncertainty = mflat.uncertainty[625:1875,0:3600]           
