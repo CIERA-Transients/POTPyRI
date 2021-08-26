@@ -15,7 +15,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.4 #last edited 24/08/2021
+__version__ = 1.5 #last edited 26/08/2021
 
 def static_mask(proc):
     return ['']
@@ -236,8 +236,11 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
             sci_full = CCDData(np.concatenate([red[1],np.fliplr(red[0]),np.zeros([np.shape(red[0])[0],200]),red[3],np.fliplr(red[2])],axis=1),header=header,unit=u.electron)
             if window and np.shape(sci_full)!=np.shape(flat_image):
                 flat_image.data = mflat.data[625:1875,0:3600]
-                flat_image.mask = mflat.mask[625:1875,0:3600]
-                flat_image.uncertainty = mflat.uncertainty[625:1875,0:3600]           
+                try:
+                    flat_image.mask = mflat.mask[625:1875,0:3600]
+                    flat_image.uncertainty = mflat.uncertainty[625:1875,0:3600] 
+                except:
+                    pass          
         if amp == '1R':
             sci_full = red[0]
         log.info('Exposure time of science image is '+str(sci_full.header['ELAPTIME']))
