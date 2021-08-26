@@ -3,7 +3,7 @@
 "Function to assess image quality for stacking."
 "Author: Kerry Paterson"
 
-__version__ = "1.5" #last updated 28/07/2021
+__version__ = "1.6" #last updated 26/08/2021
 
 import time
 import numpy as np
@@ -113,7 +113,10 @@ def quality_check(aligned_images, aligned_data, telescope, log):
         total_time += tel.exptime(image.header)
 
     sorted_times = sorted(time_list)
-    mid_time = sorted_times[0]+(sorted_times[-1]-sorted_times[0])/2
+    if len(sorted_times) == 1:
+        mid_time = sorted_times[0]
+    else:
+        mid_time = sorted_times[0]+(sorted_times[-1]-sorted_times[0])/2
 
     t_end = time.time()
     log.info('Quailty check completed in '+str(t_end-t_start)+' sec')
