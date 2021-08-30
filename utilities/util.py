@@ -604,7 +604,7 @@ def searchVizier(coord, catname, radius=2.564*u.arcmin):
     catid = viziercat[catname]['name']
     columns = viziercat[catname]['columns']
 
-    v = Vizier(columns=columns, catalog=[catname], row_limit = 1000000000)
+    v = Vizier(columns=columns, catalog=[catid], row_limit = 1000000000)
     result = v.query_region(coord, radius=2.564*u.arcmin)
 
     if len(result)==1:
