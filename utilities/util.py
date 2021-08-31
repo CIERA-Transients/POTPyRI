@@ -27,7 +27,7 @@ warnings.filterwarnings('ignore')
 
 viziercat = {
     'sdssdr12': {'name':'V/147',
-        'columns': ['RAJ2000', 'DEJ2000','class','umag', 'e_umag',
+        'columns': ['RA_ICRS', 'DE_ICRS','class','umag', 'e_umag',
             'gmag','e_gmag', 'rmag','e_rmag', 'imag','i_mag', 'zmag',
             'e_zmag', 'zph']
     },
@@ -535,7 +535,11 @@ def search_catalogs(coord, catnames, search_radius=2.564*u.arcmin,
 
         table = None
         print('Searching {0} catalog...'.format(name))
-        if name in viziercat.keys():
+        if name=='sdssdr12':
+            table = searchVizier(coord, name, radius=search_radius)
+            table_match_ra = 'RA_ICRS'
+            table_match_dec = 'DE_ICRS'
+        elif name in viziercat.keys():
             table = searchVizier(coord, name, radius=search_radius)
             table_match_ra = 'RAJ2000'
             table_match_dec = 'DEJ2000'
