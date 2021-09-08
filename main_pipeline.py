@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.10" #last updated 19/08/2021
+__version__ = "1.11" #last updated 08/09/2021
 
 import sys
 import numpy as np
@@ -377,7 +377,31 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                         log.info(wcs_error)
                         stack[k] = stack[k].replace('.fits','_wcs.fits')
                     except:
-                        log.error('WCS solution failed.')
+                        log.error('Automatic WCS solution failed.')
+                    redo_wcs = input('Please review the WCS plots and errors. Do you wish to manually redo wcs (yes or no)?  ')
+                    while redo_wcs=='yes':
+                        log.info('Manually redoing WCS.')
+                        cat = input('Please enter the name of the catalog you wish to use. The options are "gaia" (GAIA DR3), "sdssdr12" (SDSSDR12), "2mass" (2MASS). ')
+                        if cat == 'gaia':
+                            cat_header, cat_stars = import_catalog(stack[k].replace('_wcs','').replace('.fits','_wcs.gaia'))
+                            cat_stars_ra = cat_stars['ra']
+                            cat_stars_dec = cat_stars['dec']
+                        else:
+                            with fits.open(stack[k]) as hdr:
+                                header = hdr[0].header
+                            coord = SkyCoord(header['CRVAL1'],header['CRVAL2'],unit=u.deg)
+                            cat_stars = search_catalogs(coord, [cat], search_radius=10*u.arcmin)
+                            cat_stars_ra = cat_stars[cat+'_'+viziercat[cat]['columns'][0]]
+                            cat_stars_dec = cat_stars[cat+'_'+viziercat[cat]['columns'][1]]
+                        if len(cat_stars) == 0:
+                            log.info('No stars found in this catalog.')
+                            continue
+                        else:                            
+                            wcs_error = solve_wcs.man_wcs(telescope, stack[k], cat, cat_stars_ra, cat_stars_dec)
+                            log.info(wcs_error)
+                            redo_wcs = input('Please review the WCS plots and errors. Do you wish to manually redo wcs (yes or no)?  ')
+                    if wcs_error!=0:
+                        stack[k] = stack[k].replace('_wcs','').replace('.fits','_wcs.fits')
                 if tel.run_phot():
                     log.info('Running psf photometry.')
                     try:

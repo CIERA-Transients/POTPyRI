@@ -469,14 +469,26 @@ def getSDSS(coord, impix=1024, imsize=12*u.arcmin, outfile=''):
         print(error.format(fulloutfile))
         return('')
 
-def onclick(event,source_list):
+def onclick(event, source_list, log=None):
     if event.dblclick:
-        ra_click, dec_click = event.xdata, event.ydata
-        print('RA = %.3f, Dec = %.3f' %(ra_click, dec_click))
+        source_list.append((event.xdata, event.ydata))
+        if log:
+            log.info('You selected x, y position: %d, %d' %(event.xdata, event.ydata))
+        else:
+            print('You selected x, y position: %d, %d' %(event.xdata, event.ydata))
 
-def onpick(event,source_list,gaia_list,std_list):
+def onpick(event, source_list, cat_list, std_list, log=None):
     label = event.artist.get_label()
-    print(label)
+    if log:
+        log.info(event.artist.get_label())
+    else:
+        print(event.artist.get_label())
+    if 'Source' in label:
+        source_list.append([np.float(label.split('x = ')[1].split(',')[0]),np.float(label.split('y = ')[1])])
+    elif 'Catalog' in label:
+        cat_list.append([np.float(label.split('RA = ')[1].split(',')[0]),np.float(label.split('Dec = ')[1])])
+    else:
+        std_list.append(np.float(label.split('mag = ')[1]))
 
 def get_coord_from_table(table1, cat1ra='ra', cat1dec='dec', cat1coord=False):
 
