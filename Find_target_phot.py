@@ -19,17 +19,7 @@ import random
 
 # Function imports
 from Gaussians import fix_x0, twoD_Gaussian
-
-def onclick(event, new_coords, log=None):
-
-    if event.dblclick:
-        if log is not None:
-            log.info('You selected x, y position: %d, %d' % (event.xdata, event.ydata))
-        else:
-            print('You selected x, y position: %d, %d' % (event.xdata, event.ydata))
-        new_coords.append(event.xdata)
-        new_coords.append(event.ydata)
-
+from utilities import util
 
 # Radial profile function; currently only used in find_target_phot; compact since it's outlined earlier in zp function
 def radial_profile(data, x, y, step_size, fwhm, rad):
@@ -212,7 +202,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
             print("Double click to set the new center. Do nothing if you are ok with current coordinates.")
             fig = plt.figure(2)
             new_coords = []
-            fig.canvas.mpl_connect('button_press_event', lambda event: onclick(event, new_coords=new_coords))
+            fig.canvas.mpl_connect('button_press_event', lambda event: util.onclick(event, new_coords=new_coords))
             ap_in = CircularAperture((x, y), 1)  # Aperture to perform photometry
             ap_out = CircularAperture((x, y), 6*fwhm)  # Aperture to perform photometry
             ap_in.plot(color='r', lw=1)      # Plot of target with apertures and annulus
@@ -225,7 +215,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
             plt.show()
 
             if len(new_coords) != 0:
-                x, y = new_coords[len(new_coords) - 2], new_coords[len(new_coords) - 1]
+                x, y = new_coords[0]
                 real_coords = w.wcs_pix2world(np.array([[x, y]], np.float), 1)[0]  # Find the pixel coords in the image
                 ra, dec = real_coords[0], real_coords[1]
 
