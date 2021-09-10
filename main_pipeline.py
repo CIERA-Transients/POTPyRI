@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.11" #last updated 08/09/2021
+__version__ = "1.12" #last updated 10/09/2021
 
 import sys
 import numpy as np
@@ -37,6 +37,8 @@ import absphot
 import Find_target_phot as tp
 import extinction
 from utilities.util import *
+from colorama import init, Fore, Back, Style
+init()
 
 def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=None,proc=None,use_dome_flats=None,phot=None,reset=None):
     #start time
@@ -108,6 +110,11 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
         if len(files) != 0:
             log.info(str(len(files))+' files found.')
             cal_list, sci_list, sky_list, time_list = Sort_files.sort_files(files,telescope,data_path,log)
+            print('Please check the created file list and make any nessecary edits (e.g. remove bad files mentioned by the observing log etc.)')
+            con = input(Back.GREEN+'Did you edit the file list (yes or no)? '+Style.RESET_ALL)
+            if con=='yes':
+                log.info('Edits made to the file list by the user, reloading file list.')
+                cal_list, sci_list, sky_list, time_list = Sort_files.load_files(data_path+'/file_list.txt', telescope,log)
         else:
             log.critical('No files found, please check data path and rerun.')
             logging.shutdown()
@@ -124,8 +131,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                 if skip_red:
                     log.info('User input to skip reduction.')
                     if os.path.exists(red_path+'mbias_'+amp+'_'+binn+'.fits'):
-                        log.info('Found previous master bias, loading.')
-                        # mbias = CCDData.read(red_path+'mbias_'+amp+'.fits', unit=u.electron)
+                        log.info('Found previous master bias.')
                         process_bias = False
                     else:
                         log.error('No master bias found, creating master bias.')
@@ -150,7 +156,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                 if skip_red:
                     log.info('User input to skip reduction.')
                     if os.path.exists(red_path+cal+'.fits'):
-                        log.info('Found previous master dark, loading.')
+                        log.info('Found previous master dark.')
                         process_dark = False
                     else:
                         log.error('No master dark found, creating master dark.')
@@ -370,6 +376,10 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                 sci_med.header['NFILES'] = (len(aligned_images), 'Number of images in stack')
                 sci_med.write(stack[k],overwrite=True)
                 log.info('Median stack made for '+stack[k])
+                print('Please check the quality of the stack made.')
+                con = input(Back.GREEN+'Would you like to continue with the reduction (solving the WCS) for this stack (yes or no)? '+Style.RESET_ALL)
+                if con=='no':
+                    continue
                 if tel.run_wcs():
                     log.info('Solving WCS.')
                     try:
@@ -378,10 +388,10 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                         stack[k] = stack[k].replace('.fits','_wcs.fits')
                     except:
                         log.error('Automatic WCS solution failed.')
-                    redo_wcs = input('Please review the WCS plots and errors. Do you wish to manually redo wcs (yes or no)?  ')
+                    redo_wcs = input(Back.GREEN+'Please review the WCS plots and errors. Do you wish to manually redo wcs (yes or no)?  '+Style.RESET_ALL)
                     while redo_wcs=='yes':
                         log.info('Manually redoing WCS.')
-                        cat = input('Please enter the name of the catalog you wish to use. The options are "gaia" (GAIA DR3), "sdssdr12" (SDSSDR12), "2mass" (2MASS). ')
+                        cat = input(Fore.RED+'Please enter the name of the catalog you wish to use. The options are "gaia" (GAIA DR3), "sdssdr12" (SDSSDR12), "2mass" (2MASS). '+Style.RESET_ALL)
                         if cat == 'gaia':
                             cat_header, cat_stars = import_catalog(stack[k].replace('_wcs','').replace('.fits','_wcs.gaia'))
                             cat_stars_ra = cat_stars['ra']
@@ -399,10 +409,13 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                         else:                            
                             wcs_error = solve_wcs.man_wcs(telescope, stack[k], cat, cat_stars_ra, cat_stars_dec)
                             log.info(wcs_error)
-                            redo_wcs = input('Please review the WCS plots and errors. Do you wish to manually redo wcs (yes or no)?  ')
+                            redo_wcs = input(Back.GREEN+'Please review the WCS plots and errors. Do you wish to manually redo wcs (yes or no)?  '+Style.RESET_ALL)
                     if wcs_error!=0:
                         stack[k] = stack[k].replace('_wcs','').replace('.fits','_wcs.fits')
                 if tel.run_phot():
+                    con = input(Back.GREEN+'Based on the WCS solution, would you like to continue with the PSF photometry for this stack (yes or no)? '+Style.RESET_ALL)
+                    if con=='no':
+                        continue
                     log.info('Running psf photometry.')
                     try:
                         epsf, fwhm = psf.do_phot(stack[k])
@@ -419,7 +432,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
         if phot:
             log.info('User input to perform manual aperture photometry.')
             log.info('List of final stacks: '+str(final_stack))
-            k = int(input('Index (starting from 0) of the stack you want to perform aperture photometry on? '))
+            k = int(input(Back.GREEN+'Index (starting from 0) of the stack you want to perform aperture photometry on? '+Style.RESET_ALL))
             log.info('Performing aperture photometry on '+final_stack[k])
             if not os.path.exists(final_stack[k].replace('.fits','.pcmp')):
                 log.info('Running psf photometry.')
@@ -435,10 +448,10 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
             header, table = import_catalog(final_stack[k].replace('.fits','.pcmp'))
             fwhm = header['FWHM']
             log.info('FWHM = %2.4f pixels'%fwhm)
-            enter_zp = input('Enter user zeropiont instead of loading from psf photometry ("yes" or "no")? ')
+            enter_zp = input(Back.GREEN+'Enter user zeropiont instead of loading from psf photometry ("yes" or "no")? '+Style.RESET_ALL)
             if enter_zp == 'yes':
-                zp = float(input('Please enter zeropoint in AB mag: '))
-                zp_err = float(input('Please enter zeropoint error in AB mag: '))
+                zp = float(input(Fore.RED+'Please enter zeropoint in AB mag: '+Style.RESET_ALL))
+                zp_err = float(input(Fore.RED+'Please enter zeropoint error in AB mag: '+Style.RESET_ALL))
                 log.info('User entered zpt = %2.4f +/- %2.4f AB mag'%(zp,zp_err))
             else:
                 try:
@@ -447,17 +460,17 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                     log.info('zpt = %2.4f +/- %2.4f AB mag'%(zp,zp_err))
                 except:
                     log.info('No zeropint found.')
-                    zp = float(input('Please enter zeropoint in AB mag: '))
-                    zp_err = float(input('Please enter zeropoint error in AB mag: '))
+                    zp = float(input(Fore.RED+'Please enter zeropoint in AB mag: '+Style.RESET_ALL))
+                    zp_err = float(input(Fore.RED+'Please enter zeropoint error in AB mag: '+Style.RESET_ALL))
                     log.info('User entered zpt = %2.4f +/- %2.4f AB mag'%(zp,zp_err))
-            pos = input('Would you like to enter the RA and Dec ("wcs") or x and y ("xy") position of the target? ')
+            pos = input(Back.GREEN+'Would you like to enter the RA and Dec ("wcs") or x and y ("xy") position of the target? '+Style.RESET_ALL)
             if pos == 'wcs':
-                ra = float(input('Enter RA in degrees: '))
-                dec = float(input('Enter Dec in degrees: '))
+                ra = float(input(Fore.RED+'Enter RA in degrees: '+Style.RESET_ALL))
+                dec = float(input(Fore.RED+'Enter Dec in degrees: '+Style.RESET_ALL))
                 tp.find_target_phot(final_stack[k], fil, fwhm, zp, zp_err, tel.pixscale(), show_phot=True, ra=ra, dec=dec, log=log)
             elif pos == 'xy':
-                x = float(input('Enter x position in pixel: '))
-                y = float(input('Enter y position in pixel: '))
+                x = float(input(Fore.RED+'Enter x position in pixel: '+Style.RESET_ALL))
+                y = float(input(Fore.RED+'Enter y position in pixel: '+Style.RESET_ALL))
                 tp.find_target_phot(final_stack[k], fil, fwhm, zp, zp_err, tel.pixscale(), show_phot=True, x=x, y=y, log=log)
                 ra, dec = (wcs.WCS(header)).all_pix2world(x,y,1)
             log.info('Calculating extinction correction from Schlafly & Finkbeiner (2011).')
