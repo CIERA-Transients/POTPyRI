@@ -26,7 +26,7 @@ import glob
 import copy
 import os
 
-from Gaussians import fix_x0
+from Gaussians import fix_x0, twoD_Gaussian
 
 from utilities.util import *
 
@@ -113,16 +113,20 @@ def rotate_psf_to_img(psf_file, img_file, pa=0.0):
 def get_star_catalog(img_file, fwhm_init=5.0, threshold=3.5):
 
     img_hdu = fits.open(img_file)
+    data = img_hdu[0].data
 
-    std = bkgrms(img_hdu[0].data)
+    std = bkgrms(data)
     iraffind = IRAFStarFinder(threshold=threshold*std,
         fwhm=fwhm_init, minsep_fwhm=0.5,
-        roundhi=2.0, roundlo=-2.0,sharplo=0.0, sharphi=2.0)
+        roundhi=0.2, roundlo=0,sharplo=0.4, sharphi=1.0)
 
     # Get initial set of stars in image with iraffind
     print('Finding stars...')
-    stars = iraffind(img_hdu[0].data)
-
+    stars = iraffind(data)
+    mask = ((stars['xcentroid'] > 50) & (stars['xcentroid'] < (data.shape[1] -51))
+                & (stars['ycentroid'] > 50) & (stars['ycentroid'] < (data.shape[0] -51)))
+    stars = stars[mask]
+    
     return(stars)
 
 def write_out_catalog(catalog, img_file, columns, sigfig, outfile, metadata):
@@ -158,8 +162,7 @@ def write_out_catalog(catalog, img_file, columns, sigfig, outfile, metadata):
 def do_phot(img_file, write_out_back=False, write_out_residual=False,
     write_out_epsf_img=True, write_out_epsf_file=True, write_out_psf_stars=True,
     outdir='', subtract_back=False, fwhm_scale_psf=3.0, log=None,
-    star_param={'sharp_cut': 1.0, 'round_cut': 0.5, 'snthresh_psf': 25.0,
-        'fwhm_init': 5.0, 'snthresh_final': 5.0}):
+    star_param={'snthresh_psf': 25.0, 'fwhm_init': 5.0, 'snthresh_final': 5.0}):
 
     stars = get_star_catalog(img_file, fwhm_init=star_param['fwhm_init'])
     img_hdu = fits.open(img_file)
@@ -261,6 +264,14 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
 
     mask = (fwhm_stars['flux']/fwhm_stars['flux_err'] > star_param['snthresh_psf'])
     bright = fwhm_stars[mask]
+    if len(bright) < 30:
+        m='The number of bright stars for PSF determination is < 30, lowering flux threshold to 5.'
+        if log:
+            log.info(m)
+        else:
+            print(m)        
+        mask = (fwhm_stars['flux']/fwhm_stars['flux_err'] > 5)
+        bright = fwhm_stars[mask]
 
     m='Masked to {0} PSF stars based on flux.'
     if log:
@@ -275,6 +286,30 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
     epsf = generate_epsf(img_file, bright['xcentroid'],
         bright['ycentroid'], size=size, oversampling=2, maxiters=5)
     print('\n')
+
+    #Check shape of PSF compared to 2d Gaussian
+    m='Checking the 2D shape of the PSF.'
+    if log:
+        log.error(m)
+    else:
+        print(m)   
+    d = epsf.data
+    x_mesh, y_mesh = np.meshgrid(np.linspace(0, np.shape(d)[1] - 1, np.shape(d)[1]),
+                                        np.linspace(0, np.shape(d)[0] - 1, np.shape(d)[0]))
+    try:
+        popt, pcov = curve_fit(twoD_Gaussian, (x_mesh, y_mesh), d.ravel(),p0=(np.max(d),
+                                                 25, 25, fwhm/2.35482, fwhm/2.35482, 0, 0))
+        sigmax, sigmay = popt[3], popt[4]
+        if log:
+            log.info('Sigma (x, y) of PSF: {0}, {1}'.format(sigmax, sigmay))
+        else:
+            print(log.info('Sigma (x, y) of PSF: {0}, {1}'.format(sigmax, sigmay)))
+    except:
+        m='Error calculating the PSF. Check PSF png for quaility control.'
+        if log:
+            log.error(m)
+        else:
+            print(m)          
 
     mask = (stars['flux']/stars['flux_err'] > star_param['snthresh_final'])
     all_stars = stars[mask]
