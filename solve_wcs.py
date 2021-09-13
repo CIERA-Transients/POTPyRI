@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "3.9" #last updated 08/09/2021
+__version__ = "3.10" #last updated 13/09/2021
 
 import sys
 import numpy as np
@@ -34,6 +34,8 @@ import itertools
 import importlib
 import tel_params
 import catreg
+from colorama import init, Fore, Back, Style
+init()
 
 #turn Astropy warnings off
 import warnings
@@ -60,16 +62,21 @@ def man_wcs(telescope, stack, cat, cat_stars_ra, cat_stars_dec):
     source_star = []
     cat_star = []
     fig.canvas.mpl_connect('pick_event', lambda event: util.onpick(event,source_star,cat_star,[]))
-    print('Displaying interactive plot to select star forWCS solution.')
-    print('First select star (red) and corresponding catalog match (green).')
-    print('A message will confirm the selection of the star in the terminal.')
-    print('Note: star selection is turned off in zoom/pan mode.')
-    print('Close figure when finished.')
+    print(Fore.RED+'Displaying interactive plot to select star forWCS solution.'+Style.RESET_ALL)
+    print(Fore.RED+'First select star (red) and corresponding catalog match (green).'+Style.RESET_ALL)
+    print(Fore.RED+'A message will confirm the selection of the star in the terminal.'+Style.RESET_ALL)
+    print(Fore.RED+'Note: star selection is turned off in zoom/pan mode (you need to de-select the mode in order to select stars).'+Style.RESET_ALL)
+    print(Fore.RED+'Close figure when finished.'+Style.RESET_ALL)
     plt.show()
     starsx = np.array([source_star[i][0] for i in range(len(source_star))])
     starsy = np.array([source_star[i][1] for i in range(len(source_star))])
     catstarsra = np.array([cat_star[i][0] for i in range(len(cat_star))])
     catstarsdec = np.array([cat_star[i][1] for i in range(len(cat_star))])
+    np.savetxt(stack.replace('.fits','.xy'),np.c_[starsx,starsy])
+    np.savetxt(stack.replace('.fits','.radec'),np.c_[catstarsra,catstarsdec])
+    con = input(Back.GREEN+'Please check and edit the .xy and .radec files in the case of errors. Hit any key to continue. '+Style.RESET_ALL)
+    starsx,starsy = np.loadtxt(stack.replace('.fits','.xy'),unpack=True)
+    catstarsra,catstarsdec = np.loadtxt(stack.replace('.fits','.radec'),unpack=True)
     catx, caty = (wcs.WCS(stack_header)).all_world2pix(catstarsra,catstarsdec,1)
     tform = tf.estimate_transform('euclidean', np.c_[starsx, starsy], np.c_[catx, caty])
     header_trans = apply_wcs_transformation(stack_header,tform)
@@ -93,6 +100,7 @@ def wcs_plots(filename,data,x1,y1,x2,y2,type):
         [ax.add_patch(patches.Circle((x1[i],y1[i]),radius=7,edgecolor='r',alpha=0.8,facecolor='none',linewidth=1)) for i in range(len(x1))]
         [ax.add_patch(patches.Circle((x2[i],y2[i]),radius=7,edgecolor='g',alpha=0.8,facecolor='none',linewidth=1)) for i in range(len(x2))]
         fig.savefig(filename.replace('.fits','.png'),dpi=1200)
+        plt.clf()
     if type=='hist':
         fig = plt.figure(figsize=(12,12))
         left, width = 0.1, 0.75
@@ -109,7 +117,10 @@ def wcs_plots(filename,data,x1,y1,x2,y2,type):
         ax_scatter.plot(x1,y1,marker='o',linestyle='',markersize=10,color='orchid',alpha=0.5)
         ax_Histx.hist(x1,histtype='step',linewidth=2,color='darkorchid')
         ax_Histy.hist(y1,histtype='step',orientation='horizontal',linewidth=2,color='darkorchid')
+        ax_scatter.set_xlabel('Delta RA')
+        ax_scatter.set_ylabel('Delta Dec')
         fig.savefig(filename.replace('.fits','.hist.png'))
+        plt.clf()
 
 def make_reg(filename,xdata,ydata):
     catreg.wcsreg(filename,xdata,ydata)
@@ -129,7 +140,11 @@ def apply_wcs_transformation(header,tform):
     crpix1, crpix2, cd11, cd12, cd21, cd22 = wcs_keyword = tel.WCS_keywords()
     header['CRPIX1'] = header[crpix1]-tform.translation[0]
     header['CRPIX2'] = header[crpix2]-tform.translation[1]
-    cd = np.array([header[cd11],header[cd12],header[cd21],header[cd22]]).reshape(2,2)
+    try:
+        cd = np.array([header[cd11],header[cd12],header[cd21],header[cd22]]).reshape(2,2)
+    except:
+        cd11, cd12, cd21, cd22 = 'CD1_1', 'CD1_2', 'CD2_1', 'CD2_2'
+        cd = np.array([header[cd11],header[cd12],header[cd21],header[cd22]]).reshape(2,2)
     cd_matrix = tf.EuclideanTransform(rotation=tform.rotation)
     cd_transformed = tf.warp(cd,cd_matrix)
     header['CD1_1'] = cd_transformed[0][0]

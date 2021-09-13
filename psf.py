@@ -264,8 +264,8 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
 
     mask = (fwhm_stars['flux']/fwhm_stars['flux_err'] > star_param['snthresh_psf'])
     bright = fwhm_stars[mask]
-    if len(bright) < 30:
-        m='The number of bright stars for PSF determination is < 30, lowering flux threshold to 5.'
+    if len(bright) < 90:
+        m='The number of bright stars for PSF determination is < 90, lowering flux threshold to 5.'
         if log:
             log.info(m)
         else:
