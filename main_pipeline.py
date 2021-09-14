@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.12" #last updated 10/09/2021
+__version__ = "1.13" #last updated 14/09/2021
 
 import sys
 import numpy as np
@@ -420,13 +420,15 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                     try:
                         epsf, fwhm = psf.do_phot(stack[k])
                         log.info('FWHM = %2.4f"'%(fwhm*tel.pixscale()))
-                        log.info('Calculating zeropint.')
-                        zp_catalogs = tel.catalog_zp()
-                        zp_cal = absphot.absphot()
-                        for zp_cat in zp_catalogs:
-                            zp, zp_err = zp_cal.find_zeropoint(stack[k].replace('.fits','.pcmp'), fil, zp_cat, plot=True, log=log)
-                            if zp:
-                                break
+                        con = input(Back.GREEN+'Please check the PSF determined. Would you like to continue with the reduction (calculating zero point) for this stack (yes or no)? '+Style.RESET_ALL)
+                        if con=='yes':
+                            log.info('Calculating zeropint.')
+                            zp_catalogs = tel.catalog_zp()
+                            zp_cal = absphot.absphot()
+                            for zp_cat in zp_catalogs:
+                                zp, zp_err = zp_cal.find_zeropoint(stack[k].replace('.fits','.pcmp'), fil, zp_cat, plot=True, log=log)
+                                if zp:
+                                    break
                     except Exception as e:
                         log.error('PSF photometry failed due to: '+str(e))
         if phot:
