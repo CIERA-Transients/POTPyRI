@@ -62,7 +62,7 @@ def man_wcs(telescope, stack, cat, cat_stars_ra, cat_stars_dec):
     source_star = []
     cat_star = []
     fig.canvas.mpl_connect('pick_event', lambda event: util.onpick(event,source_star,cat_star,[]))
-    print(Fore.RED+'Displaying interactive plot to select star forWCS solution.'+Style.RESET_ALL)
+    print(Fore.RED+'Displaying interactive plot to select star for WCS solution.'+Style.RESET_ALL)
     print(Fore.RED+'First select star (red) and corresponding catalog match (green).'+Style.RESET_ALL)
     print(Fore.RED+'A message will confirm the selection of the star in the terminal.'+Style.RESET_ALL)
     print(Fore.RED+'Note: star selection is turned off in zoom/pan mode (you need to de-select the mode in order to select stars).'+Style.RESET_ALL)
