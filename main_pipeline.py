@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.13" #last updated 14/09/2021
+__version__ = "1.14" #last updated 16/09/2021
 
 import sys
 import numpy as np
@@ -330,7 +330,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                                 masked[masks[k]] = bkg.background[masks[k]]
                                 fringe_data.append(CCDData(masked,unit=u.electron/u.second))
                             fringe_map = ccdproc.combine(fringe_data,method='median',sigma_clip=True,sigma_clip_func=np.ma.median,mask=masks)
-                            fringe_map.write(red_path+'fringe_map_'+fil+'_'+amp+'_'+binn+suffix,overwrite=True)
+                            fringe_map.write(red_path+'fringe_map_'+fil+'_'+amp+'_'+binn+suffix[m],overwrite=True)
                             for j,n in enumerate(processed):
                                 processed[j] = n.subtract(fringe_map,propagate_uncertainties=True,handle_meta='first_found')
                         else:
