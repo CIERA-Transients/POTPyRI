@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.14" #last updated 16/09/2021
+__version__ = "1.15" #last updated 16/09/2021
 
 import sys
 import numpy as np
@@ -400,7 +400,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                             with fits.open(stack[k]) as hdr:
                                 header = hdr[0].header
                             coord = SkyCoord(header['CRVAL1'],header['CRVAL2'],unit=u.deg)
-                            cat_stars = search_catalogs(coord, [cat], search_radius=10*u.arcmin)
+                            cat_stars = search_catalogs(coord, [cat], search_radius=10*u.arcmin, outfile=stack[k].replace('.fits','_wcs.'+cat))
                             cat_stars_ra = cat_stars[cat+'_'+viziercat[cat]['columns'][0]]
                             cat_stars_dec = cat_stars[cat+'_'+viziercat[cat]['columns'][1]]
                         if len(cat_stars) == 0:
