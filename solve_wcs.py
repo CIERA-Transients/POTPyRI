@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "3.10" #last updated 13/09/2021
+__version__ = "3.11" #last updated 27/09/2021
 
 import sys
 import numpy as np
@@ -74,9 +74,15 @@ def man_wcs(telescope, stack, cat, cat_stars_ra, cat_stars_dec):
     catstarsdec = np.array([cat_star[i][1] for i in range(len(cat_star))])
     np.savetxt(stack.replace('.fits','.xy'),np.c_[starsx,starsy])
     np.savetxt(stack.replace('.fits','.radec'),np.c_[catstarsra,catstarsdec])
-    con = input(Back.GREEN+'Please check and edit the .xy and .radec files in the case of errors. Hit any key to continue. '+Style.RESET_ALL)
-    starsx,starsy = np.loadtxt(stack.replace('.fits','.xy'),unpack=True)
-    catstarsra,catstarsdec = np.loadtxt(stack.replace('.fits','.radec'),unpack=True)
+    check_len = True
+    while check_len:
+        con = input(Back.GREEN+'Please check and edit the .xy and .radec files in the case of errors. Hit any key to continue. '+Style.RESET_ALL)
+        starsx,starsy = np.loadtxt(stack.replace('.fits','.xy'),unpack=True)
+        catstarsra,catstarsdec = np.loadtxt(stack.replace('.fits','.radec'),unpack=True)
+        if len(starsx)==len(catstarsra):
+            check_len = False
+        else:
+            print('Length of the x and y star positions and the RA and Dec position are not equal.')
     catx, caty = (wcs.WCS(stack_header)).all_world2pix(catstarsra,catstarsdec,1)
     tform = tf.estimate_transform('euclidean', np.c_[starsx, starsy], np.c_[catx, caty])
     header_trans = apply_wcs_transformation(stack_header,tform)
