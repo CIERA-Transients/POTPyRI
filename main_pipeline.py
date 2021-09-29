@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.15" #last updated 16/09/2021
+__version__ = "1.16" #last updated 29/09/2021
 
 import sys
 import numpy as np
@@ -371,7 +371,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                 sci_med.header['MJD-OBS'] = (mid_time, 'Mid-MJD of the observation sequence calculated using DATE-OBS.')
                 sci_med.header['EXPTIME'] = (1, 'Effective expsoure tiime for the stack in seconds.')
                 sci_med.header['EXPTOT'] = (total_time, 'Total exposure time of stack in seconds')
-                sci_med.header['GAIN'] = (1, 'Effecetive gain for stack.')
+                sci_med.header['GAIN'] = (len(aligned_images), 'Effecetive gain for stack.')
                 sci_med.header['RDNOISE'] = (tel.rdnoise(sci_med.header)/np.sqrt(len(aligned_images)), 'Readnoise of stack.')
                 sci_med.header['NFILES'] = (len(aligned_images), 'Number of images in stack')
                 sci_med.write(stack[k],overwrite=True)
@@ -465,15 +465,17 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                     zp = float(input(Fore.RED+'Please enter zeropoint in AB mag: '+Style.RESET_ALL))
                     zp_err = float(input(Fore.RED+'Please enter zeropoint error in AB mag: '+Style.RESET_ALL))
                     log.info('User entered zpt = %2.4f +/- %2.4f AB mag'%(zp,zp_err))
+            with fits.open(final_stack[k]) as hdr:
+                gain_eff = hdr[0].header['GAIN']
             pos = input(Back.GREEN+'Would you like to enter the RA and Dec ("wcs") or x and y ("xy") position of the target? '+Style.RESET_ALL)
             if pos == 'wcs':
                 ra = float(input(Fore.RED+'Enter RA in degrees: '+Style.RESET_ALL))
                 dec = float(input(Fore.RED+'Enter Dec in degrees: '+Style.RESET_ALL))
-                tp.find_target_phot(final_stack[k], fil, fwhm, zp, zp_err, tel.pixscale(), show_phot=True, ra=ra, dec=dec, log=log)
+                tp.find_target_phot(final_stack[k], fil, fwhm, zp, zp_err, tel.pixscale(), show_phot=True, ra=ra, dec=dec, log=log, gain=gain_eff)
             elif pos == 'xy':
                 x = float(input(Fore.RED+'Enter x position in pixel: '+Style.RESET_ALL))
                 y = float(input(Fore.RED+'Enter y position in pixel: '+Style.RESET_ALL))
-                tp.find_target_phot(final_stack[k], fil, fwhm, zp, zp_err, tel.pixscale(), show_phot=True, x=x, y=y, log=log)
+                tp.find_target_phot(final_stack[k], fil, fwhm, zp, zp_err, tel.pixscale(), show_phot=True, x=x, y=y, log=log, gain=gain_eff)
                 ra, dec = (wcs.WCS(header)).all_pix2world(x,y,1)
             log.info('Calculating extinction correction from Schlafly & Finkbeiner (2011).')
             coords = SkyCoord(ra,dec,unit='deg')
