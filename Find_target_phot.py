@@ -16,6 +16,8 @@ from photutils.utils import calc_total_error
 from scipy.optimize import curve_fit
 from astropy.visualization import simple_norm
 import random
+from colorama import init, Fore, Back, Style
+init()
 
 # Function imports
 from Gaussians import fix_x0, twoD_Gaussian
@@ -78,7 +80,7 @@ def radial_profile(data, x, y, step_size, fwhm, rad):
 # This function finds the target's photometry and thus its magnitude, but in the case that the target is not found,
 # the function finds the limiting magnitude using a false source at the target's location
 def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, log=None, log2=None,
-                     ra=None, dec=None, x=None, y=None):
+                     ra=None, dec=None, x=None, y=None, gain=1):
 
     '''
 
@@ -174,7 +176,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
         log.info("Pixel coordinates: (%.3f, %.3f)" % (x, y))
     else:
         print("Pixel coordinates: (%.3f, %.3f)" % (x, y))
-    if input('Would you like to choose the cutout size? Default is 50"x50". ') == "yes":
+    if input(Back.GREEN+'Would you like to choose the cutout size? Default is 50"x50". '+Style.RESET_ALL) == "yes":
         try:
             d_x_y = int(input("Choose the radius, in arcsec: "))*2.5
         except TypeError:
@@ -183,26 +185,26 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
     sigma_clip = SigmaClip(sigma=3)  # This section is to find the error on the background
     bkg_estimator = MedianBackground()
     bkg = Background2D(data, (120, 120), filter_size=(3, 3), sigma_clip=sigma_clip, bkg_estimator=bkg_estimator)
-    error = calc_total_error(data, bkg.background_rms, 1)  # Used later as well for limiting magnitude
+    error = calc_total_error(data, bkg.background_rms, gain)  # Used later as well for limiting magnitude
 
     if log is not None:
-        log.info("You will now get to pick the position you would like. "
-                 "Decide what pixel coordinates you would like to use")
-        log.info("Blue circle in image is the distance the radial profile extends to")
+        log.info(Fore.RED+"You will now get to pick the position you would like. "
+                 "Decide what pixel coordinates you would like to use"+Style.RESET_ALL)
+        log.info(Fore.RED+"Blue circle in image is the distance the radial profile extends to"+Style.RESET_ALL)
     else:
-        print("You will now get to pick the position you would like. "
-              "Decide what pixel coordinates you would like to use")
-        print("Blue circle in image is the distance the radial profile extends to")
+        print(Fore.RED+"You will now get to pick the position you would like. "
+              "Decide what pixel coordinates you would like to use"+Style.RESET_ALL)
+        print(Fore.RED+"Blue circle in image is the distance the radial profile extends to"+Style.RESET_ALL)
     correct_position = "no"
     while correct_position == "no":
         if show_phot:
             radial_profile(data, x, y, 0.2, fwhm, rad=6)        # Radial profile
             plt.axvline(6*fwhm)
 
-            print("Double click to set the new center. Do nothing if you are ok with current coordinates.")
+            print(Fore.RED+"Double click to set the new center. Do nothing if you are ok with current coordinates."+Style.RESET_ALL)
             fig = plt.figure(2)
             new_coords = []
-            fig.canvas.mpl_connect('button_press_event', lambda event: util.onclick(event, new_coords=new_coords))
+            fig.canvas.mpl_connect('button_press_event', lambda event: util.onclick(event, new_coords))
             ap_in = CircularAperture((x, y), 1)  # Aperture to perform photometry
             ap_out = CircularAperture((x, y), 6*fwhm)  # Aperture to perform photometry
             ap_in.plot(color='r', lw=1)      # Plot of target with apertures and annulus
@@ -235,7 +237,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
                 plt.colorbar()
                 plt.show()
         
-        if input("Would you like to use a centroid? Type 'yes' or 'no': ") == "yes":
+        if input(Back.GREEN+"Would you like to use a centroid? Type 'yes' or 'no': "+Style.RESET_ALL) == "yes":
             d_x_y = 50
             d = data[int(y)-d_x_y:int(y)+d_x_y, int(x)-d_x_y:int(x)+d_x_y]      # Cutout of source; upside down from normal
             x_mesh, y_mesh = np.meshgrid(np.linspace(0, np.shape(d)[1] - 1, np.shape(d)[1]),
@@ -268,7 +270,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
             plt.colorbar()
             plt.show()
 
-        if input("Are you ok with this position? Type 'yes' or 'no': ") != "yes":
+        if input(Back.GREEN+"Are you ok with this position? Type 'yes' or 'no': "+Style.RESET_ALL) != "yes":
             pass
         else:
             correct_position = "yes"
@@ -279,7 +281,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
             if log2 is not None:
                 log2.info("Final coordinates: (%.3f, %.3f) at RA = %.5f and Dec = %.5f" % (x, y, ra, dec))
 
-    print("You will now get to choose the radii for the circular aperture and the r_in and r_out of the annulus")
+    print(Back.GREEN+"You will now get to choose the radii for the circular aperture and the r_in and r_out of the annulus"+Style.RESET_ALL)
     correct_radii = "no"
     while correct_radii == "no":
         if log is not None:
@@ -288,14 +290,14 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
         else:
             print("Automatic radii picked by comparing to FWHM of field: rad = %.3f, r_in = %.3f, r_out = %.3f" %
                   (2.5 * fwhm, 2.5 * fwhm, 4.5 * fwhm))
-        if input("Would you like to use these radii? Type 'yes or 'no': ") == "yes":
+        if input(Back.GREEN+"Would you like to use these radii? Type 'yes or 'no': "+Style.RESET_ALL) == "yes":
             rad, r_in, r_out = 2.5*fwhm, 2.5*fwhm, 4.5*fwhm
         else:
             if log:
                 log.info("FWHM = %.3f pixels" % fwhm)
-            rad = float(input("Pick a radius (in pixels) for the circular aperture: "))
-            r_in = float(input("Pick an inner radius (in pixels) for the background annulus: "))
-            r_out = float(input("Pick an outer radius (in pixels) for the background annulus: "))
+            rad = float(input(Fore.RED+"Pick a radius (in pixels) for the circular aperture: "+Style.RESET_ALL))
+            r_in = float(input(Fore.RED+"Pick an inner radius (in pixels) for the background annulus: "+Style.RESET_ALL))
+            r_out = float(input(Fore.RED+"Pick an outer radius (in pixels) for the background annulus: "+Style.RESET_ALL))
             if r_in >= r_out:
                 r_out = r_in + 1
                 if log is not None:
@@ -330,7 +332,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
             plt.colorbar()
             plt.show()
 
-        correct_radii = input("Are you ok with the previously selected radii? Type 'yes' or 'no': ")
+        correct_radii = input(Back.GREEN+"Are you ok with the previously selected radii? Type 'yes' or 'no': "+Style.RESET_ALL)
     if log is not None:
         log.info("Radii chosen in pixels: %.3f, %.3f, %.3f" % (rad, r_in, r_out))
     else:
