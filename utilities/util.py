@@ -192,11 +192,23 @@ def docasjobsstrm(coord, size=0.1, mask=True, verbose=False,
             print('running query:')
             print(query)
 
-        jobs = casjobs.CasJobs(userid='892987546', password='BossTent1',
-            base_url='http://mastweb.stsci.edu/ps1casjobs/services/jobs.asmx')
+        # try three times
+        job_output=None
+        for i in np.arange(3):
+            try:
+                jobs = casjobs.CasJobs(userid='892987546', password='BossTent1',
+                    base_url='http://mastweb.stsci.edu/ps1casjobs/services/jobs.asmx')
+                job_output = jobs.quick(query, context='HLSP_PS1_STRM',
+                    task_name='PS1cat_ra%.7f_dec%.7f'%(ra,dec))
 
-        job_output = jobs.quick(query, context='HLSP_PS1_STRM',
-            task_name='PS1cat_ra%.7f_dec%.7f'%(ra,dec))
+                break
+
+            except:
+                print('Job failed.  Trying again...')
+
+        if not job_output:
+            print('Could not get casjobs data.  Exiting...')
+            return(None)
 
         names = meta
 
