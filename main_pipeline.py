@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.16" #last updated 29/09/2021
+__version__ = "1.17" #last updated 01/10/2021
 
 import sys
 import numpy as np
@@ -399,7 +399,9 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                         else:
                             with fits.open(stack[k]) as hdr:
                                 header = hdr[0].header
-                            coord = SkyCoord(header['CRVAL1'],header['CRVAL2'],unit=u.deg)
+                                data = hdr[0].data
+                            ra_center, dec_center = (wcs.WCS(header)).all_pix2world(np.shape(data)[1]/2,np.shape(data)[0]/2,1)
+                            coord = SkyCoord(ra_center, dec_center,unit=u.deg)
                             cat_stars = search_catalogs(coord, [cat], search_radius=10*u.arcmin, outfile=stack[k].replace('.fits','_wcs.'+cat))
                             cat_stars_ra = cat_stars[cat+'_'+viziercat[cat]['columns'][0]]
                             cat_stars_dec = cat_stars[cat+'_'+viziercat[cat]['columns'][1]]
