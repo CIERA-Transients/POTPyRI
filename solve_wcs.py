@@ -5,7 +5,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "3.11" #last updated 27/09/2021
+__version__ = "3.12" #last updated 01/10/2021
 
 import sys
 import numpy as np
@@ -361,8 +361,7 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
     data = hdr[tel.wcs_extension()].data
     data_y, data_x = np.shape(data)
     header = hdr[tel.wcs_extension()].header
-    ra = header['CRVAL1']
-    dec = header['CRVAL2']
+    ra, dec = (wcs.WCS(header)).all_pix2world(data_x/2,data_y/2,1)
 
     #run sextractor
     if log:
