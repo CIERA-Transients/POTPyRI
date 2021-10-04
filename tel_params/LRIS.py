@@ -15,7 +15,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.5 #last edited 26/08/2021
+__version__ = 1.6 #last edited 04/10/2021
 
 def static_mask(proc):
     return ['']
@@ -275,17 +275,17 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
         if amp == '4B':
             final.header['CRPIX1'] = 2456
             final.header['CRPIX2'] = 1184
-            final.header['CD1_1'] = 0.135/3600*np.sin(np.pi/180.*(final.header['ROTPOSN']+90))
-            final.header['CD1_2'] = -0.135/3600*np.cos(np.pi/180.*(final.header['ROTPOSN']+90))
-            final.header['CD2_1'] = 0.135/3600*np.cos(np.pi/180.*(final.header['ROTPOSN']+90))
-            final.header['CD2_2'] = -0.135/3600*np.sin(np.pi/180.*(final.header['ROTPOSN']+90))
+            final.header['CD1_1'] = 0.135/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+            final.header['CD1_2'] = -0.135/3600*np.cos(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+            final.header['CD2_1'] = 0.135/3600*np.cos(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+            final.header['CD2_2'] = -0.135/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
         if amp == '4R':
             final.header['CRPIX1'] = 2400
             final.header['CRPIX2'] = 1200
-            final.header['CD1_1'] = 0.123/3600*np.sin(np.pi/180.*(final.header['ROTPOSN']+90))
-            final.header['CD1_2'] = -0.123/3600*np.cos(np.pi/180.*(final.header['ROTPOSN']+90))
-            final.header['CD2_1'] = 0.123/3600*np.cos(np.pi/180.*(final.header['ROTPOSN']+90))
-            final.header['CD2_2'] = -0.123/3600*np.sin(np.pi/180.*(final.header['ROTPOSN']+90))            
+            final.header['CD1_1'] = 0.123/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+            final.header['CD1_2'] = -0.123/3600*np.cos(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+            final.header['CD2_1'] = 0.123/3600*np.cos(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+            final.header['CD2_2'] = -0.123/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))            
         final.header['DATASEC'] = ('[1:%s,1:%s]'%(np.shape(final)[1],np.shape(final)[0]))  
         final.write(sci.replace('/raw/','/red/').replace('.gz',''),overwrite=True)
         processed.append(final)
