@@ -15,7 +15,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.2 #last edited 24/08/2021
+__version__ = 1.3 #last edited 04/10/2021
 
 def static_mask(proc):
     return ['']
@@ -220,10 +220,10 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
         final.header['CRPIX2'] = 901
         final.header['CRVAL1'] = coords.ra.deg
         final.header['CRVAL2'] = coords.dec.deg
-        final.header['CD1_1'] = 0.1185/3600*np.sin(np.pi/180.*(final.header['ROTPOSN']+90))
-        final.header['CD1_2'] = 0.1185/3600*np.cos(np.pi/180.*(final.header['ROTPOSN']+90))
-        final.header['CD2_1'] = 0.1185/3600*np.cos(np.pi/180.*(final.header['ROTPOSN']+90))
-        final.header['CD2_2'] = -0.1185/3600*np.sin(np.pi/180.*(final.header['ROTPOSN']+90))
+        final.header['CD1_1'] = 0.1185/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+        final.header['CD1_2'] = 0.1185/3600*np.cos(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+        final.header['CD2_1'] = 0.1185/3600*np.cos(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+        final.header['CD2_2'] = -0.1185/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
         final.header['DATASEC'] = ('[1:%s,1:%s]'%(np.shape(final)[1],np.shape(final)[0]))        
         final.write(sci.replace('/raw/','/red/').replace('.gz',''),overwrite=True)
         processed.append(final)
