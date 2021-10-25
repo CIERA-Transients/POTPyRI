@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.17" #last updated 01/10/2021
+__version__ = "1.18" #last updated 25/10/2021
 
 import sys
 import numpy as np
@@ -397,19 +397,19 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                             cat_stars_ra = cat_stars['ra']
                             cat_stars_dec = cat_stars['dec']
                         else:
-                            with fits.open(stack[k]) as hdr:
+                            with fits.open(stack[k].replace('_wcs','')) as hdr:
                                 header = hdr[0].header
                                 data = hdr[0].data
                             ra_center, dec_center = (wcs.WCS(header)).all_pix2world(np.shape(data)[1]/2,np.shape(data)[0]/2,1)
                             coord = SkyCoord(ra_center, dec_center,unit=u.deg)
-                            cat_stars = search_catalogs(coord, [cat], search_radius=10*u.arcmin, outfile=stack[k].replace('.fits','_wcs.'+cat))
+                            cat_stars = search_catalogs(coord, [cat], search_radius=10*u.arcmin, outfile=stack[k].replace('_wcs','').replace('.fits','_wcs.'+cat))
                             cat_stars_ra = cat_stars[cat+'_'+viziercat[cat]['columns'][0]]
                             cat_stars_dec = cat_stars[cat+'_'+viziercat[cat]['columns'][1]]
                         if len(cat_stars) == 0:
                             log.info('No stars found in this catalog.')
                             continue
                         else:                            
-                            wcs_error = solve_wcs.man_wcs(telescope, stack[k], cat, cat_stars_ra, cat_stars_dec)
+                            wcs_error = solve_wcs.man_wcs(telescope, stack[k].replace('_wcs',''), cat, cat_stars_ra, cat_stars_dec)
                             log.info(wcs_error)
                             redo_wcs = input(Back.GREEN+'Please review the WCS plots and errors. Do you wish to manually redo wcs (yes or no)?  '+Style.RESET_ALL)
                     if wcs_error!=0:
