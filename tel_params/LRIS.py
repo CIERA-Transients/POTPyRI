@@ -15,7 +15,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.6 #last edited 04/10/2021
+__version__ = 1.7 #last edited 08/11/2021
 
 def static_mask(proc):
     return ['']
@@ -107,7 +107,7 @@ def amp_keyword(hdr):
     try:
         amp = str(hdr['NUMAMPS'])
     except:
-        amp = str(hdr['NVIDINP']) #check for new - return 1
+        amp = '1' #str(hdr['NVIDINP'])
     instrument = hdr['INSTRUME']
     if instrument == 'LRISBLUE':
         side = 'B'
@@ -144,8 +144,12 @@ def create_bias(cal_list,cal,red_path,log):
     for i,bias in enumerate(cal_list[cal]):
         with fits.open(bias) as hdr:
             header = hdr[0].header
-        raw = [CCDData.read(bias, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
-        red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=x.header['DATASEC'], gain=gains[j]*u.electron/u.adu, readnoise=readnoises[j]*u.electron) for j,x in enumerate(raw)]
+        if amp=='1R':
+            raw = [CCDData.read(bias, hdu=x, unit='adu') for x in range(int(amp[0]))]
+            red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), gain=gains[j]*u.electron/u.adu, readnoise=readnoises[j]*u.electron) for j,x in enumerate(raw)]
+        else:
+            raw = [CCDData.read(bias, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
+            red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=x.header['DATASEC'], gain=gains[j]*u.electron/u.adu, readnoise=readnoises[j]*u.electron) for j,x in enumerate(raw)]
         bias_hdu = fits.HDUList([fits.PrimaryHDU(header=header)])
         for x in red: bias_hdu.append(fits.ImageHDU(x.data,header=x.header))
         bias_hdu.writeto(bias.replace('/raw/','/red/').replace('.gz',''),overwrite=True)
@@ -179,15 +183,18 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
         with fits.open(flat) as hdr:
             header = hdr[0].header
         if header['NPIXSAT'] < 10000:
-            raw = [CCDData.read(flat, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
-            red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=x.header['DATASEC'], gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
-            if amp == '4B':
-                flat_full = CCDData(np.concatenate([red[0],np.fliplr(red[1]),np.zeros([np.shape(red[1])[0],111]),red[2],np.fliplr(red[3])],axis=1),header=header,unit=u.electron)
-                flat_full = ccdproc.trim_image(flat_full[700:3315,350:3940])
-            if amp == '4R':
-                flat_full = CCDData(np.concatenate([red[1],np.fliplr(red[0]),np.zeros([np.shape(red[0])[0],200]),red[3],np.fliplr(red[2])],axis=1),header=header,unit=u.electron)
             if amp == '1R':
-                flat_full = red[0]
+                raw = [CCDData.read(flat, hdu=x, unit='adu') for x in range(int(amp[0]))]
+                red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
+                flat_full = CCDData(np.concatenate([np.concatenate([red[0][723:2064,284:2064],red[0][723:2064,2170:3956]],axis=1),np.concatenate([red[0][2185:3485,284:2064],red[0][2185:3485,2170:3956]],axis=1)],axis=0),header=header,unit=u.electron)
+            else:
+                raw = [CCDData.read(flat, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
+                red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=x.header['DATASEC'], gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
+                if amp == '4B':
+                    flat_full = CCDData(np.concatenate([red[0],np.fliplr(red[1]),np.zeros([np.shape(red[1])[0],111]),red[2],np.fliplr(red[3])],axis=1),header=header,unit=u.electron)
+                    flat_full = ccdproc.trim_image(flat_full[700:3315,350:3940])
+                if amp == '4R':
+                    flat_full = CCDData(np.concatenate([red[1],np.fliplr(red[0]),np.zeros([np.shape(red[0])[0],200]),red[3],np.fliplr(red[2])],axis=1),header=header,unit=u.electron)
             log.info('Exposure time of image is '+str(flat_full.header['ELAPTIME']))
             norm = 1/np.median(flat_full[1200:1600,1200:1600]) #check for binning
             log.info('Flat normalization: '+str(norm))
@@ -225,9 +232,17 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
                         x.data = x.data[0:int(trim_sec[k].split(':')[-1].rstrip(']')),0:int(trim_sec[k].split(':')[1].split(',')[0])]
                         mbias[k] = x
             else:
-                trim_sec = [hdr[k+1].header['DATASEC'] for k in range(len(mbias))]
-        raw = [CCDData.read(sci, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
-        red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=trim_sec[k], gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
+                if amp == '1R':
+                    trim_sec = None
+                else:
+                    trim_sec = [hdr[k+1].header['DATASEC'] for k in range(len(mbias))]
+        if amp == '1R':
+            raw = [CCDData.read(sci, hdu=x, unit='adu') for x in range(int(amp[0]))]
+            red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
+            sci_full = CCDData(np.concatenate([np.concatenate([red[0][723:2064,284:2064],red[0][723:2064,2170:3956]],axis=1),np.concatenate([red[0][2185:3485,284:2064],red[0][2185:3485,2170:3956]],axis=1)],axis=0),header=header,unit=u.electron)
+        else:
+            raw = [CCDData.read(sci, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
+            red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=trim_sec[k], gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
         flat_image = CCDData(np.copy(mflat),unit=u.electron,meta=mflat.meta,mask=mflat.mask,uncertainty=mflat.uncertainty)
         if amp == '4B':
             sci_full = CCDData(np.concatenate([red[0],np.fliplr(red[1]),np.zeros([np.shape(red[1])[0],111]),red[2],np.fliplr(red[3])],axis=1),header=header,unit=u.electron)
@@ -241,8 +256,6 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
                     flat_image.uncertainty = mflat.uncertainty[625:1875,0:3600] 
                 except:
                     pass          
-        if amp == '1R':
-            sci_full = red[0]
         log.info('Exposure time of science image is '+str(sci_full.header['ELAPTIME']))
         processed_data = ccdproc.flat_correct(sci_full, flat_image)
         log.info('File proccessed.')
@@ -358,7 +371,7 @@ def overscan_region(amp):
     if amp=='4R':
         oscan_reg = '[1:7,1:2520]'
     if amp=='1R':
-        oscan_reg = '[2065:2170,1:4188]'
+        oscan_reg = '[2065:2170,1:4248]'
     return oscan_reg
 
 def fringe_correction(fil):
