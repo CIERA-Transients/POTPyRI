@@ -1,4 +1,4 @@
-#Download and sort Keck data for KOA
+#Download and sort Keck data from KOA
 #Requires full path name to wget bash script downloaded from KOA
 #and new folder name to put data (e.g. MOSFIRE_20191123)
 
@@ -16,14 +16,14 @@ os.chdir(data_path)
 
 subprocess.call(['bash',download_script])
 
-tar_files = glob.glob('*.tar')
+KOA_ID = download_script.split('_')[1].split('.')[0]
+tar_files = glob.glob('KOA_'+KOA_ID+'.tar')
 for tar in tar_files:
     tar_f = tarfile.open(tar)
     tar_f.extractall(path=data_path)
     tar_f.close()
     os.remove(tar)
 
-KOA_ID = download_script.split('_')[1].split('.')[0]
 files = glob.glob('KOA_'+KOA_ID+'/*/*/*/*.fits.gz')
 new_dirname = sys.argv[2]
 if not os.path.exists(new_dirname):
