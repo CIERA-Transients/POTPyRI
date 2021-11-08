@@ -184,6 +184,13 @@ class absphot(object):
             cat = cat[mask]
             idx = idx[mask]
 
+            if len(cat)==0:
+                if log:
+                    log.info('No star matches within match radius.')
+                else:
+                    print('No star matches within match radius.')
+                return(None, None)
+
             match_table = None
             for i in idx:
                 if not match_table:

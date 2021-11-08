@@ -230,6 +230,14 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
     fwhm = 2.35482*np.median(sigmas_post_clipping)
     std_fwhm = np.std(sigmas_post_clipping)
     
+    if np.isnan(fwhm):
+        if log:
+            log.error('Could not refine FWHM, using first value.')
+        else:
+            print('Could not refine FWHM, using first value.')
+        fwhm = np.median(fwhm_stars['fwhm'])
+        std_fwhm = np.std(fwhm_stars['fwhm'])
+    
     if log:
         log.info('FWHM={0}+/-{1}'.format('%2.4f'%fwhm,'%2.4f'%std_fwhm))
     else:
