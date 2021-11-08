@@ -107,7 +107,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
     else:
         log.info('Sorting files and creating file lists.')
         # CDK - updated this to a os.path.join so it doesn't require trailing /
-        files = sorted(glob.glob(os.path.join([data_path,tel.raw_format(proc)])))
+        files = sorted(glob.glob(os.path.join(data_path,tel.raw_format(proc))))
         if len(files) != 0:
             log.info(str(len(files))+' files found.')
             cal_list, sci_list, sky_list, time_list = Sort_files.sort_files(files,telescope,data_path,log)
