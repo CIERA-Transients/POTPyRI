@@ -130,7 +130,7 @@ class absphot(object):
         mask =(~np.isnan(flux)) & (~np.isnan(fluxerr)) & (~np.isnan(cat_mag)) &\
             (~np.isnan(cat_magerr)) & (cat_magerr < 0.3) & (cat_magerr > 0.) &\
             (fluxerr > 0.) & (fluxerr/flux < 0.2) & (flux > 0.) &\
-            (cat_mag>min_mag) & (cat_magerr < max_mag)
+            (cat_mag>min_mag) & (cat_mag < max_mag)
 
 
         flux=flux[mask]
@@ -140,7 +140,7 @@ class absphot(object):
 
         return(flux, fluxerr, cat_mag, cat_magerr, mask)
 
-    def find_zeropoint(self, cmpfile, filt, catalog, match_radius=2.0*u.arcsec,
+    def find_zeropoint(self, cmpfile, filt, catalog, match_radius=2.5*u.arcsec,
         plot=False, log=None):
 
         if log:
@@ -211,7 +211,7 @@ class absphot(object):
 
             # Do basic data quality cuts to fluxes and catalog magnitudes
             flux, fluxerr, cat_mag, cat_magerr, flux_mask = self.do_cuts(flux, fluxerr,
-                cat_mag, cat_magerr)
+                cat_mag, cat_magerr, min_mag=self.get_minmag(filt))
 
             if len(flux)==0:
                 if log:
@@ -346,3 +346,13 @@ class absphot(object):
             return 'r'
         else:
             return filt
+    
+    def get_minmag(self, filt):
+        if filt=='J':
+            return 15.5
+        if filt=='K':
+            return 13.0
+        if filt=='Y':
+            return 15.0
+        else:
+            return 16.0
