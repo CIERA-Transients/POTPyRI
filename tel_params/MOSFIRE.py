@@ -14,7 +14,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.5 #last edited 24/08/2021
+__version__ = 1.6 #last edited 09/11/2021
 
 def static_mask(proc):
     return ['./staticmasks/MF.staticmask.fits']
@@ -146,6 +146,7 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
             flats.append(CCDData(masked,meta=red.header,unit=u.electron))
     mflat = ccdproc.combine(flats,method='median',scale=flat_scale,sigma_clip=True) 
     log.info('Created master flat for filter '+fil+' and '+amp+' amps and '+binn+' binning.')
+    mflat.header['VER'] = (__version__, 'Version of telescope parameter file used.')
     mflat.write(red_path+'mflat_'+fil+'_'+amp+'_'+binn+'.fits',overwrite=True)
     log.info('Master flat written to mflat_'+fil+'_'+amp+'_'+binn+'.fits')
     return

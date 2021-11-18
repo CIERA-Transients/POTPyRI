@@ -15,7 +15,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.3 #last edited 04/10/2021
+__version__ = 1.4 #last edited 09/11/2021
 
 def static_mask(proc):
     return ['']
@@ -136,6 +136,7 @@ def create_bias(cal_list,cal,red_path,log):
     mbias_hdu = fits.HDUList([fits.PrimaryHDU()])
     for x in mbias: mbias_hdu.append(fits.ImageHDU(x.data,header=x.header))
     log.info('Created master bias with '+amp+' amps and '+binn+' binning.')
+    mbias_hdu[0].header['VER'] = (__version__, 'Version of telescope parameter file used.')
     mbias_hdu.writeto(red_path+'mbias_'+amp+'_'+binn+'.fits',overwrite=True)
     log.info('Master bias written to mbias_'+amp+'_'+binn+'.fits')
     for bias in cal_list[cal]: os.remove(bias)
@@ -172,6 +173,7 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
         flats.append(flat_full)
     mflat = ccdproc.combine(flats,method='median',scale=scale,sigma_clip=True)
     log.info('Created master flat for filter: '+fil)
+    mflat.header['VER'] = (__version__, 'Version of telescope parameter file used.')
     mflat.write(red_path+'mflat_'+fil+'_'+amp+'_'+binn+'.fits',overwrite=True)
     log.info('Master flat written to mflat_'+fil+'_'+amp+'_'+binn+'.fits')
     return
