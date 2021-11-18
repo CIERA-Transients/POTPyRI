@@ -1,8 +1,8 @@
 # Data reduction pipeline for imaging from large aperture telescopes
 ## Installation
 To install run **git clone https://github.com/CIERA-Transients/Imaging_pipelines.git**. It is recommended that you create an environment for the pipeline to run in. There are two files available which you can use:
-1) pipeline_environment.txt contains a explicit list of commands to install the needed packages. To use this file run "conda create --name myenv --file pipeline_environment.txt", where myenv is the name of the environment.
-2) pipeline_environment.yml contains the environment file. To use this file, first edit the "prefix" paramater in the file, and then run "conda env create -f pipeline_environment.yml", where the name of the environment is set by the first line in the file.
+1) pipeline_environment.txt contains a explicit list of commands to install the needed packages. To use this file run **conda create --name myenv --file pipeline_environment.txt**, where myenv is the name of the environment.
+2) pipeline_environment.yml contains the environment file. To use this file, first edit the *prefix* paramater in the file, and then run **conda env create -f pipeline_environment.yml**, where the name of the environment is set by the first line in the file.
 Both these files were created from an environment on a Linux-64bit OS.
 
 ## Supported Instruments
