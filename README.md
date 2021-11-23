@@ -1,4 +1,7 @@
 # Data reduction pipeline for imaging from large aperture telescopes
+## Usage
+If you use this code, please reference Paterson et al. 2022 (in prep.)
+
 ## Installation
 To install run **git clone https://github.com/CIERA-Transients/Imaging_pipelines.git**. It is recommended that you create an environment for the pipeline to run in. There are two files available which you can use:
 1) pipeline_environment.txt contains a explicit list of commands to install the needed packages. To use this file run **conda create --name myenv --file pipeline_environment.txt**, where myenv is the name of the environment.
@@ -26,6 +29,9 @@ The pipeline runs mostly automatic, but will prompt the user to check files at v
 All processed data will be written out in the **data_path** under the **red** folder. A description of the outputs can be found in **Outputs**.
 
 If you re-run the pipeline after it has already been run, it will read in the files using the file list that was created previously. To ``reset" the pipeline to the original state, please see details under **Special cases**.
+
+## Flow diagram
+![plot](./images/Pipeline_flow_diagram.pdf)
 
 ## Pipeline parameters
 ### main_pipeline.py
