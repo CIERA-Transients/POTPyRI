@@ -15,7 +15,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.4 #last edited 09/11/2021
+__version__ = 1.5 #last edited 23/11/2021
 
 def static_mask(proc):
     return ['']
@@ -229,6 +229,7 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
         final.header['DATASEC'] = ('[1:%s,1:%s]'%(np.shape(final)[1],np.shape(final)[0]))        
         final.write(sci.replace('/raw/','/red/').replace('.gz',''),overwrite=True)
         processed.append(final)
+    masks = [k[700:2400,300:7607] for k in masks]
     return processed, masks
 
 def stacked_image(tar,red_path):
