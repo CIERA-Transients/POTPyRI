@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.18" #last updated 25/10/2021
+__version__ = "1.19" #last updated 10/01/2022
 
 import sys
 import numpy as np
@@ -297,6 +297,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                 t1 = time.time()
                 log.info('NIR data, creating NIR sky maps.')
                 for j,n in enumerate(processed):
+                    log.info('Creating map for file %d/%d'%(j,len(processed)))
                     time_diff = sorted([(abs(time_list[tar][j]-n2),k) for k,n2 in enumerate(time_list[tar])])
                     sky_list = [sci_list[tar][k] for _,k in time_diff[0:5]]
                     sky_data = [processed[k] for _,k in time_diff[0:5]]
@@ -413,8 +414,12 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                             wcs_error = solve_wcs.man_wcs(telescope, stack[k].replace('_wcs',''), cat, cat_stars_ra, cat_stars_dec)
                             log.info(wcs_error)
                             redo_wcs = input(Back.GREEN+'Please review the WCS plots and errors. Do you wish to manually redo wcs (yes or no)?  '+Style.RESET_ALL)
-                    if wcs_error!=0:
-                        stack[k] = stack[k].replace('_wcs','').replace('.fits','_wcs.fits')
+                    try:
+                        if wcs_error!=0:
+                            stack[k] = stack[k].replace('_wcs','').replace('.fits','_wcs.fits')
+                    except UnboundLocalError:
+                        log.error('WCS solution could not be calculated. Skipping the rest of the reduction for this target.')
+                        continue
                 if tel.run_phot():
                     con = input(Back.GREEN+'Based on the WCS solution, would you like to continue with the PSF photometry for this stack (yes or no)? '+Style.RESET_ALL)
                     if con=='no':
