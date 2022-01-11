@@ -16,8 +16,11 @@ os.chdir(data_path)
 
 subprocess.call(['bash',download_script])
 
+new_dirname = sys.argv[2]
+instr = new_dirname.split('_')[0]
+
 KOA_ID = download_script.split('_')[1].split('.')[0]
-tar_files = glob.glob('KOA_'+KOA_ID+'.tar')
+tar_files = glob.glob(instr+'_*'+KOA_ID+'*.tar')
 for tar in tar_files:
     tar_f = tarfile.open(tar)
     tar_f.extractall(path=data_path)
@@ -25,7 +28,6 @@ for tar in tar_files:
     os.remove(tar)
 
 files = glob.glob('KOA_'+KOA_ID+'/*/*/*/*.fits.gz')
-new_dirname = sys.argv[2]
 if not os.path.exists(new_dirname):
     os.mkdir('./'+new_dirname)
 for f in files:
