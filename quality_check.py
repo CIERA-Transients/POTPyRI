@@ -3,7 +3,7 @@
 "Function to assess image quality for stacking."
 "Author: Kerry Paterson"
 
-__version__ = "1.6" #last updated 26/08/2021
+__version__ = "1.7" #last updated 11/01/2022
 
 import time
 import numpy as np
@@ -34,8 +34,14 @@ def quality_check(aligned_images, aligned_data, telescope, log):
         log.info('Loading catalog for: '+f)
         cat = f.replace('.fits','.cat')
         table = solve_wcs.run_sextractor(f, cat, tel, sex_config_dir='./Config', log=log)
+        print(f,len(table))
         if len(table)==0:
             log.info('No sources found by SExtractor.')
+            fwhm.append(0)
+            elong.append(0)
+            stars.append(0)
+        elif len(table)<20:
+            log.info('Not enough sources found by SExtractor.')
             fwhm.append(0)
             elong.append(0)
             stars.append(0)
