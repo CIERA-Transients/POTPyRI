@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.19" #last updated 10/01/2022
+__version__ = "1.20" #last updated 26/01/2022
 
 import sys
 import numpy as np
@@ -373,9 +373,9 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                 sci_med.header['MJD-OBS'] = (mid_time, 'Mid-MJD of the observation sequence calculated using DATE-OBS.')
                 sci_med.header['EXPTIME'] = (1, 'Effective expsoure tiime for the stack in seconds.')
                 sci_med.header['EXPTOT'] = (total_time, 'Total exposure time of stack in seconds')
-                sci_med.header['GAIN'] = (len(aligned_images), 'Effecetive gain for stack.')
-                sci_med.header['RDNOISE'] = (tel.rdnoise(sci_med.header)/np.sqrt(len(aligned_images)), 'Readnoise of stack.')
-                sci_med.header['NFILES'] = (len(aligned_images), 'Number of images in stack')
+                sci_med.header['GAIN'] = (len(stacking_data), 'Effecetive gain for stack.')
+                sci_med.header['RDNOISE'] = (tel.rdnoise(sci_med.header)/np.sqrt(len(stacking_data)), 'Readnoise of stack.')
+                sci_med.header['NFILES'] = (len(stacking_data), 'Number of images in stack')
                 sci_med.write(stack[k],overwrite=True)
                 log.info('Median stack made for '+stack[k])
                 print('Please check the quality of the stack made.')
