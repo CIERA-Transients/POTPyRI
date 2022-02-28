@@ -29,9 +29,6 @@ bibliography: paper.bib
 
 # Summary
 
-This pipeline was developed for the reduction and stacking of imaging data for a number of telescopes and instruments in the optical and near-infrared (NIR) bands. The purpose of the pipeline is to provide a semi-automated way to reduce imaging data, create a median stack with reliable astrometry and photometric calibration, and allow the user to perform manual aperture photometry in Python.
+This pipeline was developed for the reduction and stacking of imaging data for a number of telescopes and instruments in the optical and near-infrared (NIR) bands. The purpose of the pipeline is to provide a semi-automated way to reduce imaging data, create a median stack with reliable astrometry and photometric calibration, and allow the user to perform manual aperture photometry in Python. [@Pearson:2017]
 
-# Statement of need
-
-The pipeline is written in Python (currently deployed and tested on Python 3.8) and uses packages from Astropy [@astropy:2013, @astropy:2018], ccdproc, astroquery [@Ginsburg2019] and photutils; with the additional use of SExtractor [@Bertin1996]. The code is available on GitHub at https://github.com/CIERA-Transients/POTPyRI, where instructions on the installation and detailed use can be found.
 
