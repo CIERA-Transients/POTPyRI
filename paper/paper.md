@@ -34,7 +34,7 @@ This pipeline was developed for the reduction and stacking of imaging data for a
 
 # Statement of need
 
-The pipeline is written in Python (currently deployed and tested on Python 3.8) and uses packages from Astropy [@astropy:2013, @astropy:2018], ccdproc, astroquery [@Ginsburg2019] and photutils; with the additional use of SExtractor [@Bertin1996]. The code is available on GitHub at https://github.com/CIERA-Transients/POTPyRI, where instructions on the installation and detailed use can be found.
+The pipeline is written in Python (currently deployed and tested on Python 3.8) and uses packages from Astropy [@astropy:2013], [@astropy:2018], ccdproc, astroquery [@Ginsburg2019] and photutils; with the additional use of SExtractor [@Bertin1996]. The code is available on GitHub at https://github.com/CIERA-Transients/POTPyRI, where instructions on the installation and detailed use can be found.
 
 Currently available instruments (as of Feb 2022 - see the GitHub for the most recent list) include:
 
@@ -45,7 +45,7 @@ Currently available instruments (as of Feb 2022 - see the GitHub for the most re
  - LRIS (Keck) [@Oke1995]
  - GMOS (Gemini-N and Gemini-S) [@Davies1997]
 
-Since the pipeline is meant to provide the community with a way to reduce imaging data from these instruments, one science application has been the rapid reduction and identification of Gamma-Ray Burst (GRB) afterglows, as well as the reduction and stacking of follow-up observations to identify potential host galaxies for associated and in depth study (see [@Paterson2020,@Rastinejad2021,@Fong2021]).
+Since the pipeline is meant to provide the community with a way to reduce imaging data from these instruments, one science application has been the rapid reduction and identification of Gamma-Ray Burst (GRB) afterglows, as well as the reduction and stacking of follow-up observations to identify potential host galaxies for associated and in depth study (see [@Paterson2020], [@Rastinejad2021], [@Fong2021]).
 
 # Method
 
