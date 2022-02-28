@@ -1,3 +1,4 @@
+---
 title: 'Pipeline for Optical/infrared Telescopes in Python for Reducing Images (POTPyRI)'
 
 tags:
@@ -33,17 +34,18 @@ This pipeline was developed for the reduction and stacking of imaging data for a
 
 # Statement of need
 
-The pipeline is written in Python (currently deployed and tested on Python 3.8) and uses packages from Astropy [astropy:2013, astropy:2018], ccdproc, astroquery [Ginsburg2019] and photutils; with the additional use of SExtractor [Bertin1996]. The code is available on GitHub at https://github.com/CIERA-Transients/POTPyRI, where instructions on the installation and detailed use can be found.
+The pipeline is written in Python (currently deployed and tested on Python 3.8) and uses packages from Astropy [@astropy:2013, @astropy:2018], ccdproc, astroquery [@Ginsburg2019] and photutils; with the additional use of SExtractor [@Bertin1996]. The code is available on GitHub at https://github.com/CIERA-Transients/POTPyRI, where instructions on the installation and detailed use can be found.
 
 Currently available instruments (as of Feb 2022 - see the GitHub for the most recent list) include:
- - MMIRS (MMT) [McLeod2012]
- - Binospec (MMT) [Fabricant2019]
- - MOSFIRE (Keck) [McLean2008]
- - DEIMOS (Keck) [Cowley1997]
- - LRIS (Keck) [Oke1995]
- - GMOS (Gemini-N and Gemini-S) [Davies1997]
 
-Since the pipeline is meant to provide the community with a way to reduce imaging data from these instruments, one science application has been the rapid reduction and identification of Gamma-Ray Burst (GRB) afterglows, as well as the reduction and stacking of follow-up observations to identify potential host galaxies for associated and in depth study (see [Paterson2020,Rastinejad2021,Fong2021]).
+ - MMIRS (MMT) [@McLeod2012]
+ - Binospec (MMT) [@Fabricant2019]
+ - MOSFIRE (Keck) [@McLean2008]
+ - DEIMOS (Keck) [@Cowley1997]
+ - LRIS (Keck) [@Oke1995]
+ - GMOS (Gemini-N and Gemini-S) [@Davies1997]
+
+Since the pipeline is meant to provide the community with a way to reduce imaging data from these instruments, one science application has been the rapid reduction and identification of Gamma-Ray Burst (GRB) afterglows, as well as the reduction and stacking of follow-up observations to identify potential host galaxies for associated and in depth study (see [@Paterson2020,@Rastinejad2021,@Fong2021]).
 
 # Method
 
@@ -57,9 +59,9 @@ After basic reductions, additional corrections are applied. For the NIR, the sky
 
 Next, the pipeline prepares the reduced science images (again grouped by target) for aligning and stacking. Images are aligned by calculating the relative shift and transformation between the first image in the observation sequence and each subsequently image using unique star quads matches. Spatial flips to the image are determined automatically based on the WCS header keywords. After the science images are aligned, the pipeline performs some basic quality checks on the images before stacking. These quality checks include removing images of poor quality based on the number of stars detected (using SExtractor) in the image (e.g. no stars found due to poor conditions), the Full-Width Half Maximum (FWHM) and elongation of sources in the image (based on 3$\sigma$ cuts from the median value), and poor alignment. There are no limits on the number of images that can be removed due to poor conditions or alignment, while images removed due to a FWHM or elongation cut are restriction to 10\% of the total number of images for that target. After the quality checks, the pipeline then stacks the remaining images using a median combine (see Figure \ref{fig:stacks} for examples of median stacks from MOSFIRE, MMIRS, LRIS (blue channel), BINOSPEC (left side) and DEIMOS).
 
-Next, the pipeline will attempt to solve the WCS of the stack to improve the astrometry of the image. The pipeline uses unique star quads to match against stars from the Gaia-DR3 catalog [Gaia2021] to calculate the initial shift and pixel scale between the native WCS and the true astrometry of the image. After the initial solution has been applied, a star to star match between the extracted sources from the image and the Gaia catalog is used to calculate the full WCS of the image in the TPV (TAN, or tangential projection plus distortion polynomials) system.
+Next, the pipeline will attempt to solve the WCS of the stack to improve the astrometry of the image. The pipeline uses unique star quads to match against stars from the Gaia-DR3 catalog [@Gaia2021] to calculate the initial shift and pixel scale between the native WCS and the true astrometry of the image. After the initial solution has been applied, a star to star match between the extracted sources from the image and the Gaia catalog is used to calculate the full WCS of the image in the TPV (TAN, or tangential projection plus distortion polynomials) system.
 
-After the astrometry, the pipeline performs Point Spread Function (PSF) photometry. First, the PSF is determined using a sample of unsaturated star-like sources, determined based on 3$\sigma$ cuts from the median values and flux (to remove saturated and faint sources). Next, the pipeline uses the PSF to calculate PSF photometry for the full source catalog. The pipeline then matches the extracted sources against a photometric catalog (set in the setting file for the instrument) and uses the PSF photometry to calculated the zero point through iterative sigma clipping for the image. Zero points can be calculated using the Sloan Digital Sky Survey DR12 [Eisenstein2011], Pan-STARRS [Tonry2012] and 2MASS [Skrutskie2006] catalogs in the $u,g,r,i,z,Y,J,H,K$ filters. The zero point is then transformed to the AB system and applied to the photometric catalog.
+After the astrometry, the pipeline performs Point Spread Function (PSF) photometry. First, the PSF is determined using a sample of unsaturated star-like sources, determined based on 3$\sigma$ cuts from the median values and flux (to remove saturated and faint sources). Next, the pipeline uses the PSF to calculate PSF photometry for the full source catalog. The pipeline then matches the extracted sources against a photometric catalog (set in the setting file for the instrument) and uses the PSF photometry to calculated the zero point through iterative sigma clipping for the image. Zero points can be calculated using the Sloan Digital Sky Survey DR12 [@Eisenstein2011], Pan-STARRS [@Tonry2012] and 2MASS [@Skrutskie2006] catalogs in the $u,g,r,i,z,Y,J,H,K$ filters. The zero point is then transformed to the AB system and applied to the photometric catalog.
 
 This concludes the automatic reductions that the pipeline performs on input data. However, several times during the course of the pipeline operation, the pipeline will ask the user to confirm changes or the quality of the outputs before continuing. A basic flow diagram of the pipeline steps, including some different ways the pipeline can process and highlighting the points where user input is required, is shown in Figure \autoref{fig:stacks}. These prompts from the pipeline allow the user to make changes to the file list, perform manual astrometry, or abort the reduction for a particular target if the quality of the outputs are not satisfactory. There are also several additional options the user can specify when running the pipeline to perform additional operations such as skipping the creation of the calibration files, only selecting a particular target for reduction, skipping the creation of the stack, and performing manual aperture photometry on a single target. For more details on these additional options, and detailed instructions on running the pipeline and pipeline outputs, please see the documentation available on the GitHub. For user support or errors running the pipeline, please open a Issue on GitHub.
 
@@ -72,5 +74,3 @@ While the pipeline runs, the pipeline will also created a detailed log of operat
 KP acknowledges the help of the Fong group at Center for Interdisciplinary Exploration and Research in Astrophysics, including W. Fong, J. Rastinejad, A. Rouco Escorial, G. Schroeder, A. E. Nugent, A. Gordon for helping to test the pipeline and providing feedback. KP acknowledges support by the National Science Foundation under grant Nos. AST-1814782, AST-1909358 and CAREER grant No. AST-2047919.
 
 # References
-
-
