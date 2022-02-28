@@ -33,14 +33,12 @@ This pipeline was developed for the reduction and stacking of imaging data for a
 The pipeline is written in Python (currently deployed and tested on Python 3.8) and uses packages from Astropy [@astropy:2013, @astropy:2018], ccdproc, astroquery [@Ginsburg2019] and photutils; with the additional use of SExtractor [@Bertin1996]. The code is available on GitHub at https://github.com/CIERA-Transients/POTPyRI, where instructions on the installation and detailed use can be found.\\
 
 Currently available instruments\footnote{As of Jan 2022 - see the GitHub for the most recent list.} include:
-\begin{itemize}
-    \item MMIRS (MMT) [@McLeod2012]
-    \item Binospec (MMT) [@Fabricant2019]
-    \item MOSFIRE (Keck) [@McLean2008]
-    \item DEIMOS (Keck) [@Cowley1997]
-    \item LRIS (Keck) [@Oke1995]
-    \item GMOS (Gemini-N and Gemini-S) [@Davies1997]
-\end{itemize}
+ - MMIRS (MMT) [@McLeod2012]
+ - Binospec (MMT) [@Fabricant2019]
+ - MOSFIRE (Keck) [@McLean2008]
+ - DEIMOS (Keck) [@Cowley1997]
+ - LRIS (Keck) [@Oke1995]
+ - (Gemini-N and Gemini-S) [@Davies1997]
 
 Since the pipeline is meant to provide the community with a way to reduce imaging data from these instruments, one science application has been the rapid reduction and identification of Gamma-Ray Burst (GRB) afterglows, as well as the reduction and stacking of follow-up observations to identify potential host galaxies for associated and in depth study (see [@Paterson2020,@Rastinejad2021,@Fong2021]).\\
 
@@ -48,7 +46,7 @@ Since the pipeline is meant to provide the community with a way to reduce imagin
 
 The pipeline requires two parameters to run. The first is the name of the instrument in order to load the correct setting file. This setting file allows new and user instruments to be added as needed. The second is the full data path to the data to be reduced. The data are expected to be in a particular format, including the file name and the number of extensions, as specified in the setting file. For example, for Keck, the pipeline expects the data in the format in which it is download from the Keck Observatory Archive). The details on data formats, including scripts to download and sort data, can be found on GitHub. 
 
-![Flow diagram of the steps taken by the pipeline. Points where user input is required is shown in green. A number of different options are shown depending on the additional optional parameters selected when running the pipeline.\label{fig:flow}](Pipeline_flow_diagram.pdf)
+![Flow diagram of the steps taken by the pipeline. Points where user input is required is shown in green. A number of different options are shown depending on the additional optional parameters selected when running the pipeline.\label{fig:flow}](../images/Pipeline_flow_diagram.pdf)
 
 Figure \autoref{fig:flow} shows the basic pipeline operations. The pipeline will first sort the files in the given path, and create a file list which contains information about each file such as the type, filter, configuration, and target. Using the file list and the setting file, the pipeline will then create calibration files (e.g. bias, dark, flat) and then performs the necessary basic reductions to science files, grouped by target, including gain correction, bias subtraction, dark subtraction, flat correction, and trimming. A source mask, which masks out sources on the image, is created for internal use in downstream steps such as the background, NIR and fringe map creation. A mask is created for each image, which shows the position of bad pixels, cosmic rays, and satellite trails. In order to prepare images for median stacking, the 2D background of each science image is determined and subtracted. Science images are also divided by their exposure time, to allow the median stacking of images with different exposure times, and results in a reduced image with pixel values in e$^{-}$/s. For instruments that do not have astrometry i.e. a World Coordinate System (WCS) in the header, a WCS is added to the header based on the position and orientation of the telescope and instrument.\\
 
@@ -64,7 +62,7 @@ This concludes the automatic reductions that the pipeline performs on input data
 
 While the pipeline runs, the pipeline will also created a detailed log of operations. Along with the log, the pipeline will write information such as the readnoise, effective gain, zero point, and limiting mag to the stack. The pipeline also produced a number of other output files, including source catalogs, star lists, error plots etc. For more details on these outputs, refer to the documentation of the GitHub.
 
-![Examples of stacks produced by the pipeline from MOSFIRE, MMIRS, LRIS (blue side), BINOSPEC (left side) and DEIMOS data. The position of Gaia DR3 stars are shown by the green circles.\label{fig:stacks}](Stack_examples.pdf)
+![Examples of stacks produced by the pipeline from MOSFIRE, MMIRS, LRIS (blue side), BINOSPEC (left side) and DEIMOS data. The position of Gaia DR3 stars are shown by the green circles.\label{fig:stacks}](../images/Stack_examples.pdf)
 
 # Acknowledgements
 
