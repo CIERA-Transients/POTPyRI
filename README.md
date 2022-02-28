@@ -1,4 +1,6 @@
-# Data reduction pipeline for imaging from large aperture telescopes
+# POTPyRI: Pipeline for Optical/infrared Telescopes in Python for Reducing Images
+Data reduction pipeline for imaging from large aperture telescopes
+
 ## Usage
 If you use this code, please reference Paterson et al. 2022 (in prep.)
 
