@@ -332,15 +332,15 @@ class absphot(object):
         return mag_sdss
 
     def convert_filter_name(self, filt):
-        if filt=='uG0308' or filt=='uG0332':
+        if filt=='uG0308' or filt=='uG0332' or filt=='U':
             return 'u'        
-        if filt=='gG0301' or filt=='gG0325':
+        if filt=='gG0301' or filt=='gG0325' or filt=='G':
             return 'g'
-        if filt=='rG0303' or filt=='rG0326':
+        if filt=='rG0303' or filt=='rG0326' or filt=='R':
             return 'r'
-        if filt=='iG0302' or filt=='iG0327':
+        if filt=='iG0302' or filt=='iG0327' or filt=='I':
             return 'i'
-        if filt=='zG0304' or filt=='zG0328':
+        if filt=='zG0304' or filt=='zG0328' or filt=='Z':
             return 'z'
         if filt=='RG850':
             return 'r'

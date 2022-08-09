@@ -1,3 +1,0 @@
-def timeadder(year,month,day,hour,minute,second,deltat):
-    """add time to UT"""
-    
