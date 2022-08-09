@@ -14,6 +14,7 @@ import astropy.units as u
 import ccdproc
 from astropy.modeling import models
 import create_mask
+import glob
 
 __version__ = 1.8 #last edited 09/11/2021
 
@@ -34,7 +35,7 @@ def saturation(hdr):
 
 def WCS_keywords_old(): #WCS keywords
     return []
-    
+
 def WCS_keywords(): #WCS keywords
     return ['CRPIX1','CRPIX2','CD1_1','CD1_2','CD2_1','CD2_2']
 
@@ -42,7 +43,10 @@ def cal_path():
     return None
 
 def raw_format(proc):
-    return 'L*.fits.gz'
+    if str(proc)=='True':
+        return 'L*.fits.gz'
+    elif str(proc)=='raw':
+        return '*[b,r]*.fits'
 
 def dark():
     return False
@@ -153,7 +157,7 @@ def create_bias(cal_list,cal,red_path,log):
         bias_hdu = fits.HDUList([fits.PrimaryHDU(header=header)])
         for x in red: bias_hdu.append(fits.ImageHDU(x.data,header=x.header))
         bias_hdu.writeto(bias.replace('/raw/','/red/').replace('.gz',''),overwrite=True)
-        cal_list[cal][i] = bias.replace('/raw/','/red/').replace('.gz','')    
+        cal_list[cal][i] = bias.replace('/raw/','/red/').replace('.gz','')
     mbias = [ccdproc.combine(cal_list[cal],hdu=x+1,unit=u.electron) for x in range(int(amp[0]))]
     mbias_hdu = fits.HDUList([fits.PrimaryHDU()])
     for x in mbias: mbias_hdu.append(fits.ImageHDU(x.data,header=x.header))
@@ -255,9 +259,9 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
                 flat_image.data = mflat.data[625:1875,0:3600]
                 try:
                     flat_image.mask = mflat.mask[625:1875,0:3600]
-                    flat_image.uncertainty = mflat.uncertainty[625:1875,0:3600] 
+                    flat_image.uncertainty = mflat.uncertainty[625:1875,0:3600]
                 except:
-                    pass          
+                    pass
         log.info('Exposure time of science image is '+str(sci_full.header['ELAPTIME']))
         processed_data = ccdproc.flat_correct(sci_full, flat_image)
         log.info('File proccessed.')
@@ -300,8 +304,8 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
             final.header['CD1_1'] = 0.123/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
             final.header['CD1_2'] = -0.123/3600*np.cos(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
             final.header['CD2_1'] = 0.123/3600*np.cos(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
-            final.header['CD2_2'] = -0.123/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))            
-        final.header['DATASEC'] = ('[1:%s,1:%s]'%(np.shape(final)[1],np.shape(final)[0]))  
+            final.header['CD2_2'] = -0.123/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+        final.header['DATASEC'] = ('[1:%s,1:%s]'%(np.shape(final)[1],np.shape(final)[0]))
         final.write(sci.replace('/raw/','/red/').replace('.gz',''),overwrite=True)
         processed.append(final)
     return processed, masks
@@ -392,3 +396,79 @@ def trim(f):
 
 def trim_section(data):
     return data[625:1875,0:3600]
+
+def edit_raw_headers(rawdir):
+
+    for file in glob.glob(os.path.join(rawdir, '*.fits')):
+
+        hdu = fits.open(file)
+        h = hdu[0].header
+
+        if ('ELAPTIME' not in h.keys() and 'DATE-BEG' in h.keys() and
+            'DATE-END' in h.keys()):
+
+            t1 = Time(h['DATE-BEG'])
+            t2 = Time(h['DATE-END'])
+            dt = t2 - t1
+
+            hdu[0].header['ELAPTIME']=dt.to_value('sec')
+
+        if ('ELAPTIME' in h.keys() and int(h['ELAPTIME'])==0):
+            hdu[0].header['SLITNAME']=''
+            hdu[0].header['OBJECT']='bias'
+            hdu[0].header['KOAIMTYP']='bias'
+
+        if (('twi' in h['OBJECT'].lower() and 'flat' in h['OBJECT'].lower()) or
+            ('blank' in h['OBJECT'].lower()) or ('t_flat' in h['OBJECT'].lower())):
+            hdu[0].header['KOAIMTYP']='flatlamp'
+
+        if ('KOAIMTYP' not in h.keys()):
+
+            if ('twi' in h['OBJECT'] and 'flat' in h['OBJECT']):
+                hdu[0].header['KOAIMTYP']='flatlamp'
+            elif ('bias' in h['OBJECT'].lower()):
+                hdu[0].header['KOAIMTYP']='bias'
+            else:
+                hdu[0].header['KOAIMTYP']='object'
+
+        if 'NPIXSAT' not in h.keys():
+            npixsat = 0
+            for nh in hdu:
+                if (('VidInp' in nh.name) or
+                    (nh.name=='PRIMARY' and nh.data is not None)):
+                    npixsat += len(nh.data[np.where(nh.data>60000)])
+            hdu[0].header['NPIXSAT']=npixsat
+
+        if 'INSTREV' in h.keys() and h['INSTREV']=='REDMARK4':
+            coord = SkyCoord(h['RABASE'],h['DECBASE'],unit=(u.hour, u.deg))
+
+            hdu[0].header['CRPIX1']=2000.0
+            hdu[0].header['CRPIX2']=2000.0
+
+            hdu[0].header['CRVAL1']=coord.ra.degree
+            hdu[0].header['CRVAL2']=coord.dec.degree
+
+            # TODO: Check that this is the correct dependence on PA
+            pa = h['PA']
+            hdu[0].header['CD1_2']=-np.sin(pa * np.pi/180.0)*3.75E-05
+            hdu[0].header['CD2_1']=np.sin(pa * np.pi/180.0)*3.75E-05
+            hdu[0].header['CD1_1']=np.cos(pa * np.pi/180.0)*3.75E-05
+            hdu[0].header['CD2_2']=-np.cos(pa * np.pi/180.0)*3.75E-05
+
+        if 'INSTRUME' in h.keys() and h['INSTRUME']=='LRISBLUE':
+
+            coord = SkyCoord(h['RA'], h['DEC'], unit=(u.hour, u.deg))
+
+            hdu[0].header['CRPIX1']=1500.0
+            hdu[0].header['CRPIX2']=1300.0
+
+            hdu[0].header['CRVAL1']=coord.ra.degree
+            hdu[0].header['CRVAL2']=coord.dec.degree
+
+            pa = h['ROTPOSN']
+            hdu[0].header['CD1_2']=np.sin(pa * np.pi/180.0)*3.75E-05
+            hdu[0].header['CD2_1']=-np.sin(pa * np.pi/180.0)*3.75E-05
+            hdu[0].header['CD1_1']=np.cos(pa * np.pi/180.0)*3.75E-05
+            hdu[0].header['CD2_2']=-np.cos(pa * np.pi/180.0)*3.75E-05
+
+        hdu.writeto(file, overwrite=True, output_verify='silentfix')
