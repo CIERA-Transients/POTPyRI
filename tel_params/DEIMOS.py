@@ -14,6 +14,7 @@ import astropy.units as u
 import ccdproc
 from astropy.modeling import models
 import create_mask
+import glob
 
 __version__ = 1.5 #last edited 23/11/2021
 
@@ -42,7 +43,10 @@ def cal_path():
     return None
 
 def raw_format(proc):
-    return 'DE*.fits.gz'
+    if proc and str(proc)=='raw':
+        return 'd*.fits'
+    else:
+        return 'DE*.fits.gz'
 
 def dark():
     return False
@@ -278,3 +282,36 @@ def fringe_correction(fil):
 
 def trim(f):
     return False
+
+def edit_raw_headers(rawdir):
+
+    for file in glob.glob(os.path.join(rawdir, '*.fits')):
+
+        hdu = fits.open(file)
+        h = hdu[0].header
+
+        if ('ELAPTIME' not in h.keys() and 'DATE-BEG' in h.keys() and
+            'DATE-END' in h.keys()):
+
+            t1 = Time(h['DATE-BEG'])
+            t2 = Time(h['DATE-END'])
+            dt = t2 - t1
+
+            hdu[0].header['ELAPTIME']=dt.to_value('sec')
+
+        if (('twi' in h['OBJECT'].lower() and 'flat' in h['OBJECT'].lower()) or
+            ('blank' in h['OBJECT'].lower()) or
+            ('t_flat' in h['OBJECT'].lower()) or
+            ('sky' in h['OBJECT'].lower() and 'flat' in h['OBJECT'].lower())):
+            hdu[0].header['OBSTYPE']='DmFlat'
+
+        if 'bias' in h['OBJECT'].lower():
+            hdu[0].header['OBSTYPE']='Bias'
+
+        if 'PONAME3' in h.keys() and h['PONAME3'].lower().strip()=='image':
+            hdu[0].header['OBSMODE']='imaging'
+        else:
+            hdu[0].header['OBSMODE']='spectroscopy'
+
+
+        hdu.writeto(file, overwrite=True, output_verify='silentfix')
