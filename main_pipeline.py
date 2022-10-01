@@ -114,7 +114,8 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
             shutil.move(f,data_path)
 
     # CDK - added editing for headers with LRIS raw data files (*[b,r]*.fits)
-    if telescope=='LRIS' and proc and str(proc)=='raw':
+    if ((telescope=='LRIS' and proc and str(proc)=='raw') or
+        (telescope=='DEIMOS' and proc and str(proc)=='raw')):
         tel.edit_raw_headers(data_path)
     
     if os.path.exists(data_path+'/file_list.txt'):
@@ -138,7 +139,8 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
             sys.exit(-1)
 
     # CDK - added editing for headers with LRIS raw data files (*[b,r]*.fits)
-    if telescope=='LRIS' and proc and str(proc)=='raw':
+    if ((telescope=='LRIS' and proc and str(proc)=='raw') or
+        (telescope=='DEIMOS' and proc and str(proc)=='raw')):
         tel.edit_raw_headers(raw_path)
     
     if tel.bias():
