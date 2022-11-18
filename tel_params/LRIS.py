@@ -399,7 +399,7 @@ def trim_section(data):
 
 def edit_raw_headers(rawdir):
 
-    for file in glob.glob(os.path.join(rawdir, '*.fits')):
+    for file in sorted(glob.glob(os.path.join(rawdir, '*.fits'))):
 
         hdu = fits.open(file)
         h = hdu[0].header
@@ -413,13 +413,15 @@ def edit_raw_headers(rawdir):
 
             hdu[0].header['ELAPTIME']=dt.to_value('sec')
 
-        if ('ELAPTIME' in h.keys() and int(h['ELAPTIME'])==0):
+        if ('ELAPTIME' in h.keys() and float(h['ELAPTIME'])==0):
             hdu[0].header['SLITNAME']=''
             hdu[0].header['OBJECT']='bias'
             hdu[0].header['KOAIMTYP']='bias'
 
         if (('twi' in h['OBJECT'].lower() and 'flat' in h['OBJECT'].lower()) or
-            ('blank' in h['OBJECT'].lower()) or ('t_flat' in h['OBJECT'].lower())):
+            ('blank' in h['OBJECT'].lower()) or
+            ('t_flat' in h['OBJECT'].lower()) or
+            ('dome' in h['OBJECT'].lower() and 'flat' in h['OBJECT'].lower())):
             hdu[0].header['KOAIMTYP']='flatlamp'
 
         if ('KOAIMTYP' not in h.keys()):
@@ -455,7 +457,8 @@ def edit_raw_headers(rawdir):
             hdu[0].header['CD1_1']=np.cos(pa * np.pi/180.0)*3.75E-05
             hdu[0].header['CD2_2']=-np.cos(pa * np.pi/180.0)*3.75E-05
 
-        if 'INSTRUME' in h.keys() and h['INSTRUME']=='LRISBLUE':
+        if ('INSTRUME' in h.keys() and h['INSTRUME']=='LRISBLUE' and
+            'RA' in h.keys() and 'DEC' in h.keys()):
 
             coord = SkyCoord(h['RA'], h['DEC'], unit=(u.hour, u.deg))
 
