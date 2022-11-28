@@ -65,6 +65,16 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
     if not os.path.exists(red_path): #create reduced file path if it doesn't exist
         os.makedirs(red_path)
 
+    # Get path to code directory
+    abspath = os.path.abspath(sys.argv[0])
+    code_dir = os.path.split(abspath)[0]
+
+    # Copy config directory to data_path
+    config_dir = os.path.join(code_dir, 'Config')
+    if not os.path.exists(os.path.join(data_path, 'Config')):
+        shutil.copytree(config_dir, os.path.join(data_path, 'Config'))
+
+
     if cal_path is not None:
         cal_path = cal_path
     else:
@@ -95,11 +105,19 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
         if os.path.exists(data_path+'/file_list.txt'):
             os.remove(data_path+'/file_list.txt')
         if reset=='all':
-            files = glob.glob(raw_path+'*')+glob.glob(bad_path+'*')+glob.glob(spec_path+'*')
+            files = glob.glob(os.path.join(raw_path,'*'))+\
+                    glob.glob(os.path.join(bad_path,'*'))+\
+                    glob.glob(os.path.join(spec_path,'*'))
         if reset=='raw':
-            files = glob.glob(raw_path+'*')
+            files = glob.glob(os.path.join(raw_path,'*'))
         for f in files:
             shutil.move(f,data_path)
+
+    # CDK - added editing for headers with LRIS raw data files (*[b,r]*.fits)
+    if ((telescope=='LRIS' and proc and str(proc)=='raw') or
+        (telescope=='DEIMOS' and proc and str(proc)=='raw')):
+        print('Edit raw headers')
+        tel.edit_raw_headers(data_path)
     
     if os.path.exists(data_path+'/file_list.txt'):
         log.info('Previous file list exists, loading lists.')
@@ -120,6 +138,11 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
             log.critical('No files found, please check data path and rerun.')
             logging.shutdown()
             sys.exit(-1)
+
+    # CDK - added editing for headers with LRIS raw data files (*[b,r]*.fits)
+    if ((telescope=='LRIS' and proc and str(proc)=='raw') or
+        (telescope=='DEIMOS' and proc and str(proc)=='raw')):
+        tel.edit_raw_headers(raw_path)
     
     if tel.bias():
         bias_num = 0

@@ -79,7 +79,7 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
     bad_num = 0
     spec_num = 0
 
-    file_list = path+'/file_list.txt'
+    file_list = os.path.join(path,'file_list.txt')
     file_table = Table(names=('File','Target','Filter','Amp','Binning','Exp','Type','Time'),dtype=('S','S','S','S','S','S','S','float64'))
 
     for i, f in enumerate(files):
@@ -89,7 +89,7 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
             except IndexError:
                 log.error('Moving file '+f+' to bad due to error opening the file.')
                 file_type = 'BAD'
-                moved_path = path+'bad/'
+                moved_path = os.path.join(path,'bad/')
                 shutil.move(f,moved_path)
                 continue
             try:
@@ -97,7 +97,7 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
             except TypeError:
                 log.error('Moving file '+f+' to bad due to corrupted data.')
                 file_type = 'BAD'
-                moved_path = path+'bad/'
+                moved_path = os.path.join(path,'bad/')
                 shutil.move(f,moved_path)
                 continue
         try:
@@ -109,17 +109,17 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
             file_time = None
             if np.any([hdr[bad_keyword[j]] == bad_files[j] for j in range(len(bad_keyword))]):
                 file_type = 'BAD'
-                moved_path = path+'bad/'
+                moved_path = os.path.join(path,'bad/')
                 shutil.move(f,moved_path)
                 bad_num += 1            
             elif np.all([hdr[spec_keyword[j]] == spec_files[j] for j in range(len(spec_keyword))]):
                 file_type = 'SPEC'
-                moved_path = path+'spec/'
+                moved_path = os.path.join(path,'spec/')
                 shutil.move(f,moved_path)
                 spec_num += 1
             elif ((len(flat_keyword) != 0) & (np.all([flat_files[j] in hdr[flat_keyword[j]] for j in range(len(flat_keyword))])) & (telescope!='DEIMOS')) | ((len(flat_keyword) != 0) & (np.any([flat_files[j] in hdr[flat_keyword[j]] for j in range(len(flat_keyword))])) & (telescope=='DEIMOS')):
                 file_type = 'FLAT'
-                moved_path = path+'raw/' 
+                moved_path = os.path.join(path,'raw/')
                 shutil.move(f,moved_path)
                 try:
                     cal_list['FLAT_'+fil+'_'+amp+'_'+binn]
@@ -128,7 +128,7 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
                 cal_list['FLAT_'+fil+'_'+amp+'_'+binn].append(f.replace(path,moved_path))  
             elif len(bias_keyword) != 0 and np.all([hdr[bias_keyword[j]] == bias_files[j] for j in range(len(bias_keyword))]):
                 file_type = 'BIAS'
-                moved_path = path+'raw/'
+                moved_path = os.path.join(path,'raw/')
                 shutil.move(f,moved_path)
                 try:
                     cal_list['BIAS_'+amp+'_'+binn]
@@ -137,7 +137,7 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
                 cal_list['BIAS_'+amp+'_'+binn].append(f.replace(path,moved_path))
             elif np.all([hdr[science_keyword[j]] == science_files[j] for j in range(len(science_keyword))]):
                 file_type = 'SCIENCE'
-                moved_path = path+'raw/'
+                moved_path = os.path.join(path,'raw/')
                 shutil.move(f,moved_path)
                 try:
                     sci_list[target+'_'+fil+'_'+amp+'_'+binn]
@@ -158,7 +158,7 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
                     sky_list[fil+'_'+amp+'_'+binn].append(f.replace(path,moved_path))
             elif len(dark_keyword) != 0 and np.all([dark_files[j] in hdr[dark_keyword[j]] for j in range(len(dark_keyword))]):
                 file_type = 'DARK'
-                moved_path = path+'raw/'
+                moved_path = os.path.join(path,'raw/')
                 shutil.move(f,moved_path)
                 try:
                     cal_list['DARK_'+exp+'_'+amp+'_'+binn]
@@ -167,13 +167,13 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
                 cal_list['DARK_'+exp+'_'+amp+'_'+binn].append(f.replace(path,moved_path))
             else:
                 file_type = 'BAD'
-                moved_path = path+'bad/'
+                moved_path = os.path.join(path,'bad/')
                 shutil.move(f,moved_path)
                 bad_num += 1
         except Exception as e:
             log.error('Moving file '+f+' to bad due to error: '+str(e))
             file_type = 'BAD'
-            moved_path = path+'bad/'
+            moved_path = os.path.join(path,'bad/')
             shutil.move(f,moved_path)
             bad_num += 1
         file_table.add_row((moved_path+os.path.basename(f),target,fil,amp,binn,exp,file_type,file_time))
