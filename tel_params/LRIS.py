@@ -15,7 +15,7 @@ import ccdproc
 from astropy.modeling import models
 import create_mask
 
-__version__ = 1.8 #last edited 09/11/2021
+__version__ = 1.9 #last edited 18/11/2022
 
 def static_mask(proc):
     return ['']
@@ -183,7 +183,12 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
         log.info('Loading file: '+flat)
         with fits.open(flat) as hdr:
             header = hdr[0].header
-        if header['NPIXSAT'] < 10000:
+        try:
+            n_sat = header['NPIXSAT']
+        except KeyError:
+            log.error('No saturation keyword in header, continuing anyway. Please manually check flats and rerun if needed.')
+            n_sat = 0
+        if n_sat < 10000:
             if amp == '1R':
                 raw = [CCDData.read(flat, hdu=x, unit='adu') for x in range(int(amp[0]))]
                 red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
