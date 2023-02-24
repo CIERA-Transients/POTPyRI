@@ -6,7 +6,7 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.20" #last updated 26/01/2022
+__version__ = "1.21" #last updated 24/02/2023
 
 import sys
 import numpy as np
@@ -78,8 +78,8 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
     if cal_path is not None:
         cal_path = cal_path
     else:
-        cal_path = tel.cal_path() #os.getenv("HOME")+'/Pipelines/MMIRS_calib/'
-    if cal_path:             
+        cal_path = tel.cal_path()
+    if cal_path:
         flat_path = cal_path
     else:
         flat_path = red_path
@@ -118,7 +118,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
         (telescope=='DEIMOS' and proc and str(proc)=='raw')):
         print('Edit raw headers')
         tel.edit_raw_headers(data_path)
-    
+
     if os.path.exists(data_path+'/file_list.txt'):
         log.info('Previous file list exists, loading lists.')
         cal_list, sci_list, sky_list, time_list = Sort_files.load_files(data_path+'/file_list.txt', telescope,log)
@@ -143,7 +143,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
     if ((telescope=='LRIS' and proc and str(proc)=='raw') or
         (telescope=='DEIMOS' and proc and str(proc)=='raw')):
         tel.edit_raw_headers(raw_path)
-    
+
     if tel.bias():
         bias_num = 0
         for cal in cal_list:
@@ -241,7 +241,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
             for fil_list in sky_list:
                 fil = fil_list.split('_')[0]
                 amp = fil_list.split('_')[1]
-                binn = fil_list.split('_')[2]           
+                binn = fil_list.split('_')[2]
                 process_flat = True
                 if skip_red:
                     log.info('User input to skip reduction.')
@@ -267,11 +267,11 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                     tel.create_flat(sky_list[fil_list],fil,amp,binn,red_path,mbias=mbias,log=log)
                     t2 = time.time()
                     log.info('Master flat creation completed in '+str(t2-t1)+' sec')
-    
+
     if len(sci_list) == 0:
         log.critical('No science files to process, check data before rerunning.')
         logging.shutdown()
-        sys.exit(-1)     
+        sys.exit(-1)
     log.info('User input target for reduction: '+str(input_target))
     for tar in sci_list:
         stack = tel.stacked_image(tar,red_path)
@@ -294,7 +294,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
             if np.all([os.path.exists(st) for st in final_stack]):
                 process_data = False
             else:
-                log.error('Missing stacks, processing data.')   
+                log.error('Missing stacks, processing data.')
         if process_data:
             if tel.bias():
                 log.info('Loading master bias.')
@@ -326,7 +326,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                     sky_data = [processed[k] for _,k in time_diff[0:5]]
                     sky_mask = [masks[k] for _,k in time_diff[0:5]]
                     sky_masked_data = []
-                    for k in range(len(sky_data)): 
+                    for k in range(len(sky_data)):
                         bkg = Background2D(sky_data[k], (20, 20), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=sky_mask[k], exclude_percentile=80)
                         masked = np.array(sky_data[k])
                         masked[sky_mask[k]] = bkg.background[sky_mask[k]]
@@ -364,7 +364,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                                 bkg = Background2D(n, (20, 20), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=masks[m][k], exclude_percentile=80)
                                 masked = np.array(n)
                                 masked[masks[m][k]] = bkg.background[masks[m][k]]
-                                fringe_data.append(CCDData(masked,unit=u.electron/u.second))                            
+                                fringe_data.append(CCDData(masked,unit=u.electron/u.second))
                             fringe_map = ccdproc.combine(fringe_data,method='median',sigma_clip=True,sigma_clip_func=np.ma.median,mask=masks)
                             fringe_map.write(red_path+'fringe_map_'+fil+'_'+amp+'_'+binn+suffix[m],overwrite=True)
                             for j,n in enumerate(processed[m]):
@@ -408,7 +408,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                 if tel.run_wcs():
                     log.info('Solving WCS.')
                     try:
-                        wcs_error = solve_wcs.solve_wcs(stack[k],telescope,log=log)   
+                        wcs_error = solve_wcs.solve_wcs(stack[k],telescope,log=log)
                         log.info(wcs_error)
                         stack[k] = stack[k].replace('.fits','_wcs.fits')
                     except:
@@ -433,7 +433,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                         if len(cat_stars) == 0:
                             log.info('No stars found in this catalog.')
                             continue
-                        else:                            
+                        else:
                             wcs_error = solve_wcs.man_wcs(telescope, stack[k].replace('_wcs',''), cat, cat_stars_ra, cat_stars_dec)
                             log.info(wcs_error)
                             redo_wcs = input(Back.GREEN+'Please review the WCS plots and errors. Do you wish to manually redo wcs (yes or no)?  '+Style.RESET_ALL)
@@ -519,19 +519,18 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
 
 def main():
     params = argparse.ArgumentParser(description='Path of data.')
-    params.add_argument('telescope', default=None, help='Path of data, in default format from KOA.') #path to MOSFIRE data: required
-    params.add_argument('data_path', default=None, help='Path of data, in default format from KOA.') #path to MOSFIRE data: required
-    params.add_argument('--use_dome_flats', type=str, default=None, help='Use dome flats for flat reduction.') #use dome flat instead of sci images to create master flat
-    params.add_argument('--skip_red', type=str, default=None, help='Option to skip reduction.') #
-    params.add_argument('--target', type=str, default=None, help='Option to only reduce this target.') #
-    params.add_argument('--proc', type=str, default=True, help='If working with the _proc data from MMT.')
-    params.add_argument('--cal_path', type=str, default=None, help='Use dome flats for flat reduction.') #use dome flat instead of sci images to create master flat
-    params.add_argument('--phot', type=str, default=None, help='Option to perform aperture photometry.') #must have pyraf install and access to IRAF to use
-    params.add_argument('--reset', type=str, default=None, help='Option to reset data files.') #must have pyraf install and access to IRAF to use
+    params.add_argument('telescope', default=None, help='Name of instrument (must be in tel_params folder) of data to reduce. Required to run pipeline. Use TEST to run the pipeline test.')
+    params.add_argument('data_path', default=None, help='Path of data to reduce. See manual for specific details. Required to run pipeline.')
+    params.add_argument('--use_dome_flats', type=str, default=None, help='Use dome flats instead of science images to create master flat for NIR. Optional parameter. Default is False.')
+    params.add_argument('--skip_red', type=str, default=None, help='Option to skip reduction i.e. the creation of master files used for calibration or the stacked image for science targets. See manual for specific details. Optional parameter.')
+    params.add_argument('--target', type=str, default=None, help='Option to only reduce a specific target. String used here must be contained within the target name in file headers. Optional parameter.')
+    params.add_argument('--proc', type=str, default=True, help='Option to use the _proc data from MMT. Optional parameter. Default is False')
+    params.add_argument('--cal_path', type=str, default=None, help='Full path of the folder containing calibrations if different from the default. Optional parameter.')
+    params.add_argument('--phot', type=str, default=None, help='Option to perform aperture photometry on stacked image. See manual for specific details. Optional parameter.')
+    params.add_argument('--reset', type=str, default=None, help='Option to reset data files sorted previously by pipeline. Optional parameter.')
     args = params.parse_args()
-    
+
     main_pipeline(args.telescope,args.data_path,args.cal_path,input_target=args.target,skip_red=args.skip_red,proc=args.proc,use_dome_flats=args.use_dome_flats,phot=args.phot,reset=args.reset)
 
 if __name__ == "__main__":
     main()
-    
