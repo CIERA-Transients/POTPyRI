@@ -34,7 +34,13 @@ import solve_wcs
 import quality_check
 import psf
 import absphot
-import Find_target_phot as tp
+
+# Update to new photutils methods and deprecate previous Find_target_phot when possible
+try:
+    import Find_target_phot as tp
+except ImportError:
+    import Find_target_phot_new as tp
+
 import extinction
 from utilities.util import *
 from colorama import init, Fore, Back, Style
@@ -48,7 +54,8 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
     try:
         tel = importlib.import_module('tel_params.'+telescope)
     except ImportError:
-        print('No such telescope file, please check that you have entered the'+\
+        telfile='tel_params.'+telescope
+        print(f'No such telescope file {telfile}, please check that you have entered the'+\
             ' correct name or this telescope is available.''')
         sys.exit(-1)
 

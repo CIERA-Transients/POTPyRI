@@ -4,7 +4,17 @@ import astropy
 import datetime
 import numpy as np
 from astropy.coordinates import SkyCoord
-from photutils import make_source_mask, Background2D, MeanBackground
+from photutils import Background2D, MeanBackground
+
+use_segm = False
+try:
+    from photutils import make_source_mask
+except ImportError:
+    use_segm=True
+    from astropy.stats import sigma_clipped_stats, SigmaClip
+    from photutils.segmentation import SegmentationImage,detect_sources,detect_threshold
+    from photutils.utils import circular_footprint
+
 from astropy.stats import SigmaClip
 from astropy.io import fits
 from astropy.time import Time
@@ -271,7 +281,16 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
         processed_data = ccdproc.flat_correct(sci_full, flat_image)
         log.info('File proccessed.')
         log.info('Cleaning cosmic rays and creating mask.')
-        mask = make_source_mask(processed_data, nsigma=3, npixels=5)
+
+        if not use_segm:
+            mask = make_source_mask(processed_data, nsigma=3, npixels=5)
+        else:
+            sigma_clip = SigmaClip(sigma=3.0, maxiters=10)
+            threshold = detect_threshold(processed_data.data, nsigma=2.0, sigma_clip=sigma_clip)
+            segment_img = detect_sources(processed_data.data, threshold, npixels=5)
+            footprint = circular_footprint(radius=10)
+            mask = segment_img.make_source_mask(footprint=footprint)
+
         masks.append(mask)
         # clean, com_mask = create_mask.create_mask(sci,processed_data,'_mask.fits',static_mask(proc),mask,saturation(red.header),binn(),np.mean(readnoise(amp)),cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
         # processed_data.data = clean
