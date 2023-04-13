@@ -24,7 +24,7 @@ import argparse
 import logging
 import astropy.wcs as wcs
 from astropy.nddata import CCDData
-from photutils import Background2D, MeanBackground
+from photutils.background import Background2D, MeanBackground
 from astropy.stats import SigmaClip
 from astropy.coordinates import SkyCoord
 import importlib
