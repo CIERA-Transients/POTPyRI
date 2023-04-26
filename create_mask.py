@@ -26,7 +26,7 @@ def create_mask(science_file,red,suffix,static_mask,source_mask,saturation,binni
     data = np.ascontiguousarray(red.data.astype(np.float32))
     
     log.info('Masking saturated pixels.')
-    mask_sat = np.zeros((np.shape(data)[0],np.shape(data)[1])).astype(np.bool) #create empty mask
+    mask_sat = np.zeros((np.shape(data)[0],np.shape(data)[1])).astype(bool) #create empty mask
     astroscrappy.update_mask(data,mask_sat,saturation,True) #add saturated stars to mask
     mask_sat = mask_sat.astype(np.uint8) #set saturated star mask type
     mask_sat[data >= saturation] = 4 #set saturated pixel flag
@@ -34,7 +34,7 @@ def create_mask(science_file,red,suffix,static_mask,source_mask,saturation,binni
 
     log.info('Cleaning and masking cosmic rays.')
     log.info('Using sigclip = %d, sigfrac = %.1f, objlim = %d'%(sigclip,sigfrac,objlim))
-    mask_cr, clean = astroscrappy.detect_cosmics(data,inmask=(mask_bp+mask_sat+source_mask).astype(np.bool),sigclip=sigclip,sigfrac=sigfrac,readnoise=rdnoise,satlevel=saturation,objlim=objlim) #clean science image of cosmic rays and create cosmic ray mask
+    mask_cr, clean = astroscrappy.detect_cosmics(data,inmask=(mask_bp+mask_sat+source_mask).astype(bool),sigclip=sigclip,sigfrac=sigfrac,readnoise=rdnoise,satlevel=saturation,objlim=objlim) #clean science image of cosmic rays and create cosmic ray mask
     mask_cr = mask_cr.astype(np.uint8) #set cosmic ray mask type
     mask_cr[mask_cr == 1] = 2 #set cosmic ray flag
     
@@ -45,8 +45,9 @@ def create_mask(science_file,red,suffix,static_mask,source_mask,saturation,binni
     for j in range(3):
         fits.PrimaryHDU(binned_data).writeto(red_path+'/binned_mask.fits',overwrite=True) #write binned data to tmp file
         results, errors = detsat(red_path+'/binned_mask.fits', chips=[0], n_processes=1, buf=40, sigma=3, h_thresh=0.2) #detect sateliite trails
-        trail_coords = results[(red_path+'/binned_mask.fits',0)] #create satellite trail if found
-        if len(trail_coords) > 0: #continue if sateliite trail found
+
+        if len(results) > 0: #continue if sateliite trail found
+            trail_coords = results[(red_path+'/binned_mask.fits',0)] #create satellite trail if found
             trail_segment = trail_coords[0]
             try:
                 mask_binned = make_mask(red_path+'/binned_mask.fits', 0, trail_segment, sublen=5, pad=0, sigma=5, subwidth=5000).astype(np.uint8) #create satellite trail mask
