@@ -496,11 +496,11 @@ def onpick(event, source_list, cat_list, std_list, log=None):
     else:
         print(event.artist.get_label())
     if 'Source' in label:
-        source_list.append([np.float(label.split('x = ')[1].split(',')[0]),np.float(label.split('y = ')[1])])
+        source_list.append([float(label.split('x = ')[1].split(',')[0]),float(label.split('y = ')[1])])
     elif 'Catalog' in label:
-        cat_list.append([np.float(label.split('RA = ')[1].split(',')[0]),np.float(label.split('Dec = ')[1])])
+        cat_list.append([float(label.split('RA = ')[1].split(',')[0]),float(label.split('Dec = ')[1])])
     else:
-        std_list.append(np.float(label.split('mag = ')[1]))
+        std_list.append(float(label.split('mag = ')[1]))
 
 def get_coord_from_table(table1, cat1ra='ra', cat1dec='dec', cat1coord=False):
 
