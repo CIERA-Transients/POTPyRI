@@ -140,7 +140,16 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
         mdark = CCDData.read(red_path+'DARK_'+str(red.header['EXPTIME'])+'_'+amp+'_'+binn+'.fits', unit=u.electron)        
         red = ccdproc.subtract_dark(red, mdark, exposure_time='EXPTIME', exposure_unit=u.second)
         red = ccdproc.subtract_overscan(red, overscan=red[:,0:4], overscan_axis=1, model=models.Chebyshev1D(3))
-        mask = make_source_mask(red, nsigma=3, npixels=5)
+
+        if not use_segm:
+            mask = make_source_mask(red, nsigma=3, npixels=5)
+        else:
+            sigma_clip = SigmaClip(sigma=3.0, maxiters=10)
+            threshold = detect_threshold(red.data, nsigma=2.0, sigma_clip=sigma_clip)
+            segment_img = detect_sources(red.data, threshold, npixels=5)
+            footprint = circular_footprint(radius=10)
+            mask = segment_img.make_source_mask(footprint=footprint)
+
         bkg = Background2D(red, (20, 20), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=mask, exclude_percentile=80)
         masked = np.array(red)
         masked[mask] = bkg.background[mask]
@@ -225,7 +234,7 @@ def create_dark(cal_list,cal,mbias,red_path,log):
     mdark_hdu.header['VER'] = (__version__, 'Version of telescope parameter file used.')
     for i,im in enumerate(images):
         mdark_hdu.header['FILE'+str(i+1)] = im
-    mdark_hdu.header['EXPTIME'] = (np.float(cal.split('_')[1]), 'Exposure time of master dark (sec).')
+    mdark_hdu.header['EXPTIME'] = (float(cal.split('_')[1]), 'Exposure time of master dark (sec).')
     mdark_hdu.writeto(red_path+cal+'.fits',overwrite=True)
     log.info('Master dark written to '+cal+'.fits')
     return
