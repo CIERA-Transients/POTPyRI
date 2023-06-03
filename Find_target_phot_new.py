@@ -177,7 +177,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
         log.info("Pixel coordinates: (%.3f, %.3f)" % (x, y))
     else:
         print("Pixel coordinates: (%.3f, %.3f)" % (x, y))
-    if input(Back.GREEN+'Would you like to choose the cutout size? Default is 50"x50". '+Style.RESET_ALL) == "yes":
+    if input(Back.RED+'Would you like to choose the cutout size? Default is 50"x50". '+Style.RESET_ALL) == "yes":
         try:
             d_x_y = int(input("Choose the radius, in arcsec: "))*2.5
         except TypeError:
@@ -238,7 +238,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
                 plt.colorbar()
                 plt.show()
 
-        if input(Back.GREEN+"Would you like to use a centroid? Type 'yes' or 'no': "+Style.RESET_ALL) == "yes":
+        if input(Back.RED+"Would you like to use a centroid? Type 'yes' or 'no': "+Style.RESET_ALL) == "yes":
             d_x_y = 50
             d = data[int(y)-d_x_y:int(y)+d_x_y, int(x)-d_x_y:int(x)+d_x_y]      # Cutout of source; upside down from normal
             x_mesh, y_mesh = np.meshgrid(np.linspace(0, np.shape(d)[1] - 1, np.shape(d)[1]),
@@ -271,7 +271,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
             plt.colorbar()
             plt.show()
 
-        if input(Back.GREEN+"Are you ok with this position? Type 'yes' or 'no': "+Style.RESET_ALL) != "yes":
+        if input(Back.RED+"Are you ok with this position? Type 'yes' or 'no': "+Style.RESET_ALL) != "yes":
             pass
         else:
             correct_position = "yes"
@@ -282,7 +282,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
             if log2 is not None:
                 log2.info("Final coordinates: (%.3f, %.3f) at RA = %.5f and Dec = %.5f" % (x, y, ra, dec))
 
-    print(Back.GREEN+"You will now get to choose the radii for the circular aperture and the r_in and r_out of the annulus"+Style.RESET_ALL)
+    print(Back.RED+"You will now get to choose the radii for the circular aperture and the r_in and r_out of the annulus"+Style.RESET_ALL)
     correct_radii = "no"
     while correct_radii == "no":
         if log is not None:
@@ -291,7 +291,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
         else:
             print("Automatic radii picked by comparing to FWHM of field: rad = %.3f, r_in = %.3f, r_out = %.3f" %
                   (2.5 * fwhm, 2.5 * fwhm, 4.5 * fwhm))
-        if input(Back.GREEN+"Would you like to use these radii? Type 'yes or 'no': "+Style.RESET_ALL) == "yes":
+        if input(Back.RED+"Would you like to use these radii? Type 'yes or 'no': "+Style.RESET_ALL) == "yes":
             rad, r_in, r_out = 2.5*fwhm, 2.5*fwhm, 4.5*fwhm
         else:
             if log:
@@ -333,7 +333,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
             plt.colorbar()
             plt.show()
 
-        correct_radii = input(Back.GREEN+"Are you ok with the previously selected radii? Type 'yes' or 'no': "+Style.RESET_ALL)
+        correct_radii = input(Back.RED+"Are you ok with the previously selected radii? Type 'yes' or 'no': "+Style.RESET_ALL)
     if log is not None:
         log.info("Radii chosen in pixels: %.3f, %.3f, %.3f" % (rad, r_in, r_out))
     else:
