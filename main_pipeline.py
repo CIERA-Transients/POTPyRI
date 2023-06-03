@@ -34,6 +34,7 @@ import solve_wcs
 import quality_check
 import psf
 import absphot
+from astroquery.astrometry_net import AstrometryNet
 
 # Update to new photutils methods and deprecate previous Find_target_phot when possible
 try:
@@ -137,7 +138,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
             log.info(str(len(files))+' files found.')
             cal_list, sci_list, sky_list, time_list = Sort_files.sort_files(files,telescope,data_path,log)
             print('Please check the created file list and make any nessecary edits (e.g. remove bad files mentioned by the observing log etc.)')
-            con = input(Back.GREEN+'Did you edit the file list (yes or no)? '+Style.RESET_ALL)
+            con = input(Back.RED+'Did you edit the file list (yes or no)? '+Style.RESET_ALL)
             if con=='yes':
                 log.info('Edits made to the file list by the user, reloading file list.')
                 cal_list, sci_list, sky_list, time_list = Sort_files.load_files(data_path+'/file_list.txt', telescope,log)
@@ -409,7 +410,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                 sci_med.write(stack[k],overwrite=True)
                 log.info('Median stack made for '+stack[k])
                 print('Please check the quality of the stack made.')
-                con = input(Back.GREEN+'Would you like to continue with the reduction (solving the WCS) for this stack (yes or no)? '+Style.RESET_ALL)
+                con = input(Back.RED+'Would you like to continue with the reduction (solving the WCS) for this stack (yes or no)? '+Style.RESET_ALL)
                 if con=='no':
                     continue
                 if tel.run_wcs():
@@ -418,10 +419,52 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                         wcs_error = solve_wcs.solve_wcs(stack[k],telescope,log=log)
                         log.info(wcs_error)
                         stack[k] = stack[k].replace('.fits','_wcs.fits')
-                    except:
+                    except Exception as e:
+                        print(e)
                         log.error('Automatic WCS solution failed.')
-                    redo_wcs = input(Back.GREEN+'Please review the WCS plots and errors. Do you wish to manually redo wcs (yes or no)?  '+Style.RESET_ALL)
-                    while redo_wcs=='yes':
+                    log.info("Below requires an Astrometry.net API key to be configured locally")
+                    redo_w_anet = input(Back.RED+'Please review the WCS plots and errors. Do you wish to redo wcs with Astrometry.net (yes or no)?  '+Style.RESET_ALL)
+                    while redo_w_anet=='yes':
+                        anet = AstrometryNet()
+                        try_again = True
+                        submission_id = None
+                        while try_again:
+                            try:
+                                # submission_id is none if this is the first iteration
+                                # in which case, submit new request for solving
+                                if not submission_id:
+                                    log.info("Submitting solve image request to Astrometry.net")
+                                    header_new = anet.solve_from_image(stack[k].replace('_wcs',''), 
+                                                                        solve_timeout=600, submission_id=submission_id, 
+                                                                        publicly_visible='n', allow_commercial_use='n')
+                                else:
+                                    # if submission has already been made, monitor it
+                                    log.info(f"Monitoring existing Astrometry.net submission with submission_id={submission_id}")
+                                    header_new = anet.monitor_submission(submission_id, solve_timeout=600)
+                            except Exception as e:
+                                # Solving or monitoring function likely timed out
+                                # Store submission id (necessary for first try) and retry 
+                                submission_id = e.args[1]
+                            else:
+                                # Astrometry.net solving succeeded, so stop retrying
+                                try_again = False
+
+                        # Update stack[k] with fixed WCS header
+                        with fits.open(stack[k].replace('_wcs','')) as hdr:
+                            # old_header = hdr[0].header
+                            stack_data = hdr[0].data
+                        
+                        wcs_file = stack[k].replace('_wcs','').replace('.fits','_wcs.fits')
+                        fits.writeto(wcs_file, stack_data, header_new, overwrite=True)
+
+                        redo_w_anet = input(Back.RED+'Do you wish to redo Astrometry.net wcs correction (yes or no)?  '+Style.RESET_ALL)
+
+                        # if not redoing, update filename
+                        if redo_w_anet == 'no':
+                            stack[k] = stack[k].replace('_wcs','').replace('.fits','_wcs.fits')
+
+                    redo_man = input(Back.RED+'Do you wish to redo wcs manually (yes or no)?  '+Style.RESET_ALL)
+                    while redo_man == 'yes':
                         log.info('Manually redoing WCS.')
                         cat = input(Fore.RED+'Please enter the name of the catalog you wish to use. The options are "gaia" (GAIA DR3), "sdssdr12" (SDSSDR12), "2mass" (2MASS). '+Style.RESET_ALL)
                         if cat == 'gaia':
@@ -443,22 +486,23 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                         else:
                             wcs_error = solve_wcs.man_wcs(telescope, stack[k].replace('_wcs',''), cat, cat_stars_ra, cat_stars_dec)
                             log.info(wcs_error)
-                            redo_wcs = input(Back.GREEN+'Please review the WCS plots and errors. Do you wish to manually redo wcs (yes or no)?  '+Style.RESET_ALL)
-                    try:
-                        if wcs_error!=0:
-                            stack[k] = stack[k].replace('_wcs','').replace('.fits','_wcs.fits')
-                    except UnboundLocalError:
-                        log.error('WCS solution could not be calculated. Skipping the rest of the reduction for this target.')
-                        continue
+                            redo_man = input(Back.RED+'Please review the WCS plots and errors. Do you wish to manually redo wcs (yes or no)?  '+Style.RESET_ALL)
+                        if redo_man == "no":
+                            try:
+                                if wcs_error!=0:
+                                    stack[k] = stack[k].replace('_wcs','').replace('.fits','_wcs.fits')
+                            except UnboundLocalError:
+                                log.error('WCS solution could not be calculated. Skipping the rest of the reduction for this target.')
+                                continue
                 if tel.run_phot():
-                    con = input(Back.GREEN+'Based on the WCS solution, would you like to continue with the PSF photometry for this stack (yes or no)? '+Style.RESET_ALL)
+                    con = input(Back.RED+'Based on the WCS solution, would you like to continue with the PSF photometry for this stack (yes or no)? '+Style.RESET_ALL)
                     if con=='no':
                         continue
                     log.info('Running psf photometry.')
                     try:
                         epsf, fwhm = psf.do_phot(stack[k])
                         log.info('FWHM = %2.4f"'%(fwhm*tel.pixscale()))
-                        con = input(Back.GREEN+'Please check the PSF determined. Would you like to continue with the reduction (calculating zero point) for this stack (yes or no)? '+Style.RESET_ALL)
+                        con = input(Back.RED+'Please check the PSF determined. Would you like to continue with the reduction (calculating zero point) for this stack (yes or no)? '+Style.RESET_ALL)
                         if con=='yes':
                             log.info('Calculating zeropint.')
                             zp_catalogs = tel.catalog_zp()
@@ -472,7 +516,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
         if phot:
             log.info('User input to perform manual aperture photometry.')
             log.info('List of final stacks: '+str(final_stack))
-            k = int(input(Back.GREEN+'Index (starting from 0) of the stack you want to perform aperture photometry on? '+Style.RESET_ALL))
+            k = int(input(Back.RED+'Index (starting from 0) of the stack you want to perform aperture photometry on? '+Style.RESET_ALL))
             log.info('Performing aperture photometry on '+final_stack[k])
             if not os.path.exists(final_stack[k].replace('.fits','.pcmp')):
                 log.info('Running psf photometry.')
@@ -488,7 +532,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
             header, table = import_catalog(final_stack[k].replace('.fits','.pcmp'))
             fwhm = header['FWHM']
             log.info('FWHM = %2.4f pixels'%fwhm)
-            enter_zp = input(Back.GREEN+'Enter user zeropiont instead of loading from psf photometry ("yes" or "no")? '+Style.RESET_ALL)
+            enter_zp = input(Back.RED+'Enter user zeropiont instead of loading from psf photometry ("yes" or "no")? '+Style.RESET_ALL)
             if enter_zp == 'yes':
                 zp = float(input(Fore.RED+'Please enter zeropoint in AB mag: '+Style.RESET_ALL))
                 zp_err = float(input(Fore.RED+'Please enter zeropoint error in AB mag: '+Style.RESET_ALL))
@@ -505,7 +549,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                     log.info('User entered zpt = %2.4f +/- %2.4f AB mag'%(zp,zp_err))
             with fits.open(final_stack[k]) as hdr:
                 gain_eff = hdr[0].header['GAIN']
-            pos = input(Back.GREEN+'Would you like to enter the RA and Dec ("wcs") or x and y ("xy") position of the target? '+Style.RESET_ALL)
+            pos = input(Back.RED+'Would you like to enter the RA and Dec ("wcs") or x and y ("xy") position of the target? '+Style.RESET_ALL)
             if pos == 'wcs':
                 ra = float(input(Fore.RED+'Enter RA in degrees: '+Style.RESET_ALL))
                 dec = float(input(Fore.RED+'Enter Dec in degrees: '+Style.RESET_ALL))
