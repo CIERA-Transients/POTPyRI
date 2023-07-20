@@ -456,7 +456,10 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                         
                         # Add important fields back into new header
                         # GAIN is needed for aperture photometry, add other necessary fields here
-                        fields_to_transfer = ['GAIN']
+                        fields_to_transfer = [
+                            'MJD-OBS', 'TIMFIRST', 'TIMLAST', 'EXPTIME', 
+                            'EXPTOT', 'GAIN', 'RDNOISE', 'NFILES'
+                        ]
                         for field in fields_to_transfer:
                             header_new[field] = header_old[field]
 
