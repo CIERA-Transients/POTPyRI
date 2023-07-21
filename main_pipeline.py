@@ -451,9 +451,18 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
 
                         # Update stack[k] with fixed WCS header
                         with fits.open(stack[k].replace('_wcs','')) as hdr:
-                            # old_header = hdr[0].header
+                            header_old = hdr[0].header
                             stack_data = hdr[0].data
                         
+                        # Add important fields back into new header
+                        # GAIN is needed for aperture photometry, add other necessary fields here
+                        fields_to_transfer = [
+                            'MJD-OBS', 'TIMFIRST', 'TIMLAST', 'EXPTIME', 
+                            'EXPTOT', 'GAIN', 'RDNOISE', 'NFILES'
+                        ]
+                        for field in fields_to_transfer:
+                            header_new[field] = header_old[field]
+
                         wcs_file = stack[k].replace('_wcs','').replace('.fits','_wcs.fits')
                         fits.writeto(wcs_file, stack_data, header_new, overwrite=True)
 
