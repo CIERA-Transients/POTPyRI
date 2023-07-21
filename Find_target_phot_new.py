@@ -158,14 +158,14 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
         w = wcs.WCS(header)  # Parse the WCS keywords in the primary HDU
 
     if ra is not None:
-        coords = np.array([[ra, dec]], np.float)  # Array of coordinates: [[RA, Dec]] in [deg, deg]
+        coords = np.array([[ra, dec]], float)  # Array of coordinates: [[RA, Dec]] in [deg, deg]
         pixel_coords = w.wcs_world2pix(coords, 1)[0]     # Find the pixel coordinates in the image
         x = pixel_coords[0]
         y = pixel_coords[1]
     elif x is not None:
         x-=1
         y-=1
-        coords = np.array([[x, y]], np.float)  # Array of coordinates: [[RA, Dec]] in [deg, deg]
+        coords = np.array([[x, y]], float)  # Array of coordinates: [[RA, Dec]] in [deg, deg]
         pixel_coords = w.wcs_pix2world(coords, 1)[0]     # Find the pixel coordinates in the image
         ra = pixel_coords[0]
         dec = pixel_coords[1]
@@ -219,7 +219,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
 
             if len(new_coords) != 0:
                 x, y = new_coords[0]
-                real_coords = w.wcs_pix2world(np.array([[x, y]], np.float), 1)[0]  # Find the pixel coords in the image
+                real_coords = w.wcs_pix2world(np.array([[x, y]], float), 1)[0]  # Find the pixel coords in the image
                 ra, dec = real_coords[0], real_coords[1]
 
                 radial_profile(data, x, y, 0.2, fwhm, rad=6)        # Radial profile
@@ -252,7 +252,7 @@ def find_target_phot(stack, fil, fwhm, zp, zp_err, pixscale, show_phot=False, lo
             else:
                 print('Centroid calculated position: (%.3f, %.3f)'%(x, y))
 
-            real_coords = w.wcs_pix2world(np.array([[x, y]], np.float), 1)[0]  # Find the pixel coords in the image
+            real_coords = w.wcs_pix2world(np.array([[x, y]], float), 1)[0]  # Find the pixel coords in the image
             ra, dec = real_coords[0], real_coords[1]
 
             radial_profile(data, x, y, 0.2, fwhm, rad=6)        # Radial profile
