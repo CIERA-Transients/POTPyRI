@@ -461,7 +461,8 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                             'EXPTOT', 'GAIN', 'RDNOISE', 'NFILES'
                         ]
                         for field in fields_to_transfer:
-                            header_new[field] = header_old[field]
+                            if field in header_old.keys():
+                                header_new[field] = header_old[field]
 
                         wcs_file = stack[k].replace('_wcs','').replace('.fits','_wcs.fits')
                         fits.writeto(wcs_file, stack_data, header_new, overwrite=True)
