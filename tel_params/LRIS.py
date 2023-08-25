@@ -185,6 +185,23 @@ def load_flat(flat):
     mflat = CCDData.read(flat[0],unit=u.electron)
     return mflat
 
+def format_datasec(sec_string, binning=1):
+    sec_string = sec_string.replace('[','').replace(']','')
+    x,y = sec_string.split(',')
+    x1,x2 = x.split(':')
+    y1,y2 = y.split(':')
+
+    x1 = float(x1) ; x2 = float(x2) ; y1 = float(y1) ; y2 = float(y2)
+
+    x1 = np.max([int(1.0*x1/binning),1])
+    x2 = int(1.0*x2/binning)
+    y1 = np.max([int(1.0*y1/binning),1])
+    y2 = int(1.0*y2/binning)
+
+    sec_string = f'[{x1}:{x2},{y1}:{y2}]'
+
+    return(sec_string)
+
 def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
     log.info('Processing files for filter: '+fil)
     log.info(str(len(flat_list))+' files found.')
@@ -204,9 +221,18 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
             n_sat = 0
         if n_sat < 10000:
             if amp == '1R':
+                bin1,bin2 = header['BINNING'].split(',')
+                bin1 = float(bin1) ; bin2=float(bin2)
+
                 raw = [CCDData.read(flat, hdu=x, unit='adu') for x in range(int(amp[0]))]
                 red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
-                flat_full = CCDData(np.concatenate([np.concatenate([red[0][723:2064,284:2064],red[0][723:2064,2170:3956]],axis=1),np.concatenate([red[0][2185:3485,284:2064],red[0][2185:3485,2170:3956]],axis=1)],axis=0),header=header,unit=u.electron)
+                
+                sl1 = str_to_slice(get_1R_datasec(1,binning=bin1))
+                sl2 = str_to_slice(get_1R_datasec(2,binning=bin1))
+                sl3 = str_to_slice(get_1R_datasec(3,binning=bin2))
+                sl4 = str_to_slice(get_1R_datasec(4,binning=bin2))
+
+                flat_full = CCDData(np.concatenate([np.concatenate([red[0][sl1],red[0][sl2]],axis=1),np.concatenate([red[0][sl3],red[0][sl4]],axis=1)],axis=0),header=header,unit=u.electron)
             else:
                 raw = [CCDData.read(flat, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
                 red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=x.header['DATASEC'], gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
@@ -226,6 +252,43 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
     mflat.write(red_path+'mflat_'+fil+'_'+amp+'_'+binn+'.fits',overwrite=True)
     log.info('Master flat written to mflat_'+fil+'_'+amp+'_'+binn+'.fits')
     return
+
+# Data sections for new red amplifier
+def get_1R_datasec(amp, binning=1):
+
+    if binning==1:
+        if amp==1:
+            return('[723:2064,284:2064]')
+        elif amp==2:
+            return('[723:2064,2170:3956]')
+        elif amp==3:
+            return('[2185:3485,284:2064]')
+        elif amp==4:
+            return('[2185:3485,2170:3956]')
+    elif binning==2:
+        if amp==1:
+            return('[437:1032,146:1032]')
+        elif amp==2:
+            return('[437:1032,1177:2069]')
+        elif amp==3:
+            return('[1152:1784,146:1032]')
+        elif amp==4:
+            return('[1152:1784,1177:2069]')
+
+
+
+def str_to_slice(sec_string):
+
+    sec_string = sec_string.replace('[','').replace(']','')
+    x,y = sec_string.split(',')
+    x1,x2 = x.split(':')
+    y1,y2 = y.split(':')
+
+    x1 = int(x1) ; x2 = int(x2) ; y1 = int(y1) ; y2 = int(y2)
+
+    sl = np.s_[x1:x2,y1:y2]
+
+    return(sl)
 
 def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=None,log=None):
     masks = []
@@ -258,9 +321,17 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
                 else:
                     trim_sec = [hdr[k+1].header['DATASEC'] for k in range(len(mbias))]
         if amp == '1R':
+            bin1,bin2 = header['BINNING'].split(',')
+            bin1 = float(bin1) ; bin2=float(bin2)
             raw = [CCDData.read(sci, hdu=x, unit='adu') for x in range(int(amp[0]))]
             red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
-            sci_full = CCDData(np.concatenate([np.concatenate([red[0][723:2064,284:2064],red[0][723:2064,2170:3956]],axis=1),np.concatenate([red[0][2185:3485,284:2064],red[0][2185:3485,2170:3956]],axis=1)],axis=0),header=header,unit=u.electron)
+            
+            sl1 = str_to_slice(get_1R_datasec(1,binning=bin1))
+            sl2 = str_to_slice(get_1R_datasec(2,binning=bin1))
+            sl3 = str_to_slice(get_1R_datasec(3,binning=bin2))
+            sl4 = str_to_slice(get_1R_datasec(4,binning=bin2))
+
+            sci_full = CCDData(np.concatenate([np.concatenate([red[0][sl1],red[0][sl2]],axis=1),np.concatenate([red[0][sl3],red[0][sl4]],axis=1)],axis=0),header=header,unit=u.electron)
         else:
             raw = [CCDData.read(sci, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
             red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=trim_sec[k], gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
@@ -395,13 +466,17 @@ def readnoise(amp):
         readnoise = [4]
     return readnoise
 
-def overscan_region(amp):
+def overscan_region(amp, binning=1):
     if amp=='4B':
         oscan_reg = '[1:50,1:4096]'
     if amp=='4R':
         oscan_reg = '[1:7,1:2520]'
     if amp=='1R':
-        oscan_reg = '[2065:2170,1:4248]'
+        b1=int(2065./binning)
+        b2=int(2170./binning)
+        b3=np.max([int(1./binning),1])
+        b4=int(4248./binning)
+        oscan_reg = f'[{b1}:{b2},{b3}:{b4}]'
     return oscan_reg
 
 def fringe_correction(fil):
@@ -476,10 +551,12 @@ def edit_raw_headers(rawdir):
 
             # TODO: Check that this is the correct dependence on PA
             pa = h['PA']
-            hdu[0].header['CD1_2']=-np.sin(pa * np.pi/180.0)*3.75E-05
-            hdu[0].header['CD2_1']=np.sin(pa * np.pi/180.0)*3.75E-05
-            hdu[0].header['CD1_1']=np.cos(pa * np.pi/180.0)*3.75E-05
-            hdu[0].header['CD2_2']=-np.cos(pa * np.pi/180.0)*3.75E-05
+            bin1,bin2 = h['BINNING'].split(',')
+
+            hdu[0].header['CD1_2']=-np.sin(pa * np.pi/180.0)*3.75E-05*int(bin1)
+            hdu[0].header['CD2_1']=np.sin(pa * np.pi/180.0)*3.75E-05*int(bin1)
+            hdu[0].header['CD1_1']=np.cos(pa * np.pi/180.0)*3.75E-05*int(bin2)
+            hdu[0].header['CD2_2']=-np.cos(pa * np.pi/180.0)*3.75E-05*int(bin2)
 
         if ('INSTRUME' in h.keys() and h['INSTRUME']=='LRISBLUE' and
             'RA' in h.keys() and 'DEC' in h.keys()):
