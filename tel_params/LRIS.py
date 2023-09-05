@@ -38,7 +38,7 @@ def wcs_extension():
     return 0
 
 def pixscale():
-    return 0.129 #0.135, 0.123 #new one?
+    return 0.135 #0.135, 0.123 #new one?
 
 def saturation(hdr):
     return 65535
@@ -254,6 +254,7 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
     return
 
 # Data sections for new red amplifier
+# [SS] This needs to be read in from the DSEC keyworkds.
 def get_1R_datasec(amp, binning=1):
 
     if binning==1:
