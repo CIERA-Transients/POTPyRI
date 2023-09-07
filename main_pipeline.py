@@ -152,6 +152,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
         (telescope=='DEIMOS' and proc and str(proc)=='raw')):
         tel.edit_raw_headers(raw_path)
 
+    # Master bias creation
     if tel.bias():
         bias_num = 0
         for cal in cal_list:
@@ -178,6 +179,7 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
             logging.shutdown()
             sys.exit(-1)
 
+    # Master dark creation
     if tel.dark():
         for cal in cal_list:
             if 'DARK' in cal:
@@ -206,7 +208,8 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                     tel.create_dark(cal_list,cal,mbias,red_path,log)
                     t2 = time.time()
                     log.info('Master dark creation completed in '+str(t2-t1)+' sec')
-
+    
+    # Master flat creation
     if tel.flat():
         for cal in cal_list:
             if 'FLAT' in cal:
@@ -276,10 +279,16 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                     t2 = time.time()
                     log.info('Master flat creation completed in '+str(t2-t1)+' sec')
 
+    # Science files
+    #######################################################################################################
+    # Basic processing
+    # Does it even need to run?
     if len(sci_list) == 0:
         log.critical('No science files to process, check data before rerunning.')
         logging.shutdown()
         sys.exit(-1)
+    
+    # Begin processing
     log.info('User input target for reduction: '+str(input_target))
     for tar in sci_list:
         stack = tel.stacked_image(tar,red_path)
@@ -297,13 +306,17 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
         else:
             final_stack = stack
         process_data = True
+        # Skip reduction if requested
         if skip_red:
             log.info('User input to skip reduction.')
             if np.all([os.path.exists(st) for st in final_stack]):
                 process_data = False
             else:
                 log.error('Missing stacks, processing data.')
+        # Proceed otherwise
         if process_data:
+
+            # Load bias frame
             if tel.bias():
                 log.info('Loading master bias.')
                 try:
@@ -313,6 +326,8 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                     continue
             else:
                 mbias = None
+
+            # Load flat frame
             log.info('Loading master flat.')
             master_flat = tel.flat_name(flat_path, fil, amp, binn)
             if not np.all([os.path.exists(mf) for mf in master_flat]):
@@ -321,9 +336,14 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
             flat_data = tel.load_flat(master_flat)
             t1 = time.time()
             log.info('Processing data for '+str(tar))
+
+            # Bias subtraction, gain correction and flat correction. and flat fielding
             processed, masks = tel.process_science(sci_list[tar],fil,amp,binn,red_path,mbias=mbias,mflat=flat_data,proc=proc,log=log)
             t2 = time.time()
             log.info('Data processed in '+str(t2-t1)+' sec')
+
+            # Background subtraction
+            # IR image?
             if wavelength=='NIR':
                 t1 = time.time()
                 log.info('NIR data, creating NIR sky maps.')
@@ -349,8 +369,10 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                     processed[j] = n.subtract(sky,propagate_uncertainties=True,handle_meta='first_found')
                 t2 = time.time()
                 log.info('Sky maps complete and subtracted in '+str(t2-t1)+' sec')
+            # Optical image?
             if wavelength=='OPT':
                 t1 = time.time()
+                # Fringe correction needed?
                 if tel.fringe_correction(fil):
                     dimen = len(stack)
                     for m in range(dimen):
@@ -379,6 +401,8 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                                 processed[m][j] = n.subtract(fringe_map,propagate_uncertainties=True,handle_meta='first_found')
                     t2 = time.time()
                     log.info('Fringe correction complete and subtracted in '+str(t2-t1)+' sec')
+            
+            # Write reduced data to file and stack images with the same pointing
             log.info('Writing out reduced data.')
             dimen = len(stack)
             if dimen == 1:
@@ -410,9 +434,12 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                 sci_med.write(stack[k],overwrite=True)
                 log.info('Median stack made for '+stack[k])
                 print('Please check the quality of the stack made.')
+
+                ## WCS solution
                 con = input(Back.RED+'Would you like to continue with the reduction (solving the WCS) for this stack (yes or no)? '+Style.RESET_ALL)
                 if con=='no':
                     continue
+                # Auto-WCS solution
                 if tel.run_wcs():
                     log.info('Solving WCS.')
                     try:
@@ -423,6 +450,8 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                         print(e)
                         log.error('Automatic WCS solution failed.')
                     log.info("Below requires an Astrometry.net API key to be configured locally")
+
+                    # Redo with Astrometry.net?
                     redo_w_anet = input(Back.RED+'Please review the WCS plots and errors. Do you wish to redo wcs with Astrometry.net (yes or no)?  '+Style.RESET_ALL)
                     while redo_w_anet=='yes':
                         anet = AstrometryNet()
@@ -467,22 +496,40 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                         wcs_file = stack[k].replace('_wcs','').replace('.fits','_wcs.fits')
                         fits.writeto(wcs_file, stack_data, header_new, overwrite=True)
 
+                        # Ask user if they want to refine the WCS from Astrometry.net using the Auto-WCS procedure
+                        refine_wcs = input(Back.RED+'Do you wish to refine the WCS solution using the auto-WCS procedure (yes or no)?  '+Style.RESET_ALL)
+                        if refine_wcs == 'yes':
+                            try:
+                                log.info('Refining WCS.')
+                                wcs_error = solve_wcs.solve_wcs(wcs_file,telescope,log=log, apply_distortion=False)
+                                log.info(wcs_error)
+                            except Exception as e:
+                                print(e)
+                                log.error('Automatic WCS refinement failed.')
                         redo_w_anet = input(Back.RED+'Do you wish to redo Astrometry.net wcs correction (yes or no)?  '+Style.RESET_ALL)
 
                         # if not redoing, update filename
                         if redo_w_anet == 'no':
                             stack[k] = stack[k].replace('_wcs','').replace('.fits','_wcs.fits')
-
                     redo_man = input(Back.RED+'Do you wish to redo wcs manually (yes or no)?  '+Style.RESET_ALL)
                     while redo_man == 'yes':
                         log.info('Manually redoing WCS.')
                         cat = input(Fore.RED+'Please enter the name of the catalog you wish to use. The options are "gaia" (GAIA DR3), "sdssdr12" (SDSSDR12), "2mass" (2MASS). '+Style.RESET_ALL)
+                        use_prev_wcs = input(Back.RED+'Do you wish to use the previous WCS solution (yes or no)?  '+Style.RESET_ALL)
+                        if use_prev_wcs == 'yes':
+                            stack_file = stack[k]
+                        else:
+                            stack_file = stack[k].replace('_wcs','')
                         if cat == 'gaia':
-                            cat_header, cat_stars = import_catalog(stack[k].replace('_wcs','').replace('.fits','_wcs.gaia'))
+                            if '_wcs' in stack_file:
+                                gaia_cat = stack_file.replace('.fits','.gaia')
+                            else:
+                                gaia_cat = stack_file.replace('.fits','_wcs.gaia')
+                            cat_header, cat_stars = import_catalog(gaia_cat)
                             cat_stars_ra = cat_stars['ra']
                             cat_stars_dec = cat_stars['dec']
                         else:
-                            with fits.open(stack[k].replace('_wcs','')) as hdr:
+                            with fits.open(stack_file) as hdr:
                                 header = hdr[0].header
                                 data = hdr[0].data
                             ra_center, dec_center = (wcs.WCS(header)).all_pix2world(np.shape(data)[1]/2,np.shape(data)[0]/2,1)
@@ -494,13 +541,13 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
                             log.info('No stars found in this catalog.')
                             continue
                         else:
-                            wcs_error = solve_wcs.man_wcs(telescope, stack[k].replace('_wcs',''), cat, cat_stars_ra, cat_stars_dec)
+                            wcs_error = solve_wcs.man_wcs(telescope, stack_file, cat, cat_stars_ra, cat_stars_dec)
                             log.info(wcs_error)
                             redo_man = input(Back.RED+'Please review the WCS plots and errors. Do you wish to manually redo wcs (yes or no)?  '+Style.RESET_ALL)
                         if redo_man == "no":
                             try:
                                 if wcs_error!=0:
-                                    stack[k] = stack[k].replace('_wcs','').replace('.fits','_wcs.fits')
+                                    stack[k] = stack_file.replace('_wcs','').replace('.fits','_wcs.fits')
                             except UnboundLocalError:
                                 log.error('WCS solution could not be calculated. Skipping the rest of the reduction for this target.')
                                 continue
