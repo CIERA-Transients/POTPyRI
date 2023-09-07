@@ -64,7 +64,7 @@ def run_photometry(img_file, epsf, fwhm, x, y, subtract_back=False,
     if subtract_back:
         bkg = Background2D(img_hdu[0].data, (21,21), filter_size=(3,3))
         image = img_hdu[0].data - bkg.background
-        ndimage = NDData(data=backsub)
+        ndimage = NDData(data=image)
     else:
         image = img_hdu[0].data
         ndimage = NDData(data=img_hdu[0].data)
@@ -157,6 +157,10 @@ def write_out_catalog(catalog, img_file, columns, sigfig, outfile, metadata):
         catdata.append(outline)
 
     # Finally write out catalog
+    # Delete the outfile if it already exists:
+    if os.path.exists(outfile):
+        os.remove(outfile)
+        
     write_catalog(outfile, header, catdata)
 
 def do_phot(img_file, write_out_back=False, write_out_residual=False,
