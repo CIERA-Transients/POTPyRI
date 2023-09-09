@@ -34,6 +34,7 @@ import solve_wcs
 import quality_check
 import psf
 import absphot
+from custom_logger import ColoredLogger
 from astroquery.astrometry_net import AstrometryNet
 
 # Update to new photutils methods and deprecate previous Find_target_phot when possible
@@ -94,17 +95,9 @@ def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=N
 
     wavelength = tel.wavelength()
 
-    log_file_name = red_path+telescope+'_log_'+datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')+'.log' #create log file name
-    log = logging.getLogger(log_file_name) #create logger
-    log.setLevel(logging.INFO) #set level of logger
-    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s") #set format of logger
-    logging.Formatter.converter = time.gmtime #convert time in logger to UCT
-    filehandler = logging.FileHandler(log_file_name, 'w+') #create log file
-    filehandler.setFormatter(formatter) #add format to log file
-    log.addHandler(filehandler) #link log file to logger
-    streamhandler = logging.StreamHandler() #add log stream to logger
-    streamhandler.setFormatter(formatter) #add format to log stream
-    log.addHandler(streamhandler) #link logger to log stream
+    log_file_name = os.path.join(red_path,
+                                 telescope+'_log_'+datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')+'.log') #create log file name
+    log = ColoredLogger(log_file_name) #create log file
 
     log.info('Running main pipeline version '+str(__version__))
     log.info('Running telescope paramater file version '+str(tel.__version__))
