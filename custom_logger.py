@@ -11,7 +11,7 @@ COLOR_SEQ = "\033[1;%dm"
 BOLD_SEQ = "\033[1m"
 
 def formatter_message(message, use_color = True):
-    # Boldens some text only when rich text/color is requested.
+    # Bold face some text only when rich text/color is requested.
     if use_color:
         message = message.replace("$RESET", RESET_SEQ).replace("$BOLD", BOLD_SEQ)
     else:
