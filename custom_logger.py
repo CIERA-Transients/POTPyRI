@@ -1,5 +1,6 @@
-import logging
+import logging, time
 
+# Define some colors for different log levels
 BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
 
 #The background is set with 40 plus the number of the color, and the foreground with 30
@@ -10,12 +11,14 @@ COLOR_SEQ = "\033[1;%dm"
 BOLD_SEQ = "\033[1m"
 
 def formatter_message(message, use_color = True):
+    # Boldens some text only when rich text/color is requested.
     if use_color:
         message = message.replace("$RESET", RESET_SEQ).replace("$BOLD", BOLD_SEQ)
     else:
         message = message.replace("$RESET", "").replace("$BOLD", "")
     return message
 
+# Dictionary of colors for different log levels
 COLORS = {
     'WARNING': YELLOW,
     'INFO': GREEN,
@@ -32,30 +35,42 @@ class ColoredFormatter(logging.Formatter):
     def format(self, record):
         levelname = record.levelname
         if self.use_color and levelname in COLORS:
+            # Change color of levelname only if it is requested
             levelname_color = COLOR_SEQ % (30 + COLORS[levelname]) + levelname + RESET_SEQ
             record.levelname = levelname_color
-        elif not self.use_color:
+        elif not self.use_color and RESET_SEQ in levelname:
+            # Remove color of levelname if coloring is not requested
             record.levelname = levelname[7:].replace(RESET_SEQ, "")
+        else:
+            # No change in levelname
+            pass
         return logging.Formatter.format(self, record)
     
 # Custom logger class with multiple destinations
 class ColoredLogger(logging.Logger):
+    # Define formats for stream and file logging
     ST_FMT = "[$BOLD%(filename)s::%(lineno)d$RESET] [%(levelname)s]  %(message)s"
     F_FMT = "[$BOLD%(asctime)s::%(filename)s::%(lineno)d$RESET] [%(levelname)s] %(message)s"
     STREAM_FORMAT = formatter_message(ST_FMT, True)
     FILE_FORMAT = formatter_message(F_FMT, False)
+    # initialize logger
     def __init__(self, filename):
         
-        #logging.Formatter.converter = time.gmtime #convert time in logger to UCT
+        # Set logging level
         logging.Logger.__init__(self, None, logging.INFO)                
 
+        # Create a stream handler
         streamhandler = logging.StreamHandler()
         streamhandler.setFormatter(ColoredFormatter(self.STREAM_FORMAT, use_color=True))
 
+        # Now a file handler
         filehandler = logging.FileHandler(filename, mode='w+')
         filehandler.setLevel(logging.INFO)
+        file_formatter = ColoredFormatter(self.FILE_FORMAT, use_color=False)
+        file_formatter.converter = time.gmtime #convert time in logger to UTC
         filehandler.setFormatter(ColoredFormatter(self.FILE_FORMAT, use_color=False))
 
+        # Add both handlers
         self.addHandler(streamhandler)
         self.addHandler(filehandler)
         return
