@@ -48,7 +48,13 @@ from utilities.util import *
 from colorama import init, Fore, Back, Style
 init()
 
-def main_pipeline(telescope,data_path,cal_path=None,input_target=None,skip_red=None,proc=None,use_dome_flats=None,phot=None,reset=None):
+def main_pipeline(telescope:str,data_path:str,
+                  cal_path:str=None,
+                  input_target:list=None,
+                  skip_red:bool=None,
+                  proc:str=None,
+                  use_dome_flats:bool=None,
+                  phot:bool=None,reset:bool=None)->None:
     #start time
     t_start = time.time()
     #import telescope parameter file
