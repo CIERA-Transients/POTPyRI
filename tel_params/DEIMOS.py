@@ -164,8 +164,12 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
         log.info('Loading file: '+flat)
         with fits.open(flat) as hdr:
             header = hdr[0].header
+        if header['DETSEC01'] == '[1:2048,1:4096]':
+            trim_sec = '[13:2060,1321:3921]'
+        else:
+            trim_sec = '[13:2060,1:2601]'
         raw = [CCDData.read(flat, hdu=x+1, unit='adu') for x in range(int(amp))]
-        red = [ccdproc.ccd_process(x, oscan=x[:,0:13], oscan_model=models.Chebyshev1D(3), trim='[13:2060,1:2601]', gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
+        red = [ccdproc.ccd_process(x, oscan=x[:,0:13], oscan_model=models.Chebyshev1D(3), trim=trim_sec, gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
         if amp == '4':
             flat_full = CCDData(np.concatenate([red[0],np.zeros([2601,113]),red[1],np.zeros([2601,81]),red[2],np.zeros([2601,113]),red[3]],axis=1),header=header,unit=u.electron/u.second)
         if amp == '8':
@@ -192,8 +196,12 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
         log.info('Applying bias correction, gain correction and flat correction.')
         with fits.open(sci) as hdr:
             header = hdr[0].header
+        if header['DETSEC01'] == '[1:2048,1:4096]':
+            trim_sec = '[13:2060,1321:3921]'
+        else:
+            trim_sec = '[13:2060,1:2601]'
         raw = [CCDData.read(sci, hdu=x+1, unit='adu') for x in range(int(amp))]
-        red = [ccdproc.ccd_process(x, oscan=x[:,0:13], oscan_model=models.Chebyshev1D(3), trim='[13:2060,1:2601]', gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
+        red = [ccdproc.ccd_process(x, oscan=x[:,0:13], oscan_model=models.Chebyshev1D(3), trim=trim_sec, gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
         if amp == '4':
             sci_full = CCDData(np.concatenate([red[0],np.zeros([2601,113]),red[1],np.zeros([2601,81]),red[2],np.zeros([2601,113]),red[3]],axis=1),header=header,unit=u.electron)
         if amp == '8':
