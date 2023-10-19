@@ -4,6 +4,7 @@
 "Author: Kerry Paterson."
 
 # Updated by CDK - 13 Mar 2021
+# Updated by SS - 8 Sep 2023
 
 # Sort the calibration files:
 def find_catalog(catalog,fil):
@@ -28,9 +29,11 @@ def find_catalog(catalog,fil):
 
     catalog_ID, ra, dec, mag, err = None, None, None, None, None
 
+    # If these catalogs are to be updated in the future, select mag columns that correspond to the
+    # PSF mags.
     if catalog == 'SDSS':
         if fil.lower() not in ['u','g','r','i','z']: return(catalog_ID, ra, dec, mag, err)
-        catalog_ID, ra, dec, mag, err = 'V/147', 'RA_ICRS', 'DE_ICRS', fil.lower()+'mag', 'e_'+fil.lower()+'mag'
+        catalog_ID, ra, dec, mag, err = 'V/154', 'RA_ICRS', 'DE_ICRS', fil.lower()+'mag', 'e_'+fil.lower()+'mag'
     elif catalog == '2MASS':
         if fil.upper() not in ['J','H','K']: return(catalog_ID, ra, dec, mag, err)
         catalog_ID, ra, dec, mag, err = 'II/246', 'RAJ2000', 'DEJ2000', fil.upper()+'mag', 'e_'+fil.upper()+'mag'

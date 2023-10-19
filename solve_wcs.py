@@ -42,23 +42,50 @@ import warnings
 warnings.simplefilter('ignore', category=AstropyWarning)
 
 def man_wcs(telescope, stack, cat, cat_stars_ra, cat_stars_dec):
+
+    # Load instrument parameters
     global tel
     tel = importlib.import_module('tel_params.'+telescope)
-    with fits.open(stack) as hdr:
-        stack_header = hdr[0].header
-        stack_data = hdr[0].data
+
+    # Get image data and header
+    stack_data, stack_header = fits.getdata(stack, header=True)
+
+    # Plot
     fig, ax = plt.subplots(figsize=(7,7))
+
+    # Display image first
     ax.imshow(stack_data, cmap='gray', norm=ImageNormalize(stack_data, interval=ZScaleInterval()))
+
+    # Catalog objects
     x, y = (wcs.WCS(stack_header)).all_world2pix(cat_stars_ra,cat_stars_dec,1)
-    [ax.add_patch(patches.Circle((x[i],y[i]),radius=5,edgecolor='g',alpha=0.8,facecolor='none',
-            linewidth=1,label='Catalog star: RA = %f, Dec = %f'%(cat_stars_ra[i],cat_stars_dec[i]),
-            picker=True)) for i in range(len(x))]
-    _, median, std = sigma_clipped_stats(stack_data, sigma=3.0)
+
+    for xi,yi, rai, deci, in zip(x,y,cat_stars_ra,cat_stars_dec):
+        ax.add_patch(patches.Circle((xi,yi),
+                                    radius=6,
+                                    edgecolor='g',
+                                    alpha=0.8,
+                                    facecolor='none',
+                                    linewidth=1,
+                                    label='Catalog star: RA = %f, Dec = %f'%(rai,deci),
+                                    picker=True)
+                                    )
+    
+    # Now extract objects from the image
+    _, _, std = sigma_clipped_stats(stack_data, sigma=3.0)
     daofind = DAOStarFinder(fwhm=5.0, threshold=10.*std)
     sources = daofind(np.asarray(stack_data))
-    [ax.add_patch(patches.Circle((sources['xcentroid'][i],sources['ycentroid'][i]),radius=4,edgecolor='r',
-            alpha=0.5,facecolor='none',linewidth=1,label='Source star x = %f, y = %f'
-            %(sources['xcentroid'][i],sources['ycentroid'][i]),picker=True)) for i in range(len(sources))]
+    for entry in sources:
+        ax.add_patch(patches.Circle((entry['xcentroid'],entry['ycentroid']),
+                                    radius=4,
+                                    edgecolor='r',
+                                    alpha=0.5,
+                                    facecolor='none',
+                                    linewidth=1,
+                                    label='Source star x = %f, y = %f'%(entry['xcentroid'],entry['ycentroid']),
+                                    picker=True)
+                                    )
+    
+    # Begin interactive plot
     source_star = []
     cat_star = []
     fig.canvas.mpl_connect('pick_event', lambda event: util.onpick(event,source_star,cat_star,[]))
@@ -68,13 +95,18 @@ def man_wcs(telescope, stack, cat, cat_stars_ra, cat_stars_dec):
     print(Fore.RED+'Note: star selection is turned off in zoom/pan mode (you need to de-select the mode in order to select stars).'+Style.RESET_ALL)
     print(Fore.RED+'Close figure when finished.'+Style.RESET_ALL)
     plt.show()
+
+    # Get user selected stars and save to file
     starsx = np.array([source_star[i][0] for i in range(len(source_star))])
     starsy = np.array([source_star[i][1] for i in range(len(source_star))])
     catstarsra = np.array([cat_star[i][0] for i in range(len(cat_star))])
     catstarsdec = np.array([cat_star[i][1] for i in range(len(cat_star))])
+    cat_radec = SkyCoord(catstarsra, catstarsdec,unit=u.deg)
     np.savetxt(stack.replace('.fits','.xy'),np.c_[starsx,starsy])
     np.savetxt(stack.replace('.fits','.radec'),np.c_[catstarsra,catstarsdec])
     check_len = True
+
+    # Prompt user to check
     while check_len:
         con = input(Back.GREEN+'Please check and edit the .xy and .radec files in the case of errors. Hit any key to continue. '+Style.RESET_ALL)
         starsx,starsy = np.loadtxt(stack.replace('.fits','.xy'),unpack=True)
@@ -84,19 +116,29 @@ def man_wcs(telescope, stack, cat, cat_stars_ra, cat_stars_dec):
         else:
             print('Length of the x and y star positions and the RA and Dec position are not equal.')
     catx, caty = (wcs.WCS(stack_header)).all_world2pix(catstarsra,catstarsdec,1)
-    tform = tf.estimate_transform('euclidean', np.c_[starsx, starsy], np.c_[catx, caty])
-    header_trans = apply_wcs_transformation(stack_header,tform)
-    header_new = apply_wcs_distortion(header_trans,starsx,starsy,catstarsra,catstarsdec)
-    header_new['WCS_REF'] = (cat, 'Reference catalog for astrometric solution.')
-    header_new['WCS_NUM'] = (len(starsx), 'Number of stars used for astrometric solution.')
-    stars_ra, stars_dec = (wcs.WCS(header_new)).all_pix2world(starsx,starsy,1)
+    #tform = tf.estimate_transform('euclidean', np.c_[starsx, starsy], np.c_[catx, caty])
+    # header_trans = apply_wcs_transformation(stack_header,tform)
+    # header_trans = apply_wcs_distortion(header_trans,starsx,starsy,catstarsra,catstarsdec)
+    # header_trans['WCS_REF'] = (cat, 'Reference catalog for astrometric solution.')
+    # header_trans['WCS_NUM'] = (len(starsx), 'Number of stars used for astrometric solution.')
+
+    # This is the new way of doing things, which is hopefully working
+    corrected_wcs = wcs.utils.fit_wcs_from_points((starsx, starsy), cat_radec, sip_degree=3)
+    corrected_wcshdr = corrected_wcs.to_header(relax=True)
+    header_trans = stack_header.copy()
+    for kw, val, comment in corrected_wcshdr.cards:
+        header_trans.set(kw, value=val,comment=comment)
+
+    stars_ra, stars_dec = (wcs.WCS(header_trans)).all_pix2world(starsx,starsy,1)
     stars_radec = SkyCoord(stars_ra*u.deg,stars_dec*u.deg)
-    cat_radec = SkyCoord(catstarsra, catstarsdec,unit=u.deg)
-    wcs_file = stack.replace('_wcs','').replace('.fits','_wcs.fits')
-    error = calculate_error(wcs_file, stars_radec, cat_radec, header_new)
+    if 'wcs' not in stack:
+        wcs_file = stack.replace('.fits','_wcs.fits')
+    else:
+        wcs_file = stack.replace('_wcs','').replace('.fits','_wcs.fits')
+    error = calculate_error(wcs_file, stars_radec, cat_radec, header_trans)
     make_reg(wcs_file, starsx, starsy)
     wcs_plots(wcs_file, stack_data, starsx, starsy, catx, caty, 'image')
-    fits.writeto(wcs_file,stack_data,header_new,overwrite=True)
+    fits.writeto(wcs_file,stack_data,header_trans,overwrite=True)
     return 'Median rms on astrometry is %.3f arcsec.'%error
 
 def wcs_plots(filename,data,x1,y1,x2,y2,type):
@@ -157,8 +199,8 @@ def apply_wcs_transformation(header,tform):
     header['CD1_2'] = cd_transformed[0][1]
     header['CD2_1'] = cd_transformed[1][0]
     header['CD2_2'] = cd_transformed[1][1]
-    header['CTYPE1'] = 'RA---TAN'
-    header['CTYPE2'] = 'DEC--TAN'
+    header['CTYPE1'] = 'RA---TAN-SIP'
+    header['CTYPE2'] = 'DEC--TAN-SIP'
     old_keywords = tel.WCS_keywords_old()
     for old in old_keywords:
         try:
@@ -168,9 +210,9 @@ def apply_wcs_transformation(header,tform):
     return header
 
 def ptv_fit(data,*p):
-    xi,eta=data
+    xi,eta=data.T
     r = np.sqrt(xi**2+eta**2)
-    d = [1,xi,eta,r,xi**2,xi*eta,eta**2,xi**3,xi**2*eta,xi*eta**2,eta**3,r**3]
+    d = [np.ones_like(xi),xi,eta,r,xi**2,xi*eta,eta**2,xi**3,xi**2*eta,xi*eta**2,eta**3,r**3]
     if len(d) <= len(p):
         return np.sum([p[i]*d[i] for i in range(len(d))])
     else:
@@ -184,8 +226,8 @@ def apply_wcs_distortion(header,starsx,starsy,gaiastarsra,gaiastarsdec):
         p0 = [0,1]+[0]*10
     else:
         p0 = [0,1]+[0]*(len(xi)-2)
-    p1 = curve_fit(ptv_fit,(xi,eta),dra,p0=p0)[0]
-    p2 = curve_fit(ptv_fit,(eta,xi),ddec,p0=p0)[0]
+    p1 = curve_fit(ptv_fit,np.array((xi,eta)).T,dra.value,p0=np.array(p0))[0]
+    p2 = curve_fit(ptv_fit,np.array((eta,xi)).T,ddec.value,p0=np.array(p0))[0]
     header['CTYPE1'] = 'RA---TPV'
     header['CTYPE2'] = 'DEC--TPV'
     del header['PV*']
@@ -340,7 +382,7 @@ def match_quads(stars,gaiastars,d,gaiad,ds,gaiads,ratios,gaiaratios,sky_coords=T
     return np.array(starsx_unq[0:len(gaiastarsra_unq)]), np.array(starsy_unq[0:len(gaiastarsdec_unq)]), np.array(gaiastarsra_unq[0:len(starsx_unq)]), np.array(gaiastarsdec_unq[0:len(starsy_unq)])
 
 #main function to calculate astrometric solution
-def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None, proc=None, log=None):
+def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None, proc=None, log=None, apply_distortion=True):
     #start time
     t_start = time.time()
 
@@ -372,12 +414,16 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
     #mask and sort table
     if log:
         log.info('Masking sources and applying brightness cuts.')
+    # Remove bad sources
     table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)&(table['MAGERR_BEST']!=99)]
+    # Apply static mask?
     if static_mask:
         with fits.open(static_mask) as mask_hdu:
             stat_mask = mask_hdu[0].data
         table = table[(stat_mask[table['YWIN_IMAGE'].astype(int)-1,table['XWIN_IMAGE'].astype(int)-1]!=0)]
+    # Sort by brightness
     table.sort('MAG_BEST')
+    # Keep only the bright sources
     table = table[table['MAG_BEST']<(np.median(table['MAG_BEST'])-np.std(table['MAG_BEST']))]
     if log:
         log.info('Total of %d usable stars'%len(table))
@@ -410,7 +456,11 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
     #writing out gaia catalog
     columns = ['ra','dec','phot_g_mean_mag']
     sigfig=[7,7,4]
-    woc(gaia, input_file, columns, sigfig, input_file.replace('.fits','_wcs.gaia'), {})
+    if '_wcs.fits' in input_file:
+        outfile = input_file.replace('_wcs.fits','_wcs.gaia')
+    else:
+        outfile = input_file.replace('.fits','_wcs.gaia')
+    woc(gaia, input_file, columns, sigfig, outfile, {})
 
     #make quads using stars brigher than 20 mag
     if log:
@@ -447,8 +497,8 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
         header['CD1_2'] = header[cd12]
         header['CD2_1'] = header[cd21]
         header['CD2_2'] = header[cd22]
-        header['CTYPE1'] = 'RA---TAN'
-        header['CTYPE2'] = 'DEC--TAN'
+        header['CTYPE1'] = 'RA---TAN-SIP'
+        header['CTYPE2'] = 'DEC--TAN-SIP'
         old_keywords = tel.WCS_keywords_old()
         for old in old_keywords:
             try:
@@ -476,28 +526,48 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
     #calculate and apply full transformation
     if log:
         log.info('Calculating the full transformation between the matched stars.')
-    tform = tf.estimate_transform('euclidean', np.c_[starx_match, stary_match], np.c_[gaiax_match, gaiay_match])
-    if log:
-        log.info('Applying the full transformation to the existing WCS in the header.')
-    header_new['CRPIX1'] = header_new['CRPIX1']-tform.translation[0]
-    header_new['CRPIX2'] = header_new['CRPIX2']-tform.translation[1]
-    cd = np.array([header_new['CD1_1'],header_new['CD1_2'],header_new['CD2_1'],header_new['CD2_2']]).reshape(2,2)
-    cd_matrix = tf.EuclideanTransform(rotation=tform.rotation)
-    cd_transformed = tf.warp(cd,cd_matrix)
-    header_new['CD1_1'] = cd_transformed[0][0]
-    header_new['CD1_2'] = cd_transformed[0][1]
-    header_new['CD2_1'] = cd_transformed[1][0]
-    header_new['CD2_2'] = cd_transformed[1][1]
-    header_new['WCS_REF'] = ('GAIA-DR3', 'Reference catalog for astrometric solution.')
-    header_new['WCS_NUM'] = (len(starx_match), 'Number of stars used for astrometric solution.')
+    
+    # This is the old way of doing things, but it's not working for some reason.
+    #################################################################################################################
+    # tform = tf.estimate_transform('euclidean', np.c_[starx_match, stary_match], np.c_[gaiax_match, gaiay_match])
+    # if log:
+    #     log.info('Applying the full transformation to the existing WCS in the header.')
+    # header_new['CRPIX1'] = header_new['CRPIX1']-tform.translation[0]
+    # header_new['CRPIX2'] = header_new['CRPIX2']-tform.translation[1]
+    # cd = np.array([header_new['CD1_1'],header_new['CD1_2'],header_new['CD2_1'],header_new['CD2_2']]).reshape(2,2)
+    # cd_matrix = tf.EuclideanTransform(rotation=tform.rotation)
+    # cd_transformed = tf.warp(cd,cd_matrix)
+    # header_new['CD1_1'] = cd_transformed[0][0]
+    # header_new['CD1_2'] = cd_transformed[0][1]
+    # header_new['CD2_1'] = cd_transformed[1][0]
+    # header_new['CD2_2'] = cd_transformed[1][1]
+    # header_new['WCS_REF'] = ('GAIA-DR3', 'Reference catalog for astrometric solution.')
+    # header_new['WCS_NUM'] = (len(starx_match), 'Number of stars used for astrometric solution.')
 
-    #calculate polynomial distortion
-    if log:
-        log.info('Calculating and applying the higher order polynomial distortion.')
-    header_dist = apply_wcs_distortion(header_new, starx_match, stary_match, gaia[match]['ra'],gaia[match]['dec'])
+    # #calculate polynomial distortion
+    # if apply_distortion:
+    #     if log:
+    #         log.info('Calculating and applying the higher order polynomial distortion.')
+    #     header_dist = apply_wcs_distortion(header_new, starx_match, stary_match, gaia[match]['ra'],gaia[match]['dec'])
+    # else:
+    #     header_dist = header_new
+    #################################################################################################################
+
+    # This is the new way of doing things, which is hopefully working
+    corrected_wcs = wcs.utils.fit_wcs_from_points((np.array(starx_match), np.array(stary_match)),
+                                                   gaia_radec, sip_degree=3)
+    corrected_wcshdr = corrected_wcs.to_header(relax=True)
+    header_dist = header_new.copy()
+    for kw, val, comment in corrected_wcshdr.cards:
+        header_dist.set(kw, value=val,comment=comment)
+    header_dist['WCS_REF'] = ('GAIA-DR3', 'Reference catalog for astrometric solution.')
+    header_dist['WCS_NUM'] = (len(starx_match), 'Number of stars used for astrometric solution.')
 
     #write region file and plots
-    wcs_file = input_file.replace('.fits','_wcs.fits')
+    if '_wcs.fits' in input_file:
+        wcs_file = input_file
+    else:
+        wcs_file = input_file.replace('.fits','_wcs.fits')
     make_reg(wcs_file, starx_match, stary_match)
     wcs_plots(wcs_file, data, starx_match, stary_match, gaiax_match, gaiay_match, 'image')
 
