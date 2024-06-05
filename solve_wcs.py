@@ -186,29 +186,29 @@ def dvrms(x):
 #plate solution
 def apply_wcs_transformation(header,tform):
     crpix1, crpix2, cd11, cd12, cd21, cd22 = wcs_keyword = tel.WCS_keywords()
-    header['CRPIX1'] = header[crpix1]-tform.translation[0]
-    header['CRPIX2'] = header[crpix2]-tform.translation[1]
+    header_new = header.copy()
+    header_new['CRPIX1'] = header[crpix1]-tform.translation[0]
+    header_new['CRPIX2'] = header[crpix2]-tform.translation[1]
     try:
-        cd = np.array([header[cd11],header[cd12],header[cd21],header[cd22]]).reshape(2,2)
+        cd = np.array([header_new[cd11],header_new[cd12],header_new[cd21],header_new[cd22]]).reshape(2,2)
     except:
         cd11, cd12, cd21, cd22 = 'CD1_1', 'CD1_2', 'CD2_1', 'CD2_2'
-        cd = np.array([header[cd11],header[cd12],header[cd21],header[cd22]]).reshape(2,2)
+        cd = np.array([header_new[cd11],header_new[cd12],header_new[cd21],header_new[cd22]]).reshape(2,2)
     cd_matrix = tf.EuclideanTransform(rotation=tform.rotation)
     cd_transformed = tf.warp(cd,cd_matrix)
-    header['CD1_1'] = cd_transformed[0][0]
-    header['CD1_2'] = cd_transformed[0][1]
-    header['CD2_1'] = cd_transformed[1][0]
-    header['CD2_2'] = cd_transformed[1][1]
-    header['CTYPE1'] = 'RA---TAN-SIP'
-    header['CTYPE2'] = 'DEC--TAN-SIP'
+    header_new['CD1_1'] = cd_transformed[0][0]
+    header_new['CD1_2'] = cd_transformed[0][1]
+    header_new['CD2_1'] = cd_transformed[1][0]
+    header_new['CD2_2'] = cd_transformed[1][1]
+    header_new['CTYPE1'] = 'RA---TAN-SIP'
+    header_new['CTYPE2'] = 'DEC--TAN-SIP'
     old_keywords = tel.WCS_keywords_old()
     for old in old_keywords:
         try:
-            del header[old]
+            del header_new[old]
         except:
             pass
-    return header
-
+    return header_new
 def ptv_fit(data,*p):
     xi,eta=data.T
     r = np.sqrt(xi**2+eta**2)
@@ -277,7 +277,7 @@ def run_sextractor(input_file, cat_name, tel, sex_config_dir='./Config', log=Non
     if os.path.exists(cat_name):
         table = ascii.read(cat_name, names=params, comment='#')
         if log:
-            log.info('SExtracor succesfully run, %d sources extracted.'%len(table))
+            log.info('SExtractor succesfully run, %d sources extracted.'%len(table))
         return(table)
     else:
         e = 'ERROR: source extractor did not successfully produce {0}'
@@ -513,7 +513,7 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
     stars_ra, stars_dec = (wcs.WCS(header_new)).all_pix2world(table['XWIN_IMAGE'],table['YWIN_IMAGE'],1)
     stars_radec = SkyCoord(stars_ra*u.deg,stars_dec*u.deg)
     gaia_radec = SkyCoord(gaia['ra'],gaia['dec'], unit='deg')
-    idx, d2, d3 = gaia_radec.match_to_catalog_sky(stars_radec)
+    idx, d2, _ = gaia_radec.match_to_catalog_sky(stars_radec)
     match = d2<5.0*u.arcsec
     idx = idx[match]
     starx_match = [table['XWIN_IMAGE'][x] for x in idx]
