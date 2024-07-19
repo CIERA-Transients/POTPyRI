@@ -1,0 +1,47 @@
+# Python
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+*.pyz
+*.pyw
+*.pyi
+*.pyz
+*.pyw
+*.pyi
+*.egg-info/
+dist/
+build/
+*.egg
+*.whl
+
+# Cython
+*.c
+*.cpp
+*.so
+*.dll
+*.pyd
+*.pyx
+*.pxd
+*.pxi
+
+# Virtual Environment
+venv/
+env/
+.venv/
+.venv3/
+env.bak/
+env/
+.python-version
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Miscellaneous
+*.bak
+*.swp
+.DS_Store
+Thumbs.db

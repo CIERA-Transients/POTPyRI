@@ -38,7 +38,7 @@ def wcs_extension():
     return 0
 
 def pixscale():
-    return 0.129 #0.135, 0.123 #new one?
+    return 0.135 #arcsec/pixel
 
 def saturation(hdr):
     return 65535
@@ -254,6 +254,7 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
     return
 
 # Data sections for new red amplifier
+# [SS] This needs to be read in from the DSEC keyworkds.
 def get_1R_datasec(amp, binning=1):
 
     if binning==1:
@@ -386,20 +387,21 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
         final.header['CTYPE2'] = 'DEC--TAN'
         final.header['CRVAL1'] = coords.ra.deg
         final.header['CRVAL2'] = coords.dec.deg
+        pixsc = pixscale()
         if amp == '4B':
             final.header['CRPIX1'] = 2456
             final.header['CRPIX2'] = 1184
-            final.header['CD1_1'] = 0.135/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
-            final.header['CD1_2'] = -0.135/3600*np.cos(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
-            final.header['CD2_1'] = 0.135/3600*np.cos(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
-            final.header['CD2_2'] = -0.135/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+            final.header['CD1_1'] = pixsc/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+            final.header['CD1_2'] = -pixsc/3600*np.cos(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+            final.header['CD2_1'] = pixsc/3600*np.cos(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+            final.header['CD2_2'] = -pixsc/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
         if amp == '4R':
             final.header['CRPIX1'] = 2400
             final.header['CRPIX2'] = 1200
-            final.header['CD1_1'] = 0.123/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
-            final.header['CD1_2'] = -0.123/3600*np.cos(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
-            final.header['CD2_1'] = 0.123/3600*np.cos(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
-            final.header['CD2_2'] = -0.123/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+            final.header['CD1_1'] = pixsc/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+            final.header['CD1_2'] = -pixsc/3600*np.cos(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+            final.header['CD2_1'] = pixsc/3600*np.cos(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
+            final.header['CD2_2'] = -pixsc/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
         final.header['DATASEC'] = ('[1:%s,1:%s]'%(np.shape(final)[1],np.shape(final)[0]))
         final.write(sci.replace('/raw/','/red/').replace('.gz',''),overwrite=True)
         processed.append(final)
@@ -443,7 +445,7 @@ def run_phot():
     return True
 
 def catalog_zp():
-    return ['SDSS','PS1']
+    return ['SDSS','PS1', 'SkyMapper']
 
 def exptime(hdr):
     return hdr['ELAPTIME']
