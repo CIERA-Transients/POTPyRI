@@ -116,11 +116,6 @@ def man_wcs(telescope, stack, cat, cat_stars_ra, cat_stars_dec):
         else:
             print('Length of the x and y star positions and the RA and Dec position are not equal.')
     catx, caty = (wcs.WCS(stack_header)).all_world2pix(catstarsra,catstarsdec,1)
-    #tform = tf.estimate_transform('euclidean', np.c_[starsx, starsy], np.c_[catx, caty])
-    # header_trans = apply_wcs_transformation(stack_header,tform)
-    # header_trans = apply_wcs_distortion(header_trans,starsx,starsy,catstarsra,catstarsdec)
-    # header_trans['WCS_REF'] = (cat, 'Reference catalog for astrometric solution.')
-    # header_trans['WCS_NUM'] = (len(starsx), 'Number of stars used for astrometric solution.')
 
     # This is the new way of doing things, which is hopefully working
     corrected_wcs = wcs.utils.fit_wcs_from_points((starsx, starsy), cat_radec, sip_degree=3)
@@ -527,32 +522,6 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
     if log:
         log.info('Calculating the full transformation between the matched stars.')
     
-    # This is the old way of doing things, but it's not working for some reason.
-    #################################################################################################################
-    # tform = tf.estimate_transform('euclidean', np.c_[starx_match, stary_match], np.c_[gaiax_match, gaiay_match])
-    # if log:
-    #     log.info('Applying the full transformation to the existing WCS in the header.')
-    # header_new['CRPIX1'] = header_new['CRPIX1']-tform.translation[0]
-    # header_new['CRPIX2'] = header_new['CRPIX2']-tform.translation[1]
-    # cd = np.array([header_new['CD1_1'],header_new['CD1_2'],header_new['CD2_1'],header_new['CD2_2']]).reshape(2,2)
-    # cd_matrix = tf.EuclideanTransform(rotation=tform.rotation)
-    # cd_transformed = tf.warp(cd,cd_matrix)
-    # header_new['CD1_1'] = cd_transformed[0][0]
-    # header_new['CD1_2'] = cd_transformed[0][1]
-    # header_new['CD2_1'] = cd_transformed[1][0]
-    # header_new['CD2_2'] = cd_transformed[1][1]
-    # header_new['WCS_REF'] = ('GAIA-DR3', 'Reference catalog for astrometric solution.')
-    # header_new['WCS_NUM'] = (len(starx_match), 'Number of stars used for astrometric solution.')
-
-    # #calculate polynomial distortion
-    # if apply_distortion:
-    #     if log:
-    #         log.info('Calculating and applying the higher order polynomial distortion.')
-    #     header_dist = apply_wcs_distortion(header_new, starx_match, stary_match, gaia[match]['ra'],gaia[match]['dec'])
-    # else:
-    #     header_dist = header_new
-    #################################################################################################################
-
     # This is the new way of doing things, which is hopefully working
     corrected_wcs = wcs.utils.fit_wcs_from_points((np.array(starx_match), np.array(stary_match)),
                                                    gaia_radec, sip_degree=3)
