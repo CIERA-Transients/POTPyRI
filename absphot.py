@@ -96,8 +96,10 @@ class absphot(object):
         coord_ra = np.median([c.ra.degree for c in coords])
         coord_dec = np.median([c.dec.degree for c in coords])
         med_coord = SkyCoord(coord_ra, coord_dec, unit='deg')
-        Vizier.ROW_LIMIT = -1
-        cat = Vizier.query_region(med_coord, width=0.5*u.degree, catalog=cat_ID)
+
+        vizier = Vizier(columns=[cat_ra, cat_dec, cat_mag, cat_err])
+        vizier.ROW_LIMIT = -1
+        cat = vizier.query_region(med_coord, width=size*u.degree, catalog=cat_ID)
         if len(cat)>0:
             cat = cat[0]
             cat = cat[~np.isnan(cat[cat_mag])]
@@ -159,7 +161,7 @@ class absphot(object):
                 catalog, filt))
 
         cat = self.get_catalog(coords, catalog, filt, log=log)
-
+        import pdb; pdb.set_trace()
         if cat:
             if catalog=='PS1':
                 if log:
@@ -183,7 +185,7 @@ class absphot(object):
             mask = d2 < match_radius
             cat = cat[mask]
             idx = idx[mask]
-
+            import pdb; pdb.set_trace()
             if len(cat)==0:
                 if log:
                     log.info('No star matches within match radius.')
