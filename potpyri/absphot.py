@@ -5,10 +5,10 @@ import sys
 from astroquery.vizier import Vizier
 from astropy import units as u
 from astropy.coordinates import SkyCoord
+from astropy.table import Table
+from astropy.io import fits
 
 import matplotlib.pyplot as plt
-
-from psf import write_out_catalog as woc
 
 from utilities.Vizier_catalogs import find_catalog
 from utilities import util
@@ -126,23 +126,6 @@ class absphot(object):
                 print(m)
             return(None)
 
-    def do_cuts(self, flux, fluxerr, cat_mag, cat_magerr, min_mag=16.0,
-        max_mag=21.0):
-        # Do generic cuts on a table of flux, fluxerr, catalog magnitudes, and
-        # catalog magnitude errors
-        mask =(~np.isnan(flux)) & (~np.isnan(fluxerr)) & (~np.isnan(cat_mag)) &\
-            (~np.isnan(cat_magerr)) & (cat_magerr < 0.3) & (cat_magerr > 0.) &\
-            (fluxerr > 0.) & (fluxerr/flux < 0.2) & (flux > 0.) &\
-            (cat_mag>min_mag) & (cat_mag < max_mag)
-
-
-        flux=flux[mask]
-        fluxerr=fluxerr[mask]
-        cat_mag=cat_mag[mask]
-        cat_magerr=cat_magerr[mask]
-
-        return(flux, fluxerr, cat_mag, cat_magerr, mask)
-
     def find_zeropoint(self, cmpfile, filt, catalog, match_radius=2.5*u.arcsec,
         plot=False, log=None):
 
@@ -150,7 +133,7 @@ class absphot(object):
             log.info('Importing catalog file: {0}'.format(cmpfile))
         else:
             print('Importing catalog file: {0}'.format(cmpfile))
-        header, table = import_catalog(cmpfile)
+        header, table = util.import_catalog(cmpfile)
         coords = SkyCoord(table['RA'], table['Dec'], unit='deg')
 
         filt = self.convert_filter_name(filt)
@@ -162,7 +145,7 @@ class absphot(object):
                 catalog, filt))
 
         cat = self.get_catalog(coords, catalog, filt, log=log)
-        import pdb; pdb.set_trace()
+
         if cat:
             if catalog=='PS1':
                 if log:
@@ -171,12 +154,12 @@ class absphot(object):
                     cat = cat[~np.isnan(cat['rmag'])]
                     cat['mag'] = self.PS1_correction(filt, cat['mag'], cat['mag'], cat['rmag'])
                 elif filt=='r':
-                    cat = cat[~np.isnan(cat['gmag'])]
-                    cat['mag'] = self.PS1_correction(filt, cat['mag'], cat['gmag'], cat['mag'])
+                    cat = cat[~np.isnan(cat['mag'])]
+                    cat['mag'] = self.PS1_correction(filt, cat['mag'], cat['mag'], cat['mag'])
                 else:
                     cat = cat[~np.isnan(cat['gmag'])]
                     cat = cat[~np.isnan(cat['rmag'])]
-                    cat['mag'] = self.PS1_correction(filt, cat['mag'], cat['gmag'], cat['rmag'])
+                    cat['mag'] = self.PS1_correction(filt, cat['mag'], cat['mag'], cat['mag'])
 
             coords_cat = SkyCoord(cat['ra'], cat['dec'], unit='deg')
 
@@ -186,7 +169,7 @@ class absphot(object):
             mask = d2 < match_radius
             cat = cat[mask]
             idx = idx[mask]
-            import pdb; pdb.set_trace()
+
             if len(cat)==0:
                 if log:
                     log.info('No star matches within match radius.')
@@ -207,70 +190,22 @@ class absphot(object):
             match_table = match_table[flux_idx]
             cat = cat[flux_idx]
             # Do basic cuts on flux, fluxerr, catalog magnitude, cat magerr
-            flux = match_table['flux']
-            fluxerr = match_table['flux_err']
-            cat_mag = cat['mag']
-            cat_magerr = cat['mag_err']
-
-            # Do basic data quality cuts to fluxes and catalog magnitudes
-            flux, fluxerr, cat_mag, cat_magerr, flux_mask = self.do_cuts(flux, fluxerr,
-                cat_mag, cat_magerr, min_mag=self.get_minmag(filt))
+            flux = match_table['flux'].data.astype('float32')
+            fluxerr = match_table['flux_err'].data.astype('float32')
+            cat_mag = cat['mag'].data.astype('float32')
+            cat_magerr = cat['mag_err'].data.astype('float32')
 
             if len(flux)==0:
                 if log:
                     log.info('No suitable stars to calculate zeropoint .')
                 return(None, None)
-            else:
-                metadata = {}
-                metadata['ZPTNSTAR']=len(flux)
 
             zpt, zpterr, master_mask = self.zpt_iteration(flux, fluxerr,
                 cat_mag, cat_magerr, log=log)
 
-            zp_catalog = match_table[flux_mask]
-            zp_catalog = zp_catalog[master_mask]
-            img_file = cmpfile.replace('.pcmp','.fits')
-            columns = ['Xpos','Ypos','mag','mag_err','flux','flux_err','SN','SKY',
-                            'FWHM','PA','SHARP','ROUND','NPIX','RA','Dec']
-            sigfig=[4,4,4,4,4,4,4,4,4,4,4,4,0,7,7]
-            outfile = cmpfile.replace('.pcmp','.zpt')
-
-            woc(zp_catalog, img_file, columns, sigfig, outfile, metadata)
-
-            catreg.secat(outfile,'zpt')
-
-            if plot:
-                label='zpt = %2.4f +/- %2.4f mag'%(zpt,zpterr)
-
-                plt.errorbar(-2.5*np.log10(flux[master_mask]),
-                    cat_mag[master_mask],
-                    xerr=1.086*fluxerr[master_mask]/flux[master_mask],
-                    yerr=cat_magerr[master_mask], label='Used data',
-                    ls='none', color='green')
-
-                plt.errorbar(-2.5*np.log10(flux[~master_mask]),
-                    cat_mag[~master_mask],
-                    xerr=1.086*fluxerr[~master_mask]/flux[~master_mask],
-                    yerr=cat_magerr[~master_mask], label='Unused data',
-                    ls='none', color='red')
-
-                instmag=-2.5*np.log10(flux)
-                inst = np.linspace(np.min(instmag), np.max(instmag), 1000)
-
-                plt.plot(inst, inst+zpt, label=label)
-                plt.xlabel('PSF photometry')
-                plt.ylabel('Catalog photometry')
-
-                plt.legend()
-
-                exten=cmpfile.split('.')[-1]
-                outfile=cmpfile.replace('.'+exten, '.png')
-
-                plt.savefig(outfile, format='png')
-
-
             if log:
                 log.info('Calculating AB correction.')
+            
             cor = self.AB_conversion(catalog,filt)
             zpt+=cor
 
@@ -279,8 +214,10 @@ class absphot(object):
                 log.info('Final zeropoint calculated:')
                 log.info('zpt = %2.4f +/- %2.4f AB mag'%(zpt,zpterr))
 
-            metadata['ZPTMAG']=zpt
-            metadata['ZPTMUCER']=zpterr
+            # Set header variables
+            header['ZPTNSTAR']=len(flux)
+            header['ZPTMAG'] = zpt
+            header['ZPTMUCER'] = zpterr
 
             # Add limiting magnitudes
             if 'FWHM' in header.keys() and 'SKYADU' in header.keys():
@@ -288,13 +225,23 @@ class absphot(object):
                 sky = header['SKYADU']
                 Npix_per_FWHM_Area = 2.5 * 2.5 * fwhm * fwhm
                 skysig_per_FWHM_Area = np.sqrt(Npix_per_FWHM_Area * (sky*sky))
-                metadata['M3SIGMA']=-2.5*np.log10(3.0*skysig_per_FWHM_Area)+zpt
-                metadata['M5SIGMA']=-2.5*np.log10(5.0*skysig_per_FWHM_Area)+zpt
-                metadata['M10SIGMA']=-2.5*np.log10(10.0*skysig_per_FWHM_Area)+zpt
+                header['M3SIGMA']=-2.5*np.log10(3.0*skysig_per_FWHM_Area)+zpt
+                header['M5SIGMA']=-2.5*np.log10(5.0*skysig_per_FWHM_Area)+zpt
+                header['M10SIGMA']=-2.5*np.log10(10.0*skysig_per_FWHM_Area)+zpt
                 if log:
                     log.info('3 sigma limiting mag of image = '+str(-2.5*np.log10(3.0*skysig_per_FWHM_Area)+zpt))
 
-            modify_catalog(cmpfile, metadata)
+            util.modify_catalog(cmpfile, header)
+
+            if os.path.exists(cmpfile.replace('.pcmp','.fits')):
+                hdu = fits.open(cmpfile.replace('.pcmp','.fits'))
+                hdu[0].header['ZPTNSTAR']=len(flux)
+                header['ZPTMAG'] = zpt
+                header['ZPTMUCER'] = zpterr
+
+                hdu.writeto(cmpfile.replace('.pcmp','.fits'), overwrite=True,
+                    output_verify='silentfix')
+            
             return(zpt, zpterr)
         else:
             if log:
@@ -359,3 +306,10 @@ class absphot(object):
             return 15.0
         else:
             return 16.0
+
+
+if __name__=="__main__":
+    zp_cal = absphot()
+
+    zp, zp_err = zp_cal.find_zeropoint('/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/red/meertrap_wf_hos_R_1R_11.pcmp', 'R', 'PS1', plot=True, log=None)
+    print(zp, zp_err)

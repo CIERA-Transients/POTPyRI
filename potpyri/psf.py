@@ -1,17 +1,17 @@
 from photutils.background import MMMBackground, MADStdBackgroundRMS
 from photutils.background import Background2D
-from photutils.detection import IRAFStarFinder
-from photutils.psf import IntegratedGaussianPRF, DAOGroup, EPSFModel
-from photutils.psf import extract_stars, EPSFBuilder, subtract_psf
-from photutils.psf import IterativelySubtractedPSFPhotometry
-from photutils.psf import BasicPSFPhotometry
-from photutils import CircularAperture, CircularAnnulus, aperture_photometry
+from photutils.detection import IRAFStarFinder, DAOStarFinder
+from photutils.psf import EPSFModel
+from photutils.psf import extract_stars, EPSFBuilder
+from photutils.psf import PSFPhotometry
+from photutils.psf import SourceGrouper
+from photutils.aperture import CircularAperture, CircularAnnulus, aperture_photometry
 
 from astropy.io import fits
 from astropy.modeling.fitting import LevMarLSQFitter
 from astropy.nddata import NDData
 from astropy.stats import gaussian_sigma_to_fwhm, sigma_clipped_stats
-from astropy.table import Table
+from astropy.table import Table, unique, Column
 from astropy.visualization import simple_norm
 from astropy.wcs import WCS
 
@@ -36,25 +36,41 @@ bkgrms = MADStdBackgroundRMS()
 mmm_bkg = MMMBackground()
 fitter = LevMarLSQFitter()
 
-def generate_epsf(img_file, x, y, size=51, oversampling=2, maxiters=5):
+def generate_epsf(img_file, x, y, size=11, oversampling=3, maxiters=5,
+    log=None):
     # Construct stars table from bright
     stars_tbl = Table()
     stars_tbl['x'] = x
     stars_tbl['y'] = y
 
-    print(stars_tbl)
-
     img_hdu = fits.open(img_file)
     ndimage = NDData(data=img_hdu[0].data)
 
     stars = extract_stars(ndimage, stars_tbl, size=size)
-    print('Extracted {0} stars.  Building EPSF...'.format(len(stars)))
+
+    if log:
+        log.info('Extracted {0} stars.  Building EPSF...'.format(len(stars)))
+    else:
+        print('Extracted {0} stars.  Building EPSF...'.format(len(stars)))
 
     epsf_builder = EPSFBuilder(oversampling=oversampling,
         maxiters=maxiters, progress_bar=True)
+
     epsf, fitted_stars = epsf_builder(stars)
 
     return(epsf)
+
+def construct_error_array(img_data):
+
+    rms = 0.5 * (
+        np.percentile(img_data[img_data != 0.0], 84.13)
+        - np.percentile(img_data[img_data != 0.0], 15.86)
+    )
+
+    poisson = img_data[img_data < 0.]=0.
+    error = np.sqrt(img_data + rms**2)
+
+    return(error)
 
 def run_photometry(img_file, epsf, fwhm, x, y, subtract_back=False,
     forced=False):
@@ -73,7 +89,7 @@ def run_photometry(img_file, epsf, fwhm, x, y, subtract_back=False,
     stars_tbl = Table()
     stars_tbl['x'] = x
     stars_tbl['y'] = y
-    stars = extract_stars(ndimage, stars_tbl, size=51)
+    stars = extract_stars(ndimage, stars_tbl, size=11)
 
     stars_tbl['flux'] = np.array([stars[0].estimate_flux()])
 
@@ -86,14 +102,26 @@ def run_photometry(img_file, epsf, fwhm, x, y, subtract_back=False,
         psf.x_0.fixed = True
         psf.y_0.fixed = True
 
-    daogroup = DAOGroup(fwhm)
-    photometry = BasicPSFPhotometry(group_maker=daogroup,
-                                    bkg_estimator=mmm_bkg,
-                                    psf_model=psf,
-                                    fitter=fitter,
-                                    fitshape=(51,51))
+    grouper = SourceGrouper(min_separation=21)
+    finder = DAOStarFinder(6.0, 2.0)
 
-    result_tab = photometry(image=image, init_guesses=targets)
+    photometry = PSFPhotometry(psf_model=psf, fit_shape=(11,11),
+        grouper=grouper, aperture_radius=10, finder=finder)
+
+    error = construct_error_array(image)
+    result_tab = photometry(image, error=error)
+
+    mask = ~np.isnan(result_tab['flux_err'])
+    result_tab = result_tab[mask]
+
+    mask = result_tab['flux_fit'] > 0.
+    result_tab = result_tab[mask]
+
+    mask = ~np.isnan(result_tab['x_err'])
+    result_tab = result_tab[mask]
+
+    mask = ~np.isnan(result_tab['y_err'])
+    result_tab = result_tab[mask]
 
     return(result_tab)
 
@@ -153,6 +181,7 @@ def write_out_catalog(catalog, img_file, columns, sigfig, outfile, metadata):
             outdata.append(fmt%row[col])
             outfmt+='{'+'{0}:>{1}'.format(i,7+int(sig))+'} '
         outline = outfmt.format(*outdata)
+        outline = str(outline)
         catdata.append(outline)
 
     # Finally write out catalog
@@ -160,12 +189,12 @@ def write_out_catalog(catalog, img_file, columns, sigfig, outfile, metadata):
     if os.path.exists(outfile):
         os.remove(outfile)
         
-    write_catalog(outfile, header, catdata)
+    util.write_catalog(outfile, header, catdata)
 
-def do_phot(img_file, write_out_back=False, write_out_residual=False,
+def do_phot(img_file, write_out_back=False,
     write_out_epsf_img=True, write_out_epsf_file=True, write_out_psf_stars=True,
-    outdir='', subtract_back=False, fwhm_scale_psf=3.0, log=None,
-    star_param={'snthresh_psf': 25.0, 'fwhm_init': 5.0, 'snthresh_final': 5.0}):
+    outdir='', subtract_back=False, fwhm_scale_psf=2.5, log=None,
+    star_param={'snthresh_psf': 20.0, 'fwhm_init': 5.0, 'snthresh_final': 10.0}):
 
     stars = get_star_catalog(img_file, fwhm_init=star_param['fwhm_init'])
     img_hdu = fits.open(img_file)
@@ -179,6 +208,7 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
         log.info('Found {0} stars'.format(len(stars)))
     else:
         print('Found {0} stars'.format(len(stars)))
+
     stars = stars['xcentroid','ycentroid','fwhm','sharpness','roundness',
         'npix','pa','flux','sky']
 
@@ -192,6 +222,7 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
     fwhm_stars = stars[mask]
 
     m='Masked to {0} stars based on sharpness, roundness'
+    
     if log:
         log.info(m.format(len(fwhm_stars)))
     else:
@@ -245,6 +276,7 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
         log.info('FWHM={0}+/-{1}'.format('%2.4f'%fwhm,'%2.4f'%std_fwhm))
     else:
         print('FWHM={0}+/-{1}'.format('%2.4f'%fwhm,'%2.4f'%std_fwhm))
+
     metadata={'FWHM':fwhm, 'EFWHM':std_fwhm, 'SKYADU': std_sky}
 
     if subtract_back:
@@ -270,6 +302,7 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
         else:
             print('Background file:',back_file)
             print('Background-subtracted file:',backsub_file)
+
         backhdu.writeto(back_file, overwrite=True)
         backsubhdu.writeto(backsub_file, overwrite=True)
 
@@ -289,21 +322,29 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
         log.info(m.format(len(bright)))
     else:
         print(m.format(len(bright)))
+
     metadata['NPSFSTAR']=len(bright)
 
     # Instantiate EPSF
     size=int(fwhm*fwhm_scale_psf)
     if size%2==0: size=size+1
+
+    if log:
+        log.info(f'EPSF size will be {size} pixels')
+    else:
+        print(f'EPSF size will be {size} pixels')
+
     epsf = generate_epsf(img_file, bright['xcentroid'],
-        bright['ycentroid'], size=size, oversampling=2, maxiters=5)
-    print('\n')
+        bright['ycentroid'], size=size, oversampling=2, maxiters=5,
+        log=log)
 
     #Check shape of PSF compared to 2d Gaussian
     m='Checking the 2D shape of the PSF.'
     if log:
         log.error(m)
     else:
-        print(m)   
+        print(m)  
+
     d = epsf.data
     x_mesh, y_mesh = np.meshgrid(np.linspace(0, np.shape(d)[1] - 1, np.shape(d)[1]),
                                         np.linspace(0, np.shape(d)[0] - 1, np.shape(d)[0]))
@@ -330,6 +371,7 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
     else:
         print('Final catalog is {0} stars'.format(len(all_stars)))
         print('Getting final photometry...')
+
     photometry = run_photometry(img_file, epsf, fwhm, all_stars['xcentroid'],
         all_stars['ycentroid'], subtract_back=subtract_back)
 
@@ -338,31 +380,26 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
     coords = w.pixel_to_world(photometry['x_fit'], photometry['y_fit'])
 
     # Join the photometry and all star catalogs and rename columns
-    photometry['FWHM'] = all_stars['fwhm']
-    photometry['PA'] = all_stars['pa']
-    photometry['NPIX'] = all_stars['npix']
-    photometry['SKY'] = all_stars['sky']
-    photometry['SHARP'] = all_stars['sharpness']
-    photometry['ROUND'] = all_stars['roundness']
-    photometry['SN'] = photometry['flux_fit']/photometry['flux_unc']
+    photometry['SN'] = photometry['flux_fit']/photometry['flux_err']
     photometry['mag'] = -2.5*np.log10(photometry['flux_fit'])
     photometry['mag_err'] = 2.5/np.log(10) * 1./photometry['SN']
     photometry['RA'] = [c.ra.degree for c in coords]
     photometry['Dec'] = [c.dec.degree for c in coords]
+    photometry.add_column(Column([fwhm]*len(photometry), name='FWHM'))
     photometry.rename_column('x_fit', 'Xpos')
     photometry.rename_column('y_fit', 'Ypos')
-    photometry.rename_column('x_0_unc', 'Xpos_err')
-    photometry.rename_column('y_0_unc', 'Ypos_err')
+    photometry.rename_column('x_err', 'Xpos_err')
+    photometry.rename_column('y_err', 'Ypos_err')
     photometry.rename_column('flux_fit','flux')
-    photometry.rename_column('flux_unc','flux_err')
+    photometry.rename_column('local_bkg','SKY')
     # Sort from brightest to faintest
     photometry.sort('flux', reverse=True)
 
     # Get final list of column names we want in catalog in order and the number
     # of significant figures they should all have
-    colnames=['Xpos','Ypos','mag','mag_err','flux','flux_err','SN','SKY',
-        'FWHM','PA','SHARP','ROUND','NPIX','RA','Dec']
-    sigfig=[4,4,4,4,4,4,4,4,4,4,4,4,0,7,7]
+    colnames=['Xpos','Ypos','Xpos_err','Ypos_err','mag','mag_err','flux',
+        'flux_err','SN','SKY','RA','Dec']
+    sigfig=[4,4,4,4,4,4,4,4,4,4,7,7]
 
     if log:
         log.info('Got {0} stars for final photometry'.format(len(photometry)))
@@ -380,16 +417,6 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
         outname = os.path.join(outdir,img_file.replace('.fits','.psf.stars'))
         all_stars.write(outname, format='ascii.no_header', overwrite=True)
 
-    if write_out_residual:
-        subdata = img_hdu[0].data
-        for row in result_tab:
-            subdata = subtract_psf(subdata, epsf, Table(row))
-
-        newhdu = fits.PrimaryHDU(subdata)
-        outname = os.path.join(outdir,
-            img_file.replace('.fits','.residual.fits'))
-        newhdu.writeto(outname, overwrite=True)
-
     if write_out_epsf_img:
         norm = simple_norm(epsf.data, 'log', percent=99.)
         plt.imshow(epsf.data, norm=norm, origin='lower', cmap='viridis')
@@ -406,3 +433,7 @@ def do_phot(img_file, write_out_back=False, write_out_residual=False,
 
     # Finally return EPSF
     return(epsf, fwhm)
+
+if __name__=="__main__":
+
+    do_phot('/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/red/meertrap_wf_hos_R_1R_11.fits')

@@ -731,13 +731,9 @@ def crossmatch_tables(table1, table2, t1name, t2name, radius=2.0 * u.arcsec,
 
 def write_catalog(catfile, header, catdata):
 
-    # First write out the header to a fits file
-    hdu = fits.PrimaryHDU()
-    hdu.header=header
-    hdu.writeto(catfile, overwrite=True)
-
     # Next append all catalog data to the file
     with open(catfile, 'a') as f:
+        f.write(header.tostring().strip()+'\n')
         for line in catdata:
             if '\n' in line: line.replace('\n', '')
             f.write(line+'\n')
@@ -752,15 +748,19 @@ def import_catalog(catfile):
     while True:
         key='COLUM'+str(j).zfill(2)
         if key in header.keys():
-            colnames.append(header[key])
+            colnames.append(header[key].strip())
             j=j+1
         else:
             break
 
-    table = Table.read(catfile, data_start=1, format='ascii')
+    all_data = []
+    with open(catfile, 'r') as cat:
+        for i,line in enumerate(cat):
+            if i==0: continue
+            all_data.append(line.split())
 
-    for i,col in enumerate(table.keys()):
-        table.rename_column(col,colnames[i])
+    all_data = list(map(list, zip(*all_data)))
+    table = Table(all_data, names=colnames)
 
     return(header, table)
 
