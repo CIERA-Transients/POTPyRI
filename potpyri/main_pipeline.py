@@ -6,7 +6,8 @@
 "This project was funded by AST "
 "If you use this code for your work, please consider citing ."
 
-__version__ = "1.21" #last updated 24/02/2023
+# Refactor on 2024-07-19
+__version__ = "1.22"
 
 import sys
 import numpy as np
@@ -34,17 +35,16 @@ import solve_wcs
 import quality_check
 import psf
 import absphot
+import cal_procs
+
 from custom_logger import ColoredLogger
 from astroquery.astrometry_net import AstrometryNet
 
 # Update to new photutils methods and deprecate previous Find_target_phot when possible
-try:
-    import Find_target_phot as tp
-except ImportError:
-    import Find_target_phot_new as tp
+import Find_target_phot as tp
 
-import extinction
-from utilities.util import *
+from utilities import extinction
+from utilities import util
 from colorama import init, Fore, Back, Style
 init()
 
@@ -54,40 +54,37 @@ def main_pipeline(telescope:str,data_path:str,
                   skip_red:bool=None,
                   proc:str=None,
                   use_dome_flats:bool=None,
-                  phot:bool=None,reset:bool=None)->None:
-    #start time
+                  phot:bool=None,
+                  reset:bool=None,
+                  use_anet:bool=None,
+                  no_verify:bool=None)->None:
+
+    # start time
     t_start = time.time()
-    #import telescope parameter file
+    # import telescope parameter file
     global tel
     try:
-        tel = importlib.import_module('tel_params.'+telescope)
+        tel = importlib.import_module('params.'+telescope)
     except ImportError:
-        telfile='tel_params.'+telescope
-        print(f'No such telescope file {telfile}, please check that you have entered the'+\
-            ' correct name or this telescope is available.''')
+        telfile='params.'+telescope
+        print(f'''No such telescope file {telfile}, please check that you have 
+            entered the correct name or this telescope is available.''')
         sys.exit(-1)
 
-    raw_path = data_path+'/raw/' #path containing the raw data
-    if not os.path.exists(raw_path): #create reduced file path if it doesn't exist
-        os.makedirs(raw_path)
-    bad_path = data_path+'/bad/' #path containing the raw data
-    if not os.path.exists(bad_path): #create reduced file path if it doesn't exist
-        os.makedirs(bad_path)
-    spec_path = data_path+'/spec/' #path containing the raw data
-    if not os.path.exists(spec_path): #create reduced file path if it doesn't exist
-        os.makedirs(spec_path)
-    red_path = data_path+'/red/' #path to write the reduced files
-    if not os.path.exists(red_path): #create reduced file path if it doesn't exist
-        os.makedirs(red_path)
+    raw_path = os.path.join(data_path, 'raw') #path containing the raw data
+    bad_path = os.path.join(data_path, 'bad') #path containing the bad (unused) data
+    red_path = os.path.join(data_path, 'red') #path to write the reduced files
+    for dirname in [raw_path, bad_path, red_path]:
+        if not os.path.exists(dirname): os.makedirs(dirname)
 
     # Get path to code directory
     abspath = os.path.abspath(sys.argv[0])
     code_dir = os.path.split(abspath)[0]
 
     # Copy config directory to data_path
-    config_dir = os.path.join(code_dir, 'Config')
-    if not os.path.exists(os.path.join(data_path, 'Config')):
-        shutil.copytree(config_dir, os.path.join(data_path, 'Config'))
+    config_dir = os.path.join(code_dir, 'config')
+    if not os.path.exists(os.path.join(data_path, 'config')):
+        shutil.copytree(config_dir, os.path.join(data_path, 'config'))
 
 
     if cal_path is not None:
@@ -101,20 +98,23 @@ def main_pipeline(telescope:str,data_path:str,
 
     wavelength = tel.wavelength()
 
-    log_file_name = os.path.join(red_path,
-                                 telescope+'_log_'+datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')+'.log') #create log file name
-    log = ColoredLogger(log_file_name) #create log file
+    # Generate logfile
+    datestr = datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+    base_logname = f'{telescope}_log_{datestr}.log'
+    log_file_name = os.path.join(red_path, base_logname)
+    log = ColoredLogger(log_file_name)
 
-    log.info('Running main pipeline version '+str(__version__))
-    log.info('Running telescope paramater file version '+str(tel.__version__))
+    log.info(f'Running main pipeline version {__version__}')
+    log.info(f'Running telescope paramater file version {tel.__version__}')
+
+    file_list = os.path.join(data_path, 'file_list.txt')
 
     if reset is not None:
-        if os.path.exists(data_path+'/file_list.txt'):
-            os.remove(data_path+'/file_list.txt')
+        if os.path.exists(file_list):
+            os.remove(file_list)
         if reset=='all':
             files = glob.glob(os.path.join(raw_path,'*'))+\
-                    glob.glob(os.path.join(bad_path,'*'))+\
-                    glob.glob(os.path.join(spec_path,'*'))
+                    glob.glob(os.path.join(bad_path,'*'))
         if reset=='raw':
             files = glob.glob(os.path.join(raw_path,'*'))
         for f in files:
@@ -123,24 +123,31 @@ def main_pipeline(telescope:str,data_path:str,
     # CDK - added editing for headers with LRIS raw data files (*[b,r]*.fits)
     if ((telescope=='LRIS' and proc and str(proc)=='raw') or
         (telescope=='DEIMOS' and proc and str(proc)=='raw')):
-        print('Edit raw headers')
+        log.info('Edit raw headers')
         tel.edit_raw_headers(data_path)
 
-    if os.path.exists(data_path+'/file_list.txt'):
+    if os.path.exists(file_list):
         log.info('Previous file list exists, loading lists.')
-        cal_list, sci_list, sky_list, time_list = Sort_files.load_files(data_path+'/file_list.txt', telescope,log)
+        cal_list, sci_list, sky_list, time_list = Sort_files.load_files(file_list, telescope,log)
     else:
         log.info('Sorting files and creating file lists.')
         # CDK - updated this to a os.path.join so it doesn't require trailing /
-        files = sorted(glob.glob(os.path.join(data_path,tel.raw_format(proc))))
+        glob_str = os.path.join(data_path,tel.raw_format(proc))
+        log.info(f'Looking for files with format: {glob_str}')
+        files = sorted(glob.glob(glob_str))
         if len(files) != 0:
             log.info(str(len(files))+' files found.')
             cal_list, sci_list, sky_list, time_list = Sort_files.sort_files(files,telescope,data_path,log)
-            print('Please check the created file list and make any nessecary edits (e.g. remove bad files mentioned by the observing log etc.)')
-            con = input(Back.RED+'Did you edit the file list (yes or no)? '+Style.RESET_ALL)
+            if not no_verify:
+                print('''Please check the created file list and make any 
+                    nessecary edits (e.g. remove bad files mentioned by the 
+                    observing log etc.)''')
+                con = input(Back.RED+'Did you edit the file list (yes or no)? '+Style.RESET_ALL)
+            else:
+                con='yes'
             if con=='yes':
                 log.info('Edits made to the file list by the user, reloading file list.')
-                cal_list, sci_list, sky_list, time_list = Sort_files.load_files(data_path+'/file_list.txt', telescope,log)
+                cal_list, sci_list, sky_list, time_list = Sort_files.load_files(file_list, telescope,log)
         else:
             log.critical('No files found, please check data path and rerun.')
             logging.shutdown()
@@ -153,60 +160,11 @@ def main_pipeline(telescope:str,data_path:str,
 
     # Master bias creation
     if tel.bias():
-        bias_num = 0
-        for cal in cal_list:
-            if 'BIAS' in cal:
-                bias_num += 1
-                process_bias = True
-                amp = cal.split('_')[1]
-                binn = cal.split('_')[2]
-                if skip_red:
-                    log.info('User input to skip reduction.')
-                    if os.path.exists(red_path+'mbias_'+amp+'_'+binn+'.fits'):
-                        log.info('Found previous master bias.')
-                        process_bias = False
-                    else:
-                        log.error('No master bias found, creating master bias.')
-                if process_bias:
-                    t1 = time.time()
-                    log.info('Processing bias files.')
-                    tel.create_bias(cal_list,cal,red_path,log)
-                    t2 = time.time()
-                    log.info('Master bias creation completed in '+str(t2-t1)+' sec')
-        if bias_num==0:
-            log.critical('No bias files present, check data before rerunning.')
-            logging.shutdown()
-            sys.exit(-1)
+        cal_procs.do_bias(cal_list, tel, red_path, skip_red=skip_red, log=log)
 
     # Master dark creation
     if tel.dark():
-        for cal in cal_list:
-            if 'DARK' in cal:
-                process_dark = True
-                exp = cal.split('_')[1]
-                amp = cal.split('_')[2]
-                binn = cal.split('_')[3]
-                if skip_red:
-                    log.info('User input to skip reduction.')
-                    if os.path.exists(red_path+cal+'.fits'):
-                        log.info('Found previous master dark.')
-                        process_dark = False
-                    else:
-                        log.error('No master dark found, creating master dark.')
-                if process_dark:
-                    if tel.bias():
-                        log.info('Loading master bias.')
-                        try:
-                            mbias = tel.load_bias(red_path,amp,binn)
-                        except:
-                            log.error('No master bias found for this configuration, skipping master dark creation for exposure '+exp+', '+amp+' amps and '+binn+' binning.')
-                            continue
-                    else:
-                        mbias = None
-                    t1 = time.time()
-                    tel.create_dark(cal_list,cal,mbias,red_path,log)
-                    t2 = time.time()
-                    log.info('Master dark creation completed in '+str(t2-t1)+' sec')
+        cal_procs.do_dark(cal_list, tel, red_path, skip_red=skip_red, log=log)
     
     # Master flat creation
     if tel.flat():
@@ -218,8 +176,8 @@ def main_pipeline(telescope:str,data_path:str,
                 binn = cal.split('_')[3]
                 if skip_red:
                     log.info('User input to skip reduction.')
-                    master_flat = tel.flat_name(flat_path, fil, amp, binn)
-                    if np.all([os.path.exists(mf) for mf in master_flat]):
+                    master_flat = tel.get_mflat_name(flat_path, fil, amp, binn)
+                    if os.path.exists(master_flat):
                         log.info('Found previous master flat for filter '+fil+', '+amp+' amps and '+binn+' binning.')
                         process_flat = False
                     else:
@@ -255,8 +213,8 @@ def main_pipeline(telescope:str,data_path:str,
                 process_flat = True
                 if skip_red:
                     log.info('User input to skip reduction.')
-                    master_flat = tel.flat_name(flat_path, fil, amp, binn)
-                    if np.all([os.path.exists(mf) for mf in master_flat]):
+                    master_flat = tel.get_mflat_name(flat_path, fil, amp, binn)
+                    if os.path.exists(master_flat):
                         log.info('Found previous master flat for filter '+fil+', '+amp+' amps and '+binn+' binning.')
                         process_flat = False
                     else:
@@ -328,8 +286,8 @@ def main_pipeline(telescope:str,data_path:str,
 
             # Load flat frame
             log.info('Loading master flat.')
-            master_flat = tel.flat_name(flat_path, fil, amp, binn)
-            if not np.all([os.path.exists(mf) for mf in master_flat]):
+            master_flat = tel.get_mflat_name(flat_path, fil, amp, binn)
+            if not os.path.exists(master_flat):
                 log.error('No master flat present for filter '+fil+', skipping data reduction for '+tar+'. Check data before rerunning.')
                 continue
             flat_data = tel.load_flat(master_flat)
@@ -364,7 +322,8 @@ def main_pipeline(telescope:str,data_path:str,
                         sky_hdu.header['FILE'+str(k+1)] = (os.path.basename(str(m)), 'Name of file used in creation of sky.')
                     sky = ccdproc.combine(sky_masked_data,method='median',sigma_clip=True,sigma_clip_func=np.ma.median,mask=sky_mask)
                     sky.header = sky_hdu.header
-                    sky.write(red_path+os.path.basename(sci_list[tar][j]).replace('.fits','_sky.fits').replace('.gz','').replace('.bz2',''),overwrite=True)
+
+                    sky.write(os.path.join(red_path, os.path.basename(sci_list[tar][j]).replace('.fits','_sky.fits').replace('.gz','').replace('.bz2','')),overwrite=True)
                     processed[j] = n.subtract(sky,propagate_uncertainties=True,handle_meta='first_found')
                 t2 = time.time()
                 log.info('Sky maps complete and subtracted in '+str(t2-t1)+' sec')
@@ -384,7 +343,7 @@ def main_pipeline(telescope:str,data_path:str,
                                 masked[masks[k]] = bkg.background[masks[k]]
                                 fringe_data.append(CCDData(masked,unit=u.electron/u.second))
                             fringe_map = ccdproc.combine(fringe_data,method='median',sigma_clip=True,sigma_clip_func=np.ma.median,mask=masks)
-                            fringe_map.write(red_path+'fringe_map_'+fil+'_'+amp+'_'+binn+suffix[m],overwrite=True)
+                            fringe_map.write(os.path.join(red_path, 'fringe_map_'+fil+'_'+amp+'_'+binn+suffix[m]),overwrite=True)
                             for j,n in enumerate(processed):
                                 processed[j] = n.subtract(fringe_map,propagate_uncertainties=True,handle_meta='first_found')
                         else:
@@ -395,7 +354,7 @@ def main_pipeline(telescope:str,data_path:str,
                                 masked[masks[m][k]] = bkg.background[masks[m][k]]
                                 fringe_data.append(CCDData(masked,unit=u.electron/u.second))
                             fringe_map = ccdproc.combine(fringe_data,method='median',sigma_clip=True,sigma_clip_func=np.ma.median,mask=masks)
-                            fringe_map.write(red_path+'fringe_map_'+fil+'_'+amp+'_'+binn+suffix[m],overwrite=True)
+                            fringe_map.write(os.path.join(red_path, 'fringe_map_'+fil+'_'+amp+'_'+binn+suffix[m]),overwrite=True)
                             for j,n in enumerate(processed[m]):
                                 processed[m][j] = n.subtract(fringe_map,propagate_uncertainties=True,handle_meta='first_found')
                     t2 = time.time()
@@ -411,7 +370,7 @@ def main_pipeline(telescope:str,data_path:str,
                 suffix = tel.suffix()
             mask = tel.static_mask(proc)
             for k in range(dimen):
-                red_list = [red_path+os.path.basename(sci).replace('.fits',suffix[k]).replace('.gz','').replace('.bz2','') for sci in sci_list[tar]]
+                red_list = [os.path.join(red_path, os.path.basename(sci).replace('.fits',suffix[k]).replace('.gz','').replace('.bz2','')) for sci in sci_list[tar]]
                 if dimen == 1:
                     for j,process_data in enumerate(processed):
                         process_data.write(red_list[j],overwrite=True)
@@ -424,23 +383,39 @@ def main_pipeline(telescope:str,data_path:str,
                 stacking_data, mid_time, total_time = quality_check.quality_check(aligned_images, aligned_data, telescope, log)
                 log.info('Creating median stack.')
                 sci_med = ccdproc.combine(stacking_data,method='median',sigma_clip=True,sigma_clip_func=np.ma.median)
+
+                sci_med.data = sci_med.data.astype('float32')
+                sci_med.header['BITPIX'] = -32
                 sci_med.header['MJD-OBS'] = (mid_time, 'Mid-MJD of the observation sequence calculated using DATE-OBS.')
                 sci_med.header['EXPTIME'] = (1, 'Effective expsoure tiime for the stack in seconds.')
                 sci_med.header['EXPTOT'] = (total_time, 'Total exposure time of stack in seconds')
                 sci_med.header['GAIN'] = (len(stacking_data), 'Effecetive gain for stack.')
                 sci_med.header['RDNOISE'] = (tel.rdnoise(sci_med.header)/np.sqrt(len(stacking_data)), 'Readnoise of stack.')
                 sci_med.header['NFILES'] = (len(stacking_data), 'Number of images in stack')
+                sci_med.header['FILTER'] = fil
+                sci_med.header['OBSTYPE'] = 'OBJECT'
                 sci_med.write(stack[k],overwrite=True)
                 log.info('Median stack made for '+stack[k])
                 print('Please check the quality of the stack made.')
 
                 ## WCS solution
-                con = input(Back.RED+'Would you like to continue with the reduction (solving the WCS) for this stack (yes or no)? '+Style.RESET_ALL)
+                if not no_verify:
+                    con = input(Back.RED+'Would you like to continue with the reduction (solving the WCS) for this stack (yes or no)? '+Style.RESET_ALL)
+                else:
+                    con = 'yes'
                 if con=='no':
                     continue
                 # Auto-WCS solution
                 if tel.run_wcs():
+
                     log.info('Solving WCS.')
+
+                    if use_anet:
+                        basefile = os.path.basename(stack[k])
+                        dirname = os.path.dirname(stack[k])
+                        solve_wcs.solve_astrometry(dirname, basefile, tel,
+                            replace=True, log=log)
+
                     try:
                         wcs_error = solve_wcs.solve_wcs(stack[k],telescope,log=log)
                         log.info(wcs_error)
@@ -448,108 +423,9 @@ def main_pipeline(telescope:str,data_path:str,
                     except Exception as e:
                         print(e)
                         log.error('Automatic WCS solution failed.')
+                    
                     log.info("Below requires an Astrometry.net API key to be configured locally")
 
-                    # Redo with Astrometry.net?
-                    redo_w_anet = input(Back.RED+'Please review the WCS plots and errors. Do you wish to redo wcs with Astrometry.net (yes or no)?  '+Style.RESET_ALL)
-                    while redo_w_anet=='yes':
-                        anet = AstrometryNet()
-                        try_again = True
-                        submission_id = None
-                        while try_again:
-                            try:
-                                # submission_id is none if this is the first iteration
-                                # in which case, submit new request for solving
-                                if not submission_id:
-                                    log.info("Submitting solve image request to Astrometry.net")
-                                    header_new = anet.solve_from_image(stack[k].replace('_wcs',''), 
-                                                                        solve_timeout=600, submission_id=submission_id, 
-                                                                        publicly_visible='n', allow_commercial_use='n')
-                                else:
-                                    # if submission has already been made, monitor it
-                                    log.info(f"Monitoring existing Astrometry.net submission with submission_id={submission_id}")
-                                    header_new = anet.monitor_submission(submission_id, solve_timeout=600)
-                            except Exception as e:
-                                # Solving or monitoring function likely timed out
-                                # Store submission id (necessary for first try) and retry 
-                                submission_id = e.args[1]
-                            else:
-                                # Astrometry.net solving succeeded, so stop retrying
-                                try_again = False
-
-                        # Update stack[k] with fixed WCS header
-                        with fits.open(stack[k].replace('_wcs','')) as hdr:
-                            header_old = hdr[0].header
-                            stack_data = hdr[0].data
-                        
-                        # Add important fields back into new header
-                        # GAIN is needed for aperture photometry, add other necessary fields here
-                        fields_to_transfer = [
-                            'MJD-OBS', 'TIMFIRST', 'TIMLAST', 'EXPTIME', 
-                            'EXPTOT', 'GAIN', 'RDNOISE', 'NFILES'
-                        ]
-                        for field in fields_to_transfer:
-                            if field in header_old.keys():
-                                header_new[field] = header_old[field]
-
-                        wcs_file = stack[k].replace('_wcs','').replace('.fits','_wcs.fits')
-                        fits.writeto(wcs_file, stack_data, header_new, overwrite=True)
-
-                        # Ask user if they want to refine the WCS from Astrometry.net using the Auto-WCS procedure
-                        refine_wcs = input(Back.RED+'Do you wish to refine the WCS solution using the auto-WCS procedure (yes or no)?  '+Style.RESET_ALL)
-                        if refine_wcs == 'yes':
-                            try:
-                                log.info('Refining WCS.')
-                                wcs_error = solve_wcs.solve_wcs(wcs_file,telescope,log=log, apply_distortion=False)
-                                log.info(wcs_error)
-                            except Exception as e:
-                                print(e)
-                                log.error('Automatic WCS refinement failed.')
-                        redo_w_anet = input(Back.RED+'Do you wish to redo Astrometry.net wcs correction (yes or no)?  '+Style.RESET_ALL)
-
-                        # if not redoing, update filename
-                        if redo_w_anet == 'no':
-                            stack[k] = stack[k].replace('_wcs','').replace('.fits','_wcs.fits')
-                    redo_man = input(Back.RED+'Do you wish to redo wcs manually (yes or no)?  '+Style.RESET_ALL)
-                    while redo_man == 'yes':
-                        log.info('Manually redoing WCS.')
-                        cat = input(Fore.RED+'Please enter the name of the catalog you wish to use. The options are "gaia" (GAIA DR3), "sdssdr12" (SDSSDR12), "2mass" (2MASS). '+Style.RESET_ALL)
-                        use_prev_wcs = input(Back.RED+'Do you wish to use the previous WCS solution (yes or no)?  '+Style.RESET_ALL)
-                        if use_prev_wcs == 'yes':
-                            stack_file = stack[k]
-                        else:
-                            stack_file = stack[k].replace('_wcs','')
-                        if cat == 'gaia':
-                            if '_wcs' in stack_file:
-                                gaia_cat = stack_file.replace('.fits','.gaia')
-                            else:
-                                gaia_cat = stack_file.replace('.fits','_wcs.gaia')
-                            cat_header, cat_stars = import_catalog(gaia_cat)
-                            cat_stars_ra = cat_stars['ra']
-                            cat_stars_dec = cat_stars['dec']
-                        else:
-                            with fits.open(stack_file) as hdr:
-                                header = hdr[0].header
-                                data = hdr[0].data
-                            ra_center, dec_center = (wcs.WCS(header)).all_pix2world(np.shape(data)[1]/2,np.shape(data)[0]/2,1)
-                            coord = SkyCoord(ra_center, dec_center,unit=u.deg)
-                            cat_stars = search_catalogs(coord, [cat], search_radius=10*u.arcmin, outfile=stack[k].replace('_wcs','').replace('.fits','_wcs.'+cat))
-                            cat_stars_ra = cat_stars[cat+'_'+viziercat[cat]['columns'][0]]
-                            cat_stars_dec = cat_stars[cat+'_'+viziercat[cat]['columns'][1]]
-                        if len(cat_stars) == 0:
-                            log.info('No stars found in this catalog.')
-                            continue
-                        else:
-                            wcs_error = solve_wcs.man_wcs(telescope, stack_file, cat, cat_stars_ra, cat_stars_dec)
-                            log.info(wcs_error)
-                            redo_man = input(Back.RED+'Please review the WCS plots and errors. Do you wish to manually redo wcs (yes or no)?  '+Style.RESET_ALL)
-                        if redo_man == "no":
-                            try:
-                                if wcs_error!=0:
-                                    stack[k] = stack_file.replace('_wcs','').replace('.fits','_wcs.fits')
-                            except UnboundLocalError:
-                                log.error('WCS solution could not be calculated. Skipping the rest of the reduction for this target.')
-                                continue
                 if tel.run_phot():
                     con = input(Back.RED+'Based on the WCS solution, would you like to continue with the PSF photometry for this stack (yes or no)? '+Style.RESET_ALL)
                     if con=='no':
@@ -626,18 +502,66 @@ def main_pipeline(telescope:str,data_path:str,
 
 def main():
     params = argparse.ArgumentParser(description='Path of data.')
-    params.add_argument('telescope', default=None, help='Name of instrument (must be in tel_params folder) of data to reduce. Required to run pipeline. Use TEST to run the pipeline test.')
-    params.add_argument('data_path', default=None, help='Path of data to reduce. See manual for specific details. Required to run pipeline.')
-    params.add_argument('--use_dome_flats', type=str, default=None, help='Use dome flats instead of science images to create master flat for NIR. Optional parameter. Default is False.')
-    params.add_argument('--skip_red', type=str, default=None, help='Option to skip reduction i.e. the creation of master files used for calibration or the stacked image for science targets. See manual for specific details. Optional parameter.')
-    params.add_argument('--target', type=str, default=None, help='Option to only reduce a specific target. String used here must be contained within the target name in file headers. Optional parameter.')
-    params.add_argument('--proc', type=str, default=True, help='Option to use the _proc data from MMT. Optional parameter. Default is False')
-    params.add_argument('--cal_path', type=str, default=None, help='Full path of the folder containing calibrations if different from the default. Optional parameter.')
-    params.add_argument('--phot', type=str, default=None, help='Option to perform aperture photometry on stacked image. See manual for specific details. Optional parameter.')
-    params.add_argument('--reset', type=str, default=None, help='Option to reset data files sorted previously by pipeline. Optional parameter.')
+    params.add_argument('instrument', 
+        default=None, 
+        choices=['Binospec','DEIMOS','GMOS','LRIS','MMIRS','MOSFIRE','TEST'],
+        help='''Name of instrument (must be in params folder) of data to 
+        reduce. Required to run pipeline. Use TEST to run the pipeline test.''')
+    params.add_argument('data_path', 
+        default=None, 
+        help='''Path of data to reduce. See manual for specific details. 
+        Required to run pipeline.''')
+    params.add_argument('--use_dome_flats', 
+        type=str, 
+        default=None, 
+        help='''Use dome flats instead of science images to create master flat 
+        for NIR. Optional parameter. Default is False.''')
+    params.add_argument('--skip_red', 
+        type=str, 
+        default=None, 
+        help='''Option to skip reduction i.e. the creation of master files used 
+        for calibration or the stacked image for science targets. See manual 
+        for specific details. Optional parameter.''')
+    params.add_argument('--target', 
+        type=str, 
+        default=None, 
+        help='''Option to only reduce a specific target. String used here must 
+        be contained within the target name in file headers. Optional 
+        parameter.''')
+    params.add_argument('--proc', 
+        type=str, 
+        default=True, 
+        help='''Option to use the _proc data from MMT. Optional parameter. 
+        Default is False.''')
+    params.add_argument('--cal_path', 
+        type=str, 
+        default=None, 
+        help='''Full path of the folder containing calibrations if different 
+        from the default. Optional parameter.''')
+    params.add_argument('--phot', 
+        type=str, 
+        default=None, 
+        help='''Option to perform aperture photometry on stacked image. See 
+        manual for specific details. Optional parameter.''')
+    params.add_argument('--reset', 
+        type=str, 
+        default=None, 
+        help='''Option to reset data files sorted previously by pipeline. 
+        Optional parameter.''')
+    params.add_argument('--use-anet',
+        default=False,
+        action='store_true',
+        help='''Use astrometry.net in initial WCS solver.''')
+    params.add_argument('--no-verify',
+        default=False,
+        action='store_true',
+        help='''Do not prompt the user for input.''')
     args = params.parse_args()
 
-    main_pipeline(args.telescope,args.data_path,args.cal_path,input_target=args.target,skip_red=args.skip_red,proc=args.proc,use_dome_flats=args.use_dome_flats,phot=args.phot,reset=args.reset)
+    main_pipeline(args.instrument,args.data_path,args.cal_path,
+        input_target=args.target,skip_red=args.skip_red,proc=args.proc,
+        use_dome_flats=args.use_dome_flats,phot=args.phot,reset=args.reset,
+        use_anet=args.use_anet,no_verify=args.no_verify)
 
 if __name__ == "__main__":
     main()

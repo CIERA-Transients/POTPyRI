@@ -14,7 +14,8 @@ import astropy.units.astrophys as u
 import astropy.units as u
 import importlib
 import solve_wcs
-import tel_params
+import os
+import params as tel_params
 
 def align_stars(images,telescope,hdu=0,mask=None,log=None):
     """
@@ -40,11 +41,11 @@ def align_stars(images,telescope,hdu=0,mask=None,log=None):
     t_start = time.time()
 
     if log:
-        log.info('Running align_quads version '+str(__version__))
+        log.info(f'Running align_quads version {__version__}')
 
     #import telescope parameter file
     try:
-        tel = importlib.import_module('tel_params.'+telescope)
+        tel = importlib.import_module(f'params.{telescope}')
     except ImportError:
         print('No such telescope file, please check that you have entered the'+\
             ' correct name or this telescope is available.''')
@@ -96,7 +97,9 @@ def align_stars(images,telescope,hdu=0,mask=None,log=None):
             f = f.replace('.fits','_trim.fits')
             fits.writeto(f,data,header,overwrite=True)
         cat_name = f.replace('.fits','.cat')
-        table = solve_wcs.run_sextractor(f, cat_name, tel, sex_config_dir='./Config', log=log)
+        config_file = os.path.abspath(os.path.join('potpyri','config'))
+        table = solve_wcs.run_sextractor(f, cat_name, tel, 
+            sex_config_dir=config_file, log=log)
         table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
         if mask:
             with fits.open(mask) as mask_hdu:

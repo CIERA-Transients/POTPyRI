@@ -26,9 +26,8 @@ import glob
 import copy
 import os
 
-from Gaussians import fix_x0, twoD_Gaussian
-
-from utilities.util import *
+from utilities.Gaussians import fix_x0, twoD_Gaussian
+from utilities import util
 
 import warnings
 warnings.filterwarnings('ignore')

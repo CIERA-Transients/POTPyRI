@@ -32,8 +32,8 @@ import matplotlib.patches as patches
 from utilities import util
 import itertools
 import importlib
-import tel_params
-import catreg
+import params
+from utilities import catreg
 from colorama import init, Fore, Back, Style
 init()
 
@@ -45,7 +45,7 @@ def man_wcs(telescope, stack, cat, cat_stars_ra, cat_stars_dec):
 
     # Load instrument parameters
     global tel
-    tel = importlib.import_module('tel_params.'+telescope)
+    tel = importlib.import_module(f'params.{telescope}')
 
     # Get image data and header
     stack_data, stack_header = fits.getdata(stack, header=True)
@@ -387,7 +387,7 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
     #import telescope parameter file
     global tel
     try:
-        tel = importlib.import_module('tel_params.'+telescope)
+        tel = importlib.import_module(f'params.{telescope}')
     except ImportError:
         print('No such telescope file, please check that you have entered the'+\
             ' correct name or this telescope is available.''')
@@ -558,6 +558,157 @@ def solve_wcs(input_file, telescope, sex_config_dir='./Config', static_mask=None
         print('Solve_wcs ran in '+str(t_end-t_start)+' sec')
 
     return 'Median rms on astrometry is %.3f arcsec.'%error
+
+def clean_up_astrometry(directory, file, exten):
+    filelist = [file.replace(exten,'.axy'),
+                file.replace(exten,'.corr'),
+                file.replace(exten,'-indx.xyls'),
+                file.replace(exten,'.match'),
+                file.replace(exten,'.rdls'),
+                file.replace(exten,'.solved'),
+                file.replace(exten,'.wcs')]
+
+    filelist = [os.path.join(directory, f) for f in filelist]
+
+    for f in filelist:
+        if os.path.exists(f):
+            os.remove(f)
+
+def solve_astrometry(directory, file, tel, replace=True, log=None):
+
+    # Starting solve, print file and directory for reference
+    fullfile = directory + '/' + file
+    message = 'Trying to solve file={file}'
+    if log: log.info(message.format(file=fullfile))
+
+    if not os.path.exists(fullfile):
+        return(False)
+
+    hdu = fits.open(fullfile)
+    data = hdu[0].data
+    header = hdu[0].header
+    hkeys = list(header.keys())
+
+    exten = '.'+file.split('.')[-1]
+    if not replace:
+        if os.path.exists(fullfile.replace(exten,'.solved.fits')):
+            if log: log.info('SUCCESS: solved {0}'.format(fullfile))
+            return(True)
+
+    exten = '.'+file.split('.')[-1]
+
+    check_pairs = [('RA','DEC'),('CRVAL1','CRVAL2'),('OBJCTRA','OBJCTDEC')]
+    coord = None
+
+    for pair in check_pairs:
+        if pair[0] in header.keys() and pair[1] in header.keys():
+            ra = header[pair[0]]
+            dec = header[pair[1]]
+            coord = util.parse_coord(ra, dec)
+            if coord:
+                break
+
+    if not coord:
+        error = 'Could not parse RA/DEC from header of {file}'
+        if log: log.error(error.format(file=file))
+        return(False)
+
+    if 'solved.fits' in fullfile:
+        newfile = 'tmp.fits'
+    else:
+        newfile = fullfile.replace(exten,'.solved.fits')
+
+    scale = tel.pixscale()
+    scale_high = scale * 1.2
+    scale_low = scale * 0.8
+
+    cmd = 'solve-field'
+    args = '--scale-units arcsecperpix '
+    args += '--scale-low {lo} --scale-high {hi} --ra {ra} --dec {dec} '
+    args += ' --radius 0.5 --no-plots --overwrite -N {newfile} --dir {outdir} '
+
+    args = args.format(ra=coord.ra.degree, dec=coord.dec.degree,
+        outdir=directory, newfile=newfile, lo=scale_low, hi=scale_high)
+
+    extra_opts = '--downsample 2 --no-verify --odds-to-tune-up 1e4 --objs 15'
+
+    tries = 1
+    good = False
+    while tries < 4 and not good:
+        if log: log.info('Try #{n} with astrometry.net...'.format(n=tries))
+        input_args = args + extra_opts
+        if log: log.info(input_args)
+
+        process = [cmd,fullfile]+input_args.split()
+
+        FNULL = open(os.devnull, 'w')
+
+        p = subprocess.Popen(process, stdout=FNULL, stderr=subprocess.STDOUT)
+        try:
+            p.wait(30)
+        except subprocess.TimeoutExpired:
+            p.kill()
+
+        if os.path.exists(newfile):
+            good = True
+        else:
+            tries += 1
+            if 'downsample' in extra_opts:
+                extra_opts='--objs 15'
+            else:
+                extra_opts=''
+
+    file_exists=os.path.exists(newfile)
+    if log: log.info(f'{newfile} exists: {file_exists}')
+
+    if os.path.exists(newfile):
+        if log: log.info('SUCCESS: solved {0}'.format(fullfile))
+
+        if replace or newfile=='tmp.fits':
+            output_file = fullfile
+            os.rename(newfile, output_file)
+        else:
+            output_file = fullfile.replace(exten,'.solved.fits')
+
+        hdu = fits.open(output_file)
+        for i,h in enumerate(hdu):
+
+            if 'COMMENT' in hdu[i].header.keys():
+                del hdu[i].header['COMMENT']
+            if 'HISTORY' in hdu[i].header.keys():
+                del hdu[i].header['HISTORY']
+
+            # Delete other WCS header keys
+            wcs_key = ['CSYER1','CSYER2','CRDER1','CRDER2','CD1_1','CD1_2','CD2_1',
+                'CD2_2','CRPIX1','CRPIX2','CUNIT1','CUNIT2','EQUINOX','RADESYS',
+                'CNAME1','CNAME2','CTYPE1','CTYPE2','WCSNAME','CRVAL1','CRVAL2']
+
+            for key in [w + 'C' for w in wcs_key]:
+                if key in list(hdu[i].header.keys()):
+                    del hdu[i][key]
+
+            for key in [w + 'S' for w in wcs_key]:
+                if key in list(hdu[i].header.keys()):
+                    del hdu[i][key]
+
+        try:
+            hdu.writeto(output_file, overwrite=True, output_verify='silentfix')
+        except TypeError:
+            if log: log.error('FAILURE: could not properly save file {0}'.format(
+                fullfile))
+
+            clean_up_astrometry(directory, file, exten)
+            return(False)
+
+        clean_up_astrometry(directory, file, exten)
+
+        return(True)
+
+    else:
+        #if log: log.info('FAILURE: did not solve {0}'.format(fullfile))
+        print('FAILURE: did not solve {0}'.format(fullfile))
+        clean_up_astrometry(directory, file, exten)
+        return(False)
 
 def main():
     params = argparse.ArgumentParser(description='Path of data.')

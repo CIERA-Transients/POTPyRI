@@ -5,13 +5,14 @@ import sys
 from astroquery.vizier import Vizier
 from astropy import units as u
 from astropy.coordinates import SkyCoord
-from Vizier_catalogs import find_catalog
 
 import matplotlib.pyplot as plt
 
 from psf import write_out_catalog as woc
-from utilities.util import *
-import catreg
+
+from utilities.Vizier_catalogs import find_catalog
+from utilities import util
+from utilities import catreg
 
 class absphot(object):
     def __init__(self, iterations=5, sigma=5):
