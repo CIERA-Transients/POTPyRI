@@ -12,7 +12,7 @@ from astropy.io import fits
 from acstools.satdet import detsat, make_mask
 import astroscrappy
 import importlib
-import tel_params
+import params
 
 def create_mask(science_file,red,suffix,static_mask,source_mask,saturation,binning,rdnoise,sigclip,sigfrac,objlim,log):
 

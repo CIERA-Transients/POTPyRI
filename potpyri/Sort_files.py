@@ -11,7 +11,7 @@ import os
 import time
 import shutil
 import importlib
-import tel_params
+import params
 import numpy as np
 
 # Sort the calibration files:
@@ -50,9 +50,9 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
 
     t_start = time.time()
     
-    log.info('Running sort_files version: '+str(__version__))
+    log.info(f'Running sort_files version: {__version__}')
 
-    tel = importlib.import_module('tel_params.'+telescope)
+    tel = importlib.import_module(f'params.{telescope}')
 
     ext = tel.raw_header_ext()
     science_keyword = tel.science_keyword()
@@ -109,12 +109,12 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
             file_time = None
             if np.any([hdr[bad_keyword[j]] == bad_files[j] for j in range(len(bad_keyword))]):
                 file_type = 'BAD'
-                moved_path = os.path.join(path,'bad/')
+                moved_path = os.path.join(path,'bad')
                 shutil.move(f,moved_path)
                 bad_num += 1            
-            elif np.all([hdr[spec_keyword[j]] == spec_files[j] for j in range(len(spec_keyword))]):
+            elif np.all([hdr[spec_keyword[j]] == bad_files[j] for j in range(len(spec_keyword))]):
                 file_type = 'SPEC'
-                moved_path = os.path.join(path,'spec/')
+                moved_path = os.path.join(path,'bad')
                 shutil.move(f,moved_path)
                 spec_num += 1
             elif ((len(flat_keyword) != 0) & (np.all([flat_files[j] in hdr[flat_keyword[j]] for j in range(len(flat_keyword))])) & (telescope!='DEIMOS')) | ((len(flat_keyword) != 0) & (np.any([flat_files[j] in hdr[flat_keyword[j]] for j in range(len(flat_keyword))])) & (telescope=='DEIMOS')):
@@ -193,7 +193,7 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
 
 def load_files(file_list, telescope,log):
     t_start = time.time()
-    tel = importlib.import_module('tel_params.'+telescope)
+    tel = importlib.import_module(f'params.{telescope}')
     cal_list = {}
     sci_list = {}
     sky_list = {}

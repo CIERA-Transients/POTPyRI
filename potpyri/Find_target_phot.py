@@ -21,7 +21,7 @@ from colorama import init, Fore, Back, Style
 init()
 
 # Function imports
-from Gaussians import fix_x0, twoD_Gaussian
+from utilities.Gaussians import fix_x0, twoD_Gaussian
 from utilities import util
 
 # Radial profile function; currently only used in find_target_phot; compact since it's outlined earlier in zp function

@@ -10,9 +10,12 @@ import numpy as np
 from astropy.io import fits, ascii
 import importlib
 import solve_wcs
-import tel_params
+import params
+import sys
+import os
 
-def quality_check(aligned_images, aligned_data, telescope, log):
+def quality_check(aligned_images, aligned_data, telescope, log,
+    nsource_align=100, nsource_align_min=20):
 
     t_start = time.time()
 
@@ -20,7 +23,7 @@ def quality_check(aligned_images, aligned_data, telescope, log):
 
     #import telescope parameter file
     try:
-        tel = importlib.import_module('tel_params.'+telescope)
+        tel = importlib.import_module(f'params.{telescope}')
     except ImportError:
         print('No such telescope file, please check that you have entered the'+\
             ' correct name or this telescope is available.''')
@@ -33,14 +36,15 @@ def quality_check(aligned_images, aligned_data, telescope, log):
     for f in aligned_images:
         log.info('Loading catalog for: '+f)
         cat = f.replace('.fits','.cat')
-        table = solve_wcs.run_sextractor(f, cat, tel, sex_config_dir='./Config', log=log)
-        print(f,len(table))
+        config_dir = os.path.abspath(os.path.join('potpyri','config'))
+        table = solve_wcs.run_sextractor(f, cat, tel, 
+            sex_config_dir=config_dir, log=log)
         if len(table)==0:
             log.info('No sources found by SExtractor.')
             fwhm.append(0)
             elong.append(0)
             stars.append(0)
-        elif len(table)<20:
+        elif len(table)<nsource_align_min:
             log.info('Not enough sources found by SExtractor.')
             fwhm.append(0)
             elong.append(0)
@@ -50,12 +54,14 @@ def quality_check(aligned_images, aligned_data, telescope, log):
             if i==1:
                 table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)&(table['MAGERR_BEST']!=99)]
                 table.sort('MAG_BEST')
-                x_pos = table['XWIN_IMAGE'][0:20]
-                y_pos = table['YWIN_IMAGE'][0:20]
-                match = 20
+                nsource = np.min([len(table), nsource_align])
+                x_pos = table['XWIN_IMAGE'][0:nsource]
+                y_pos = table['YWIN_IMAGE'][0:nsource]
+                match = nsource
             else:
                 matches = []
-                for j in range(20):
+                nsource = np.min([len(table), nsource_align])
+                for j in range(nsource):
                     x_pos_search = table['XWIN_IMAGE'][(table['XWIN_IMAGE']>x_pos[j]-5)&(table['XWIN_IMAGE']<x_pos[j]+5)&(table['YWIN_IMAGE']>y_pos[j]-5)&(table['YWIN_IMAGE']<y_pos[j]+5)]
                     y_pos_search = table['YWIN_IMAGE'][(table['XWIN_IMAGE']>x_pos[j]-5)&(table['XWIN_IMAGE']<x_pos[j]+5)&(table['YWIN_IMAGE']>y_pos[j]-5)&(table['YWIN_IMAGE']<y_pos[j]+5)]
                     if len(x_pos_search)!=0 and len(y_pos_search)!=0:

@@ -41,7 +41,8 @@ def pixscale():
     return 0.135 #arcsec/pixel
 
 def saturation(hdr):
-    return 65535
+    # See LRIS non-linearity: https://www2.keck.hawaii.edu/inst/lris/lris-red-upgrade-notes_vol2.html
+    return 55000
 
 def WCS_keywords_old(): #WCS keywords
     return []
@@ -54,7 +55,7 @@ def cal_path():
 
 def raw_format(proc):
     if str(proc)=='True':
-        return 'L*.fits.gz'
+        return '*.fits.gz'
     elif str(proc)=='raw':
         return '*[b,r]*.fits'
 
@@ -142,8 +143,14 @@ def time_format(hdr):
 def wavelength():
     return 'OPT'
 
-def load_bias(red_path,amp,binn):
-    bias = red_path+'mbias_'+amp+'_'+binn+'.fits'
+def get_mbias_name(red_path, amp, binn):
+    return(os.path.join(red_path, f'mbias_{amp}_{binn}.fits'))
+
+def get_mflat_name(red_path, fil, amp, binn):
+    return(os.path.join(red_path, f'mflat_{fil}_{amp}_{binn}.fits'))
+
+def load_bias(red_path, amp, binn):
+    bias = get_mbias_name(red_path, amp, binn)
     mbias = [CCDData.read(bias,hdu=x+1,unit=u.electron) for x in range(int(amp[0]))]
     return mbias
 
@@ -166,6 +173,7 @@ def create_bias(cal_list,cal,red_path,log):
             red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=x.header['DATASEC'], gain=gains[j]*u.electron/u.adu, readnoise=readnoises[j]*u.electron) for j,x in enumerate(raw)]
         bias_hdu = fits.HDUList([fits.PrimaryHDU(header=header)])
         for x in red: bias_hdu.append(fits.ImageHDU(x.data,header=x.header))
+
         bias_hdu.writeto(bias.replace('/raw/','/red/').replace('.gz',''),overwrite=True)
         cal_list[cal][i] = bias.replace('/raw/','/red/').replace('.gz','')
     mbias = [ccdproc.combine(cal_list[cal],hdu=x+1,unit=u.electron) for x in range(int(amp[0]))]
@@ -173,16 +181,15 @@ def create_bias(cal_list,cal,red_path,log):
     for x in mbias: mbias_hdu.append(fits.ImageHDU(x.data,header=x.header))
     log.info('Created master bias with '+amp+' amps and '+binn+' binning.')
     mbias_hdu[0].header['VER'] = (__version__, 'Version of telescope parameter file used.')
-    mbias_hdu.writeto(red_path+'mbias_'+amp+'_'+binn+'.fits',overwrite=True)
-    log.info('Master bias written to mbias_'+amp+'_'+binn+'.fits')
+    
+    bias_filename = get_mbias_name(red_path, amp, binn)
+    mbias_hdu.writeto(bias_filename,overwrite=True)
+    log.info(f'Master bias written to {bias_filename}')
     for bias in cal_list[cal]: os.remove(bias)
     return
 
-def flat_name(flatpath,fil,amp,binn):
-    return [flatpath+'mflat_'+fil+'_'+amp+'_'+binn+'.fits']
-
 def load_flat(flat):
-    mflat = CCDData.read(flat[0],unit=u.electron)
+    mflat = CCDData.read(flat,unit=u.electron)
     return mflat
 
 def format_datasec(sec_string, binning=1):
@@ -211,7 +218,8 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
     readnoises = readnoise(amp)
     oscan_reg = overscan_region(amp)
     for i, flat in enumerate(flat_list):
-        log.info('Loading file: '+flat)
+        flat = os.path.abspath(flat)
+        log.info(f'Loading file: {flat}')
         with fits.open(flat) as hdr:
             header = hdr[0].header
         try:
@@ -249,8 +257,10 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
     mflat = ccdproc.combine(flats,method='median',scale=scale,sigma_clip=True)
     log.info('Created master flat for filter: '+fil+' and '+amp+' amp '+binn+' biinning.')
     mflat.header['VER'] = (__version__, 'Version of telescope parameter file used.')
-    mflat.write(red_path+'mflat_'+fil+'_'+amp+'_'+binn+'.fits',overwrite=True)
-    log.info('Master flat written to mflat_'+fil+'_'+amp+'_'+binn+'.fits')
+
+    flat_filename = get_mflat_name(red_path, fil, amp, binn)
+    mflat.write(flat_filename, overwrite=True)
+    log.info(f'Master flat written to {flat_filename}')
     return
 
 # Data sections for new red amplifier
@@ -298,7 +308,8 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
     readnoises = readnoise(amp)
     oscan_reg = overscan_region(amp)
     for sci in sci_list:
-        log.info('Loading file: '+sci)
+        sci = os.path.abspath(sci)
+        log.info(f'Loading file: {sci}')
         log.info('Applying bias correction, gain correction and flat correction.')
         with fits.open(sci) as hdr:
             header = hdr[0].header
@@ -324,6 +335,7 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
         if amp == '1R':
             bin1,bin2 = header['BINNING'].split(',')
             bin1 = float(bin1) ; bin2=float(bin2)
+                
             raw = [CCDData.read(sci, hdu=x, unit='adu') for x in range(int(amp[0]))]
             red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
             
@@ -364,12 +376,15 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
             mask = segment_img.make_source_mask(footprint=footprint)
 
         masks.append(mask)
-        # clean, com_mask = create_mask.create_mask(sci,processed_data,'_mask.fits',static_mask(proc),mask,saturation(red.header),binn(),np.mean(readnoise(amp)),cr_clean_sigclip(),cr_clean_sigcfrac(),cr_clean_objlim(),log)
-        # processed_data.data = clean
+        
         log.info('Calculating 2D background.')
         bkg = Background2D(processed_data, (128, 128), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=mask, exclude_percentile=80)
         log.info('Median background: '+str(np.median(bkg.background)))
-        fits.writeto(sci.replace('/raw/','/red/').replace('.fits','_bkg.fits').replace('.gz',''),np.array(bkg.background),overwrite=True)
+        
+        bkg_basefile = os.path.basename(sci).replace('.fits','_bkg.fits').replace('.gz','')
+        bkg_outfile_name = os.path.join(red_path, bkg_basefile)
+        log.info(f'Writing: {bkg_outfile_name}')
+        fits.writeto(bkg_outfile_name,np.array(bkg.background),overwrite=True)
         final = processed_data.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found').divide(processed_data.header['ELAPTIME']*u.second,propagate_uncertainties=True,handle_meta='first_found')
         log.info('Background subtracted and image divided by exposure time.')
         if window:
@@ -403,12 +418,17 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
             final.header['CD2_1'] = pixsc/3600*np.cos(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
             final.header['CD2_2'] = -pixsc/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
         final.header['DATASEC'] = ('[1:%s,1:%s]'%(np.shape(final)[1],np.shape(final)[0]))
-        final.write(sci.replace('/raw/','/red/').replace('.gz',''),overwrite=True)
+        
+
+        final_basefile = sci.replace('.gz','')
+        final_outfile_name = os.path.join(red_path, final_basefile)
+        log.info(f'Writing: {final_outfile_name}')
+        final.write(final_outfile_name,overwrite=True)
         processed.append(final)
     return processed, masks
 
 def stacked_image(tar,red_path):
-    return [red_path+tar+'.fits']
+    return [os.path.join(red_path, tar+'.fits')]
 
 def rdnoise(header):
     try:
@@ -498,7 +518,7 @@ def trim(f):
 def trim_section(data):
     return data[625:1875,0:3600]
 
-def edit_raw_headers(rawdir):
+def edit_raw_headers(rawdir, log=None):
 
     for file in sorted(glob.glob(os.path.join(rawdir, '*.fits'))):
 
@@ -576,5 +596,11 @@ def edit_raw_headers(rawdir):
             hdu[0].header['CD2_1']=-np.sin(pa * np.pi/180.0)*3.75E-05
             hdu[0].header['CD1_1']=np.cos(pa * np.pi/180.0)*3.75E-05
             hdu[0].header['CD2_2']=-np.cos(pa * np.pi/180.0)*3.75E-05
+
+            for i in np.arange(len(hdu)):
+                if i==0: continue
+
+                hdu[i].header['CUNIT1'] = 'deg'
+                hdu[i].header['CUNIT2'] = 'deg'
 
         hdu.writeto(file, overwrite=True, output_verify='silentfix')
