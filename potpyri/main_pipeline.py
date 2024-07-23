@@ -66,7 +66,7 @@ def main_pipeline(telescope:str,data_path:str,
     try:
         tel = importlib.import_module('params.'+telescope)
     except ImportError:
-        telfile='params.'+telescope
+        telfile=f'params.{telescope}'
         print(f'''No such telescope file {telfile}, please check that you have 
             entered the correct name or this telescope is available.''')
         sys.exit(-1)
@@ -237,7 +237,7 @@ def main_pipeline(telescope:str,data_path:str,
                     log.info('Master flat creation completed in '+str(t2-t1)+' sec')
 
     # Science files
-    #######################################################################################################
+    ##################
     # Basic processing
     # Does it even need to run?
     if len(sci_list) == 0:
@@ -398,103 +398,33 @@ def main_pipeline(telescope:str,data_path:str,
                 log.info('Median stack made for '+stack[k])
                 print('Please check the quality of the stack made.')
 
-                ## WCS solution
-                if not no_verify:
-                    con = input(Back.RED+'Would you like to continue with the reduction (solving the WCS) for this stack (yes or no)? '+Style.RESET_ALL)
-                else:
-                    con = 'yes'
-                if con=='no':
-                    continue
                 # Auto-WCS solution
                 if tel.run_wcs():
 
                     log.info('Solving WCS.')
 
-                    if use_anet:
-                        basefile = os.path.basename(stack[k])
-                        dirname = os.path.dirname(stack[k])
-                        solve_wcs.solve_astrometry(dirname, basefile, tel,
+                    basefile = os.path.basename(stack[k])
+                    dirname = os.path.dirname(stack[k])
+                    solve_wcs.solve_astrometry(dirname, basefile, tel,
                             replace=True, log=log)
 
-                    try:
-                        wcs_error = solve_wcs.solve_wcs(stack[k],telescope,log=log)
-                        log.info(wcs_error)
-                        stack[k] = stack[k].replace('.fits','_wcs.fits')
-                    except Exception as e:
-                        print(e)
-                        log.error('Automatic WCS solution failed.')
-                    
-                    log.info("Below requires an Astrometry.net API key to be configured locally")
-
                 if tel.run_phot():
-                    con = input(Back.RED+'Based on the WCS solution, would you like to continue with the PSF photometry for this stack (yes or no)? '+Style.RESET_ALL)
-                    if con=='no':
-                        continue
                     log.info('Running psf photometry.')
                     try:
-                        epsf, fwhm = psf.do_phot(stack[k])
+                        epsf, fwhm = psf.do_phot(stack[k], log=log)
                         log.info('FWHM = %2.4f"'%(fwhm*tel.pixscale()))
-                        con = input(Back.RED+'Please check the PSF determined. Would you like to continue with the reduction (calculating zero point) for this stack (yes or no)? '+Style.RESET_ALL)
-                        if con=='yes':
-                            log.info('Calculating zeropint.')
-                            zp_catalogs = tel.catalog_zp()
-                            zp_cal = absphot.absphot()
-                            for zp_cat in zp_catalogs:
-                                zp, zp_err = zp_cal.find_zeropoint(stack[k].replace('.fits','.pcmp'), fil, zp_cat, plot=True, log=log)
-                                if zp:
-                                    break
+                        log.info('Calculating zeropint.')
+                        zp_catalogs = tel.catalog_zp()
+                        zp_cal = absphot.absphot()
+                        for zp_cat in zp_catalogs:
+                            catfile = stack[k].replace('.fits','.pcmp')
+                            zp, zp_err = zp_cal.find_zeropoint(catfile, fil, 
+                                zp_cat, plot=True, log=log)
+                            if zp:
+                                break
                     except Exception as e:
                         log.error('PSF photometry failed due to: '+str(e))
-        if phot:
-            log.info('User input to perform manual aperture photometry.')
-            log.info('List of final stacks: '+str(final_stack))
-            k = int(input(Back.RED+'Index (starting from 0) of the stack you want to perform aperture photometry on? '+Style.RESET_ALL))
-            log.info('Performing aperture photometry on '+final_stack[k])
-            if not os.path.exists(final_stack[k].replace('.fits','.pcmp')):
-                log.info('Running psf photometry.')
-                epsf, fwhm = psf.do_phot(final_stack[k], log=log)
-                log.info('Calculating zeropint.')
-                zp_catalogs = tel.catalog_zp()
-                zp_cal = absphot.absphot()
-                for zp_cat in zp_catalogs:
-                    zp, zp_err = zp_cal.find_zeropoint(final_stack[k].replace('.fits','.pcmp'), fil, zp_cat, plot=True, log=log)
-                    if zp:
-                        break
-            log.info('Loading FWHM from psf photometry.')
-            header, table = import_catalog(final_stack[k].replace('.fits','.pcmp'))
-            fwhm = header['FWHM']
-            log.info('FWHM = %2.4f pixels'%fwhm)
-            enter_zp = input(Back.RED+'Enter user zeropiont instead of loading from psf photometry ("yes" or "no")? '+Style.RESET_ALL)
-            if enter_zp == 'yes':
-                zp = float(input(Fore.RED+'Please enter zeropoint in AB mag: '+Style.RESET_ALL))
-                zp_err = float(input(Fore.RED+'Please enter zeropoint error in AB mag: '+Style.RESET_ALL))
-                log.info('User entered zpt = %2.4f +/- %2.4f AB mag'%(zp,zp_err))
-            else:
-                try:
-                    zp = header['ZPTMAG']
-                    zp_err = header['ZPTMUCER']
-                    log.info('zpt = %2.4f +/- %2.4f AB mag'%(zp,zp_err))
-                except:
-                    log.info('No zeropint found.')
-                    zp = float(input(Fore.RED+'Please enter zeropoint in AB mag: '+Style.RESET_ALL))
-                    zp_err = float(input(Fore.RED+'Please enter zeropoint error in AB mag: '+Style.RESET_ALL))
-                    log.info('User entered zpt = %2.4f +/- %2.4f AB mag'%(zp,zp_err))
-            with fits.open(final_stack[k]) as hdr:
-                gain_eff = hdr[0].header['GAIN']
-            pos = input(Back.RED+'Would you like to enter the RA and Dec ("wcs") or x and y ("xy") position of the target? '+Style.RESET_ALL)
-            if pos == 'wcs':
-                ra = float(input(Fore.RED+'Enter RA in degrees: '+Style.RESET_ALL))
-                dec = float(input(Fore.RED+'Enter Dec in degrees: '+Style.RESET_ALL))
-                tp.find_target_phot(final_stack[k], fil, fwhm, zp, zp_err, tel.pixscale(), show_phot=True, ra=ra, dec=dec, log=log, gain=gain_eff)
-            elif pos == 'xy':
-                x = float(input(Fore.RED+'Enter x position in pixel: '+Style.RESET_ALL))
-                y = float(input(Fore.RED+'Enter y position in pixel: '+Style.RESET_ALL))
-                tp.find_target_phot(final_stack[k], fil, fwhm, zp, zp_err, tel.pixscale(), show_phot=True, x=x, y=y, log=log, gain=gain_eff)
-                ra, dec = (wcs.WCS(header)).all_pix2world(x,y,1)
-            log.info('Calculating extinction correction from Schlafly & Finkbeiner (2011).')
-            coords = SkyCoord(ra,dec,unit='deg')
-            ext_cor = extinction.calculate_mag_extinction(coords,fil)
-            log.info('Galactic extinction = %2.4f mag'%ext_cor)
+        
     t_end = time.time()
     log.info('Pipeline finshed.')
     log.info('Total runtime: '+str(t_end-t_start)+' sec')
