@@ -70,14 +70,12 @@ class absphot(object):
             flux=flux[mask] ; fluxerr=fluxerr[mask]
             mag=mag[mask] ; magerr=magerr[mask]
 
-            m='Iteration {i}: {N} obj, zpt = {zpt}+/-{zpterr}, {s}-sigma '+\
-                'clip to {M} obj'
-            if log:
-                log.info(m.format(i=i, N=nobj, zpt='%2.4f'%zpt, zpterr='%2.4f'%zpterr,
-                s=self.sigma, M=len(flux)))
+            m=f'''Iteration {i}: {nobj} obj, zpt = {zpt}+/-{zpterr}, {self.sigma}-sigma 
+                clip to {len(flux)} obj'''
+            if log: 
+                log.info(m)
             else:
-                print(m.format(i=i, N=nobj, zpt='%2.4f'%zpt, zpterr='%2.4f'%zpterr,
-                s=self.sigma, M=len(flux)))
+                print(m)
         
         if log:
             log.info('Number of stars used to calculate final zeropoint: '+str(len(flux)))

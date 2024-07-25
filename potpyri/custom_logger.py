@@ -1,4 +1,7 @@
-import logging, time
+import logging
+import time
+import datetime
+import os
 
 # Define some colors for different log levels
 BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
@@ -9,6 +12,26 @@ BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
 RESET_SEQ = "\033[0m"
 COLOR_SEQ = "\033[1;%dm"
 BOLD_SEQ = "\033[1m"
+
+def get_log(log_dir):
+
+    datestr = datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+    base_logname = f'log_{datestr}.log'
+    log_filename = os.path.join(log_dir, base_logname)
+    log = ColoredLogger(log_filename)
+
+    return(log)
+
+def logprint(log, message, method='info'):
+    if log: 
+        if method=='info':
+            log.info(message)
+        elif method=='error':
+            log.error(message)
+        elif method=='critical':
+            log.critical(message)
+        else:
+            raise Exception(f'Unknown method {method}')
 
 def formatter_message(message, use_color = True):
     # Bold face some text only when rich text/color is requested.

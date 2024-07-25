@@ -574,12 +574,15 @@ def clean_up_astrometry(directory, file, exten):
         if os.path.exists(f):
             os.remove(f)
 
-def solve_astrometry(directory, file, tel, replace=True, log=None):
+def solve_astrometry(directory, file, tel, radius=0.5, replace=True, log=None):
 
     # Starting solve, print file and directory for reference
-    fullfile = directory + '/' + file
-    message = 'Trying to solve file={file}'
-    if log: log.info(message.format(file=fullfile))
+    if os.path.basename(file)==file:
+        fullfile = os.path.join(directory, file)
+    else:
+        fullfile = file
+
+    if log: log.info(f'Trying to solve file: {file}')
 
     if not os.path.exists(fullfile):
         return(False)
@@ -609,8 +612,7 @@ def solve_astrometry(directory, file, tel, replace=True, log=None):
                 break
 
     if not coord:
-        error = 'Could not parse RA/DEC from header of {file}'
-        if log: log.error(error.format(file=file))
+        if log: log.error(f'Could not parse RA/DEC from header of {file}')
         return(False)
 
     if 'solved.fits' in fullfile:
@@ -618,25 +620,26 @@ def solve_astrometry(directory, file, tel, replace=True, log=None):
     else:
         newfile = fullfile.replace(exten,'.solved.fits')
 
+    # Handle pixel scale guess
     scale = tel.pixscale()
     scale_high = scale * 1.2
     scale_low = scale * 0.8
 
     cmd = 'solve-field'
     args = '--scale-units arcsecperpix '
-    args += '--scale-low {lo} --scale-high {hi} --ra {ra} --dec {dec} '
-    args += ' --radius 0.5 --no-plots --overwrite -N {newfile} --dir {outdir} '
-
-    args = args.format(ra=coord.ra.degree, dec=coord.dec.degree,
-        outdir=directory, newfile=newfile, lo=scale_low, hi=scale_high)
+    args += f'--scale-low {scale_low} --scale-high {scale_high} '
+    args += f'--ra {coord.ra.degree} --dec {coord.dec.degree} '
+    args += f' --radius {radius} --no-plots '
+    args += f'--overwrite -N {newfile} --dir {directory} '
 
     extra_opts = '--downsample 2 --no-verify --odds-to-tune-up 1e4 --objs 15'
 
     tries = 1
     good = False
     while tries < 4 and not good:
-        if log: log.info('Try #{n} with astrometry.net...'.format(n=tries))
         input_args = args + extra_opts
+
+        if log: log.info(f'Try #{tries} with astrometry.net...')
         if log: log.info(input_args)
 
         process = [cmd,fullfile]+input_args.split()
@@ -662,7 +665,9 @@ def solve_astrometry(directory, file, tel, replace=True, log=None):
     if log: log.info(f'{newfile} exists: {file_exists}')
 
     if os.path.exists(newfile):
-        if log: log.info('SUCCESS: solved {0}'.format(fullfile))
+
+        clean_up_astrometry(directory, file, exten)
+        if log: log.info(f'SUCCESS: solved {fullfile}')
 
         if replace or newfile=='tmp.fits':
             output_file = fullfile
@@ -679,9 +684,10 @@ def solve_astrometry(directory, file, tel, replace=True, log=None):
                 del hdu[i].header['HISTORY']
 
             # Delete other WCS header keys
-            wcs_key = ['CSYER1','CSYER2','CRDER1','CRDER2','CD1_1','CD1_2','CD2_1',
-                'CD2_2','CRPIX1','CRPIX2','CUNIT1','CUNIT2','EQUINOX','RADESYS',
-                'CNAME1','CNAME2','CTYPE1','CTYPE2','WCSNAME','CRVAL1','CRVAL2']
+            wcs_key = ['CSYER1','CSYER2','CRDER1','CRDER2','CD1_1','CD1_2',
+                'CD2_1','CD2_2','CRPIX1','CRPIX2','CUNIT1','CUNIT2','EQUINOX',
+                'RADESYS','CNAME1','CNAME2','CTYPE1','CTYPE2','WCSNAME',
+                'CRVAL1','CRVAL2']
 
             for key in [w + 'C' for w in wcs_key]:
                 if key in list(hdu[i].header.keys()):
@@ -694,19 +700,14 @@ def solve_astrometry(directory, file, tel, replace=True, log=None):
         try:
             hdu.writeto(output_file, overwrite=True, output_verify='silentfix')
         except TypeError:
-            if log: log.error('FAILURE: could not properly save file {0}'.format(
-                fullfile))
-
-            clean_up_astrometry(directory, file, exten)
+            if log: log.error(f'FAILURE: could not save file {fullfile}')
             return(False)
-
-        clean_up_astrometry(directory, file, exten)
 
         return(True)
 
     else:
         #if log: log.info('FAILURE: did not solve {0}'.format(fullfile))
-        print('FAILURE: did not solve {0}'.format(fullfile))
+        print(f'FAILURE: did not solve {fullfile}')
         clean_up_astrometry(directory, file, exten)
         return(False)
 
@@ -719,7 +720,8 @@ def main():
     params.add_argument('--log', default=None, help='')
     args = params.parse_args()
 
-    solve_wcs(args.input_file,telescope=args.telescope,proc=args.proc,static_mask=args.static_mask,log=args.log)
+    solve_wcs(args.input_file, telescope=args.telescope, proc=args.proc,
+        static_mask=args.static_mask, log=args.log)
 
 if __name__ == "__main__":
     main()
