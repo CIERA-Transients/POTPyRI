@@ -193,8 +193,8 @@ def write_out_catalog(catalog, img_file, columns, sigfig, outfile, metadata):
 
 def do_phot(img_file, write_out_back=False,
     write_out_epsf_img=True, write_out_epsf_file=True, write_out_psf_stars=True,
-    outdir='', subtract_back=False, fwhm_scale_psf=2.5, log=None,
-    star_param={'snthresh_psf': 20.0, 'fwhm_init': 5.0, 'snthresh_final': 10.0}):
+    outdir='', subtract_back=False, fwhm_scale_psf=3.5, log=None,
+    star_param={'snthresh_psf': 20.0, 'fwhm_init': 8.0, 'snthresh_final': 10.0}):
 
     stars = get_star_catalog(img_file, fwhm_init=star_param['fwhm_init'])
     img_hdu = fits.open(img_file)
@@ -436,4 +436,4 @@ def do_phot(img_file, write_out_back=False,
 
 if __name__=="__main__":
 
-    do_phot('/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/red/meertrap_wf_hos_R_1R_11.fits')
+    do_phot('/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/red/R155_host.R.ut240629.1R.11.stk.fits')
