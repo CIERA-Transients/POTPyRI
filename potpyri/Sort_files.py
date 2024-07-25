@@ -12,10 +12,99 @@ import time
 import shutil
 import importlib
 import params
+import glob
 import numpy as np
 
+def is_bad(hdr, tel):
+    bad_keyword = tel.bad_keyword()
+    bad_files = tel.bad_files()
+
+    bad = np.any([hdr[bad_keyword[j]] == bad_files[j] 
+        for j in range(len(bad_keyword))])
+
+    return(bad)
+
+def is_spec(hdr, tel):
+    spec_keyword = tel.spec_keyword()
+    spec_files = tel.spec_files()
+
+    spec = np.all([hdr[spec_keyword[j]] == spec_files[j] 
+        for j in range(len(spec_keyword))])
+
+    return(spec)
+
+def is_flat(hdr, tel):
+    flat_keyword = tel.flat_keyword()
+    flat_files = tel.flat_files()
+
+    telescope = tel.name()
+
+    flat = ((len(flat_keyword) != 0) & (np.all([flat_files[j] in hdr[flat_keyword[j]] 
+        for j in range(len(flat_keyword))])) & (telescope!='DEIMOS')) | ((len(flat_keyword) != 0) & (np.any([flat_files[j] in hdr[flat_keyword[j]] 
+        for j in range(len(flat_keyword))])) & (telescope=='DEIMOS'))
+
+    return(flat)
+
+def is_bias(hdr, tel):
+    bias_keyword = tel.bias_keyword()
+    bias_files = tel.bias_files()
+
+    bias = len(bias_keyword) != 0 and np.all([hdr[bias_keyword[j]] == bias_files[j] for j in range(len(bias_keyword))])
+
+    return(bias)
+
+def is_science(hdr, tel):
+    science_keyword = tel.science_keyword()
+    science_files = tel.science_files()
+
+    science = np.all([hdr[science_keyword[j]] == science_files[j] 
+        for j in range(len(science_keyword))])
+
+    return(science)
+
+def is_dark(hdr, tel):
+    dark_keyword = tel.dark_keyword()
+    dark_files = tel.dark_files()
+
+    dark = len(dark_keyword) != 0 and np.all([dark_files[j] in hdr[dark_keyword[j]] 
+        for j in range(len(dark_keyword))])
+
+    return(dark)
+
+
+# Overall method to handle files:
+def handle_files(file_list, tel, paths, incl_bad=False, proc=None, 
+    no_redo=False, log=None):
+
+    file_table = None
+
+    # Always regenerate file list from existing data in data, raw, and bad
+    if os.path.exists(file_list): 
+        if no_redo:
+            file_table = Table.read(file_list, format='ascii.ecsv')
+            return(file_table)
+        else:
+            os.remove(file_list)
+
+    files = glob.glob(os.path.join(paths['raw'], tel.raw_format(proc)))+\
+            glob.glob(os.path.join(paths['data'], tel.raw_format(proc)))+\
+            glob.glob(os.path.join(paths['bad'], tel.raw_format(proc)))
+
+
+    if log: log.info('Sorting files and creating file lists.')
+    if len(files)!=0:
+        log.info(f'{len(files)} files found.')
+        file_table = sort_files(files, file_list, tel, paths, incl_bad=incl_bad, 
+            log=log)
+    else:
+        log.critical('No files found, please check data path and rerun.')
+        logging.shutdown()
+        sys.exit(-1)
+
+    return(file_table)
+
 # Sort the calibration files:
-def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, date=None,
+def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
 
     '''
 
@@ -27,18 +116,16 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
     :param files: list (string)
         List of strings of files (path should be included).
 
-    :param manual_filter: string, optional
-        Filter name if filter is not given in header of files.
-        Default is ``None``.
+    :param tel: Telescope
+        Telescope with parameters and methods to sort data.
 
-    :param log2: log, optional
+    :param incl_bad: bool, optional
+
+    :param log: log, optional
         Overview log used to write the object and date observed (if ``date`` parameter is not ``None``).
         If no log is inputted, information is printed out instead of being written to ``log2``.
         Default is ``None``.
 
-    :param date: string, optional
-        String of the date the observations were taken (to be recorded in ``log2`` if it is not ``None``).
-        Default is ``None``.
 
     Returns
     -------
@@ -50,55 +137,38 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
 
     t_start = time.time()
     
-    log.info(f'Running sort_files version: {__version__}')
-
-    tel = importlib.import_module(f'params.{telescope}')
+    if log: log.info(f'Running sort_files version: {__version__}')
 
     ext = tel.raw_header_ext()
-    science_keyword = tel.science_keyword()
-    flat_keyword = tel.flat_keyword()
-    bias_keyword = tel.bias_keyword()
-    dark_keyword = tel.dark_keyword()
-    spec_keyword = tel.spec_keyword()
-    bad_keyword = tel.bad_keyword()
-
-    science_files = tel.science_files()
-    flat_files = tel.flat_files()
-    bias_files = tel.bias_files()
-    dark_files = tel.dark_files()
-    spec_files = tel.spec_files()
-    bad_files = tel.bad_files()
-
     target_keyword = tel.target_keyword()
-
-    cal_list = {}
-    sci_list = {}
-    sky_list = {}
-    time_list = {}
 
     bad_num = 0
     spec_num = 0
+    sci_num = 0
+    bias_num = 0
+    dark_num = 0
+    flat_num = 0
 
-    file_list = os.path.join(path,'file_list.txt')
-    file_table = Table(names=('File','Target','Filter','Amp','Binning','Exp','Type','Time'),dtype=('S','S','S','S','S','S','S','float64'))
+    params = ('File','Target','Filter','Amp','Binning','Exp','Type',
+        'CalType','Time')
+    dtypes = ('S','S','S','S','S','S','S','S','float64')
+    file_table = Table(names=params, dtype=dtypes)
 
     for i, f in enumerate(files):
-        with fits.open(f) as file_open:
+        with fits.open(f, mode='readonly') as file_open:
             try:
                 hdr = file_open[ext].header
             except IndexError:
-                log.error('Moving file '+f+' to bad due to error opening the file.')
-                file_type = 'BAD'
-                moved_path = os.path.join(path,'bad/')
-                shutil.move(f,moved_path)
+                if log: log.error(f'Moving file {f} to bad due to error opening file.')
+                moved_path = paths['bad']
+                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
                 continue
             try:
                 check_data = file_open[ext].data
             except TypeError:
-                log.error('Moving file '+f+' to bad due to corrupted data.')
-                file_type = 'BAD'
-                moved_path = os.path.join(path,'bad/')
-                shutil.move(f,moved_path)
+                if log: log.error(f'Moving file {f} to bad due to corrupted data.')
+                moved_path = paths['bad']
+                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
                 continue
         try:
             target = hdr[target_keyword].replace(' ','')
@@ -106,149 +176,85 @@ def sort_files(files, telescope, path, log): #manual_filter=None, log2=None, dat
             amp = tel.amp_keyword(hdr)
             binn = tel.bin_keyword(hdr)
             exp = str(tel.exptime(hdr))
-            file_time = None
-            if np.any([hdr[bad_keyword[j]] == bad_files[j] for j in range(len(bad_keyword))]):
+            file_time = tel.time_format(hdr)
+
+            if is_bad(hdr, tel):
                 file_type = 'BAD'
-                moved_path = os.path.join(path,'bad')
-                shutil.move(f,moved_path)
+                moved_path = paths['bad']
+                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
                 bad_num += 1            
-            elif np.all([hdr[spec_keyword[j]] == bad_files[j] for j in range(len(spec_keyword))]):
+            elif is_spec(hdr, tel):
                 file_type = 'SPEC'
-                moved_path = os.path.join(path,'bad')
-                shutil.move(f,moved_path)
+                moved_path = paths['bad']
+                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
                 spec_num += 1
-            elif ((len(flat_keyword) != 0) & (np.all([flat_files[j] in hdr[flat_keyword[j]] for j in range(len(flat_keyword))])) & (telescope!='DEIMOS')) | ((len(flat_keyword) != 0) & (np.any([flat_files[j] in hdr[flat_keyword[j]] for j in range(len(flat_keyword))])) & (telescope=='DEIMOS')):
+            elif is_flat(hdr, tel):
                 file_type = 'FLAT'
-                moved_path = os.path.join(path,'raw/')
-                shutil.move(f,moved_path)
-                try:
-                    cal_list['FLAT_'+fil+'_'+amp+'_'+binn]
-                except KeyError:
-                    cal_list.update({'FLAT_'+fil+'_'+amp+'_'+binn:[]}) 
-                cal_list['FLAT_'+fil+'_'+amp+'_'+binn].append(f.replace(path,moved_path))  
-            elif len(bias_keyword) != 0 and np.all([hdr[bias_keyword[j]] == bias_files[j] for j in range(len(bias_keyword))]):
+                moved_path = paths['raw']
+                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['raw']) 
+                flat_num += 1
+            elif is_bias(hdr, tel):
                 file_type = 'BIAS'
-                moved_path = os.path.join(path,'raw/')
-                shutil.move(f,moved_path)
-                try:
-                    cal_list['BIAS_'+amp+'_'+binn]
-                except KeyError:
-                    cal_list.update({'BIAS_'+amp+'_'+binn:[]})
-                cal_list['BIAS_'+amp+'_'+binn].append(f.replace(path,moved_path))
-            elif np.all([hdr[science_keyword[j]] == science_files[j] for j in range(len(science_keyword))]):
+                moved_path = paths['raw']
+                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['raw'])
+                bias_num += 1
+            elif is_science(hdr, tel):
                 file_type = 'SCIENCE'
-                moved_path = os.path.join(path,'raw/')
-                shutil.move(f,moved_path)
-                try:
-                    sci_list[target+'_'+fil+'_'+amp+'_'+binn]
-                except KeyError:
-                    sci_list.update({target+'_'+fil+'_'+amp+'_'+binn:[]})
-                sci_list[target+'_'+fil+'_'+amp+'_'+binn].append(f.replace(path,moved_path))
-                try:
-                    time_list[target+'_'+fil+'_'+amp+'_'+binn]
-                except KeyError:
-                    time_list.update({target+'_'+fil+'_'+amp+'_'+binn:[]})
-                file_time = tel.time_format(hdr)
-                time_list[target+'_'+fil+'_'+amp+'_'+binn].append(file_time)
-                if tel.wavelength() == 'NIR':
-                    try:
-                        sky_list[fil+'_'+amp+'_'+binn]
-                    except KeyError:
-                        sky_list.update({fil+'_'+amp+'_'+binn:[]})
-                    sky_list[fil+'_'+amp+'_'+binn].append(f.replace(path,moved_path))
-            elif len(dark_keyword) != 0 and np.all([dark_files[j] in hdr[dark_keyword[j]] for j in range(len(dark_keyword))]):
+                moved_path = paths['raw']
+                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['raw'])
+                sci_num += 1
+            elif is_dark(hdr, tel):
                 file_type = 'DARK'
-                moved_path = os.path.join(path,'raw/')
-                shutil.move(f,moved_path)
-                try:
-                    cal_list['DARK_'+exp+'_'+amp+'_'+binn]
-                except KeyError:
-                    cal_list.update({'DARK_'+exp+'_'+amp+'_'+binn:[]}) 
-                cal_list['DARK_'+exp+'_'+amp+'_'+binn].append(f.replace(path,moved_path))
+                moved_path = paths['raw']
+                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['raw'])
+                dark_num += 1
             else:
                 file_type = 'BAD'
-                moved_path = os.path.join(path,'bad/')
-                shutil.move(f,moved_path)
+                moved_path = paths['bad']
+                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
                 bad_num += 1
         except Exception as e:
-            log.error('Moving file '+f+' to bad due to error: '+str(e))
+            if log: log.error(f'Moving file {f} to bad due to error: {e}')
             file_type = 'BAD'
-            moved_path = os.path.join(path,'bad/')
-            shutil.move(f,moved_path)
+            moved_path = paths['bad']
+            shutil.move(f, paths['bad'])
             bad_num += 1
-        file_table.add_row((moved_path+os.path.basename(f),target,fil,amp,binn,exp,file_type,file_time))
-    file_table.write(file_list,format='ascii',delimiter='\t')
 
-    for cal in cal_list:
-        log.info(str(len(cal_list[cal]))+' '+cal+' files found.')
-    science_num = np.sum([len(sci_list[sci]) for sci in sci_list])
-    log.info(str(science_num)+' imaging science files found.')
-    log.info(str(spec_num)+' spectroscopic science files found.')
-    log.info(str(bad_num)+' bad files found and removed from reduction.')
+        if file_type=='BIAS':
+            # Bias only depends on amplifier and bin mode
+            cal_type = f'{amp}_{binn}'
+        elif file_type=='DARK':
+            # Dark depends on exposure, amplifier, and bin
+            cal_type = f'{exp}_{amp}_{binn}'
+        elif file_type=='FLAT':
+            # Flat depends on filter, amplifier, and bin
+            cal_type = f'{fil}_{amp}_{binn}'
+        elif file_type=='SCIENCE':
+            # Science is grouped by target, filter, amplifier, bin
+            cal_type = f'{target}_{fil}_{amp}_{binn}'
+        else:
+            cal_type = ''
 
-    t_end = time.time()
-    log.info('Sort_files ran in '+str(t_end-t_start)+' sec')
+        currfile = os.path.join(moved_path, os.path.basename(f))
+        if not os.path.exists(currfile):
+            if log: log.critical(f'Lost track of file {f}->{currfile}')
+            logging.shutdown()
+            sys.exit(-1)
 
-    return cal_list, sci_list, sky_list, time_list
-
-def load_files(file_list, telescope,log):
-    t_start = time.time()
-    tel = importlib.import_module(f'params.{telescope}')
-    cal_list = {}
-    sci_list = {}
-    sky_list = {}
-    time_list = {}
-    file_table = Table.read(file_list,format='ascii',delimiter='\t')
-    for i in range(len(file_table)):
-        f = file_table['File'][i]
-        target = file_table['Target'][i]
-        fil = file_table['Filter'][i]
-        amp = str(file_table['Amp'][i])
-        binn = str(file_table['Binning'][i])
-        exp = str(file_table['Exp'][i])
-        if file_table['Type'][i] == 'SCIENCE':
-            try:
-                sci_list[target+'_'+fil+'_'+amp+'_'+binn]
-            except KeyError:
-                sci_list.update({target+'_'+fil+'_'+amp+'_'+binn:[]})
-            sci_list[target+'_'+fil+'_'+amp+'_'+binn].append(f)
-            try:
-                time_list[target+'_'+fil+'_'+amp+'_'+binn]
-            except KeyError:
-                time_list.update({target+'_'+fil+'_'+amp+'_'+binn:[]})
-            file_time = float(file_table['Time'][i])
-            time_list[target+'_'+fil+'_'+amp+'_'+binn].append(file_time)
-            if tel.wavelength() == 'NIR':
-                try:
-                    sky_list[fil+'_'+amp+'_'+binn]
-                except KeyError:
-                    sky_list.update({fil+'_'+amp+'_'+binn:[]})
-                sky_list[fil+'_'+amp+'_'+binn].append(f)
-        elif file_table['Type'][i] == 'FLAT':
-            try:
-                cal_list['FLAT_'+fil+'_'+amp+'_'+binn]
-            except KeyError:
-                cal_list.update({'FLAT_'+fil+'_'+amp+'_'+binn:[]})
-            cal_list['FLAT_'+fil+'_'+amp+'_'+binn].append(f)
-        elif file_table['Type'][i] == 'BIAS':
-            try:
-                cal_list['BIAS_'+amp+'_'+binn]
-            except KeyError:
-                cal_list.update({'BIAS_'+amp+'_'+binn:[]})           
-            cal_list['BIAS_'+amp+'_'+binn].append(f)
-        elif file_table['Type'][i] == 'DARK':
-            try:
-                cal_list['DARK_'+exp+'_'+amp+'_'+binn]
-            except KeyError:
-                cal_list.update({'DARK_'+exp+'_'+amp+'_'+binn:[]}) 
-            cal_list['DARK_'+exp+'_'+amp+'_'+binn].append(f)
+        if (file_type!='BAD' and file_type!='SPEC') or incl_bad:
+            file_table.add_row((currfile,target,fil,amp,binn,exp,file_type,
+                cal_type,file_time))
     
-    for cal in cal_list:
-        log.info(str(len(cal_list[cal]))+' '+cal+' files found.')
-    science_num = np.sum([len(sci_list[sci]) for sci in sci_list])
-    log.info(str(science_num)+' imaging science files found.')
+    file_table.write(file_list, format='ascii.ecsv')
+
+    if sci_num>0 and log: log.info(f'{sci_num} imaging science files found.')
+    if bias_num>0 and log: log.info(f'{bias_num} bias files found.')
+    if flat_num>0 and log: log.info(f'{flat_num} flat files found.')
+    if dark_num>0 and log: log.info(f'{dark_num} dark files found.')
+    if bad_num>0 and log: log.info(f'{bad_num} bad files found and removed from reduction.')
+    if spec_num>0 and log: log.info(f'{spec_num} spectroscopy files found and removed from reduction.')
 
     t_end = time.time()
-    log.info('Load_files ran in '+str(t_end-t_start)+' sec')
+    log.info(f'Sort_files ran in {t_end-t_start} sec')
 
-    return cal_list, sci_list, sky_list, time_list
+    return file_table

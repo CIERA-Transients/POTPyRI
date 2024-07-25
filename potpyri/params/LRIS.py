@@ -28,6 +28,9 @@ import glob
 
 __version__ = 1.9 #last edited 18/11/2022
 
+def name():
+    return 'LRIS'
+
 def static_mask(proc):
     return ['']
 
@@ -154,15 +157,18 @@ def load_bias(red_path, amp, binn):
     mbias = [CCDData.read(bias,hdu=x+1,unit=u.electron) for x in range(int(amp[0]))]
     return mbias
 
-def create_bias(cal_list,cal,red_path,log):
-    amp = cal.split('_')[1]
-    binn = cal.split('_')[2]
+def create_bias(cal_list,amp,binn,red_path,log):
+
     gains = gain(amp)
     readnoises = readnoise(amp)
     oscan_reg = overscan_region(amp)
-    log.info('Processing bias files with '+amp+' amps and '+binn+' binning.')
-    log.info(str(len(cal_list[cal]))+' files found.')
-    for i,bias in enumerate(cal_list[cal]):
+    log.info(f'Processing bias files with {amp} amps and {binn} binning.')
+    log.info(f'{len(cal_list)} files found.')
+
+    outlist = []
+    for i,bias in enumerate(cal_list):
+        basename = os.path.basename(bias)
+
         with fits.open(bias) as hdr:
             header = hdr[0].header
         if amp=='1R':
@@ -171,21 +177,28 @@ def create_bias(cal_list,cal,red_path,log):
         else:
             raw = [CCDData.read(bias, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
             red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=x.header['DATASEC'], gain=gains[j]*u.electron/u.adu, readnoise=readnoises[j]*u.electron) for j,x in enumerate(raw)]
+        
         bias_hdu = fits.HDUList([fits.PrimaryHDU(header=header)])
         for x in red: bias_hdu.append(fits.ImageHDU(x.data,header=x.header))
 
-        bias_hdu.writeto(bias.replace('/raw/','/red/').replace('.gz',''),overwrite=True)
-        cal_list[cal][i] = bias.replace('/raw/','/red/').replace('.gz','')
-    mbias = [ccdproc.combine(cal_list[cal],hdu=x+1,unit=u.electron) for x in range(int(amp[0]))]
+        outfile = os.path.join(red_path, basename).replace('.gz','')
+        bias_hdu.writeto(outfile, overwrite=True)
+        outlist.append(outfile)
+
+    bias_filename = get_mbias_name(red_path, amp, binn)
+    mbias = [ccdproc.combine(outlist, hdu=x+1, unit=u.electron, method='median',
+        sigma_clip=True, sigma_clip_func=np.ma.median) 
+        for x in range(int(amp[0]))]
     mbias_hdu = fits.HDUList([fits.PrimaryHDU()])
     for x in mbias: mbias_hdu.append(fits.ImageHDU(x.data,header=x.header))
-    log.info('Created master bias with '+amp+' amps and '+binn+' binning.')
     mbias_hdu[0].header['VER'] = (__version__, 'Version of telescope parameter file used.')
-    
-    bias_filename = get_mbias_name(red_path, amp, binn)
     mbias_hdu.writeto(bias_filename,overwrite=True)
+
+    log.info(f'Created master bias with {amp} amps and {binn} binning.')
+
     log.info(f'Master bias written to {bias_filename}')
-    for bias in cal_list[cal]: os.remove(bias)
+    for bias in outlist: os.remove(bias)
+    
     return
 
 def load_flat(flat):
@@ -269,9 +282,9 @@ def get_1R_datasec(amp, binning=1):
 
     if binning==1:
         if amp==1:
-            return('[723:2064,284:2064]')
+            return('[830:2064,284:2064]')
         elif amp==2:
-            return('[723:2064,2170:3956]')
+            return('[830:2064,2170:3956]')
         elif amp==3:
             return('[2185:3485,284:2064]')
         elif amp==4:
@@ -427,8 +440,17 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
         processed.append(final)
     return processed, masks
 
-def stacked_image(tar,red_path):
-    return [os.path.join(red_path, tar+'.fits')]
+def stacked_image(row, red_path):
+    target = row['Target']
+    fil = row['Filter']
+    amp = row['Amp']
+    binn = row['Binning']
+    mjd = row['Time']
+
+    datestr = Time(mjd, format='mjd').datetime.strftime('ut%y%m%d')
+    filename = f'{target}.{fil}.{datestr}.{amp}.{binn}.stk.fits'
+
+    return os.path.join(red_path, filename)
 
 def rdnoise(header):
     try:
@@ -465,7 +487,7 @@ def run_phot():
     return True
 
 def catalog_zp():
-    return ['SDSS','PS1', 'SkyMapper']
+    return 'PS1'
 
 def exptime(hdr):
     return hdr['ELAPTIME']
