@@ -23,7 +23,6 @@ import astropy.units.astrophys as u
 import astropy.units as u
 import ccdproc
 from astropy.modeling import models
-import create_mask
 import glob
 
 __version__ = 1.9 #last edited 18/11/2022
@@ -32,7 +31,7 @@ def name():
     return 'LRIS'
 
 def static_mask(proc):
-    return ['']
+    return ''
 
 def run_wcs():
     return True
@@ -44,7 +43,8 @@ def pixscale():
     return 0.135 #arcsec/pixel
 
 def saturation(hdr):
-    # See LRIS non-linearity: https://www2.keck.hawaii.edu/inst/lris/lris-red-upgrade-notes_vol2.html
+    # See LRIS non-linearity: 
+    # https://www2.keck.hawaii.edu/inst/lris/lris-red-upgrade-notes_vol2.html
     return 55000
 
 def WCS_keywords_old(): #WCS keywords
@@ -157,7 +157,7 @@ def load_bias(red_path, amp, binn):
     mbias = [CCDData.read(bias,hdu=x+1,unit=u.electron) for x in range(int(amp[0]))]
     return mbias
 
-def create_bias(cal_list,amp,binn,red_path,log):
+def create_bias(cal_list, amp, binn, red_path, log):
 
     gains = gain(amp)
     readnoises = readnoise(amp)
@@ -286,9 +286,9 @@ def get_1R_datasec(amp, binning=1):
         elif amp==2:
             return('[830:2064,2170:3956]')
         elif amp==3:
-            return('[2185:3485,284:2064]')
+            return('[2185:3450,284:2064]')
         elif amp==4:
-            return('[2185:3485,2170:3956]')
+            return('[2185:3450,2170:3956]')
     elif binning==2:
         if amp==1:
             return('[437:1032,146:1032]')
@@ -314,16 +314,18 @@ def str_to_slice(sec_string):
 
     return(sl)
 
-def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=None,log=None):
+def process_science(sci_list, fil, amp, binn, red_path, mbias=None,
+    mflat=None, proc=None, log=None):
+    
     masks = []
     processed = []
     gains = gain(amp)
     readnoises = readnoise(amp)
     oscan_reg = overscan_region(amp)
-    for sci in sci_list:
+    for sci in sorted(sci_list):
         sci = os.path.abspath(sci)
-        log.info(f'Loading file: {sci}')
-        log.info('Applying bias correction, gain correction and flat correction.')
+        if log: log.info(f'Loading file: {sci}')
+        if log: log.info('Applying bias correction, gain correction and flat correction.')
         with fits.open(sci) as hdr:
             header = hdr[0].header
             if amp == '4B' and hdr[1].header['DATASEC'] != '[52:1075,1:4096]':
@@ -374,40 +376,53 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
                     flat_image.uncertainty = mflat.uncertainty[625:1875,0:3600]
                 except:
                     pass
-        log.info('Exposure time of science image is '+str(sci_full.header['ELAPTIME']))
+
+        # Add SATURATE keyword to sci_full
+        sci_full.header['SATURATE'] = saturation(hdr)
+        
         processed_data = ccdproc.flat_correct(sci_full, flat_image)
-        log.info('File proccessed.')
-        log.info('Cleaning cosmic rays and creating mask.')
-
-        if not use_segm:
-            mask = make_source_mask(processed_data, nsigma=3, npixels=5)
-        else:
-            sigma_clip = SigmaClip(sigma=3.0, maxiters=10)
-            threshold = detect_threshold(processed_data.data, nsigma=2.0, sigma_clip=sigma_clip)
-            segment_img = detect_sources(processed_data.data, threshold, npixels=5)
-            footprint = circular_footprint(radius=10)
-            mask = segment_img.make_source_mask(footprint=footprint)
-
-        masks.append(mask)
+        proc_basefile = os.path.basename(sci).replace('.fits','_proc.fits')
+        proc_basefile = proc_basefile.replace('.gz','')
+        proc_outfile_name = os.path.join(red_path, proc_basefile)
+        fits.writeto(proc_outfile_name,np.array(processed_data.data),overwrite=True)
+        if log: log.info(f'Wrote processed to: {proc_outfile_name}')
         
-        log.info('Calculating 2D background.')
-        bkg = Background2D(processed_data, (128, 128), filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(), mask=mask, exclude_percentile=80)
-        log.info('Median background: '+str(np.median(bkg.background)))
+        if log: log.info('File proccessed.')
+        if log: log.info('Cleaning cosmic rays and creating mask.')
         
-        bkg_basefile = os.path.basename(sci).replace('.fits','_bkg.fits').replace('.gz','')
+        if log: log.info('Calculating 2D background.')
+        bkg = Background2D(processed_data, (64, 64), filter_size=(3, 3),
+            sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(),
+            exclude_percentile=80)
+        
+        med_background = np.median(bkg.background)
+        if log: log.info(f'Median background: {med_background}')
+
+        bkg_basefile = os.path.basename(sci).replace('.fits','_bkg.fits')
+        bkg_basefile = bkg_basefile.replace('.gz','')
         bkg_outfile_name = os.path.join(red_path, bkg_basefile)
-        log.info(f'Writing: {bkg_outfile_name}')
         fits.writeto(bkg_outfile_name,np.array(bkg.background),overwrite=True)
-        final = processed_data.subtract(CCDData(bkg.background,unit=u.electron),propagate_uncertainties=True,handle_meta='first_found').divide(processed_data.header['ELAPTIME']*u.second,propagate_uncertainties=True,handle_meta='first_found')
-        log.info('Background subtracted and image divided by exposure time.')
+        if log: log.info(f'Wrote background to: {bkg_outfile_name}')
+        
+        final = processed_data.subtract(CCDData(bkg.background,unit=u.electron),
+            propagate_uncertainties=True,handle_meta='first_found')
+
+        final.header['SATURATE'] -= med_background.value
+        final.header['SKYBKG'] = med_background.value
+        if log: log.info('Background subtracted and updated saturation.')
+        
         if window:
-            log.info('Image windowed, adding padding.')
+            if log: log.info('Image windowed, adding padding.')
             if amp == '4R':
-                final = CCDData(np.concatenate([np.zeros([625,np.shape(final)[1]]),final,np.zeros([625,np.shape(final)[1]])],axis=0),header=final.header,unit=u.electron/u.second)
-        log.info('Writing WCS to file.')
-        ra = final.header['RA'].split(':')
-        dec = final.header['DEC'].split(':')
-        coords = SkyCoord(ra[0]+'h'+ra[1]+'m'+ra[2]+'s',dec[0]+'d'+dec[1]+'m'+dec[2]+'s',frame='icrs')
+                final = CCDData(np.concatenate([np.zeros([625,
+                    np.shape(final)[1]]),final,
+                    np.zeros([625,np.shape(final)[1]])],axis=0),
+                    header=final.header,unit=u.electron)
+
+        if log: log.info('Writing WCS to file.')
+        ra = final.header['RA']
+        dec = final.header['DEC']
+        coords = SkyCoord(ra, dec, unit=(u.hour, u.deg), frame='icrs')
         final.header['RADECSYS'] = 'ICRS'
         final.header['CUNIT1'] = 'deg'
         final.header['CUNIT2'] = 'deg'
@@ -415,6 +430,7 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
         final.header['CTYPE2'] = 'DEC--TAN'
         final.header['CRVAL1'] = coords.ra.deg
         final.header['CRVAL2'] = coords.dec.deg
+        
         pixsc = pixscale()
         if amp == '4B':
             final.header['CRPIX1'] = 2456
@@ -432,13 +448,17 @@ def process_science(sci_list,fil,amp,binn,red_path,mbias=None,mflat=None,proc=No
             final.header['CD2_2'] = -pixsc/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
         final.header['DATASEC'] = ('[1:%s,1:%s]'%(np.shape(final)[1],np.shape(final)[0]))
         
-
-        final_basefile = sci.replace('.gz','')
+        final_basefile = os.path.basename(sci).replace('.gz','')
         final_outfile_name = os.path.join(red_path, final_basefile)
-        log.info(f'Writing: {final_outfile_name}')
+        if log: 
+            log.info(f'Writing: {final_outfile_name}')
+        else:
+            print(f'Writing: {final_outfile_name}')
+        
         final.write(final_outfile_name,overwrite=True)
         processed.append(final)
-    return processed, masks
+
+    return processed
 
 def stacked_image(row, red_path):
     target = row['Target']
@@ -626,3 +646,33 @@ def edit_raw_headers(rawdir, log=None):
                 hdu[i].header['CUNIT2'] = 'deg'
 
         hdu.writeto(file, overwrite=True, output_verify='silentfix')
+
+def edit_stack_headers(stack):
+
+    good_keys = ['SIMPLE','BITPIX','NAXIS','NAXIS1','NAXIS2','EXTEND',
+        'DATE-OBS','RA','DEC','TARGRA','TARGDEC','EQUINOX','HA','AIRMASS',
+        'PARANG','EL','AZ','LST','TELESCOP','PA','DICHNAME','OBSMODE',
+        'CTYPE1','CTYPE2','CUNIT1','CUNIT2','RADECSYS','CD1_1','CD1_2',
+        'CD2_1','CD2_2','CRPIX1','CRPIX2','CRVAL1','CRVAL2','SEMESTER',
+        'PROGID','PROGPI','PROGINST','OA','SATURATE','SKYBKG','BUNIT',
+        'MJD-OBS','EXPTOT','EXPTIME','GAIN','RDNOISE','NFILES','FILTER',
+        'OBSTYPE','XTENSION','EXTNAME']
+
+    if 'TARGNAME' in stack[0].header.keys() and 'OBJECT' in stack[0].header.keys():
+        stack[0].header['OBJECT'] = stack[0].header['TARGNAME']
+
+    if 'EXPTOT' in stack[0].header.keys() and 'EXPTIME' in stack[0].header.keys():
+        stack[0].header['OBJECT'] = stack[0].header['TARGNAME']
+
+    # This deletes all keys in the header that are not in good_keys
+    for i,h in enumerate(stack):
+        while True:
+            cont = True
+            for key in stack[i].header.keys():
+                if key in stack[i].header.keys() and key not in good_keys:
+                    del stack[i].header[key]
+                    cont = False
+            if cont:
+                break
+
+    return(stack)

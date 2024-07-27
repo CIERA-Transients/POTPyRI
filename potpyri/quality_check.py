@@ -95,8 +95,10 @@ def quality_check(aligned_images, aligned_data, tel,
         fwhm_cut = fwhm_sorted[ten_percent-1]
         elong_sorted = sorted(elong_3sigma_cut,reverse=True)
         elong_cut = elong_sorted[ten_percent-1]
-        if log: log.info('Using new cuts of %.2f sigma for FWHM and %.2f sigma for elongation'
-            %((fwhm_cut-fwhm_med)/fwhm_std,(elong_cut-elong_med)/elong_std))
+        if log: 
+            log.info(f'''Using new cuts of {(fwhm_cut-fwhm_med)/fwhm_std} sigma 
+                for FWHM and {(elong_cut-elong_med)/elong_std} sigma for 
+                elongation.''')
     else:
         fwhm_cut = fwhm_med+3*fwhm_std
         elong_cut = elong_med+3*elong_std
@@ -106,9 +108,15 @@ def quality_check(aligned_images, aligned_data, tel,
     if log: log.info('Checking alignment of images.')
     for i,f in enumerate(aligned_images):
         if (fwhm[i]>fwhm_cut) or (elong[i]>elong_cut):
-            if log: log.info('Removing '+f+' from stack due to bad quality.')
+            if log: 
+                log.info(f'Removing {f} from stack due to bad quality.')
+            else:
+                print(f'Removing {f} from stack due to bad quality.')
         elif stars[i] < 5:
-            if log: log.info('Removing '+f+' from stack due to bad alignment.')
+            if log: 
+                log.info(f'Removing {f} from stack due to bad alignment.')
+            else:
+                print(f'Removing {f} from stack due to bad alignment.')
         else:
             stacking_images.append(f)
             stacking_arrays.append(aligned_data[i])
@@ -127,6 +135,6 @@ def quality_check(aligned_images, aligned_data, tel,
         mid_time = sorted_times[0]+(sorted_times[-1]-sorted_times[0])/2
 
     t_end = time.time()
-    if log: log.info('Quailty check completed in '+str(t_end-t_start)+' sec')
+    if log: log.info(f'Quailty check completed in {t_end-t_start} sec')
 
     return stacking_arrays, mid_time, total_time

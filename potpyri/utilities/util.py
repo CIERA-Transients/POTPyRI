@@ -732,7 +732,7 @@ def crossmatch_tables(table1, table2, t1name, t2name, radius=2.0 * u.arcsec,
 def write_catalog(catfile, header, catdata):
 
     # Next append all catalog data to the file
-    with open(catfile, 'a') as f:
+    with open(catfile, 'w') as f:
         f.write(header.tostring().strip()+'\n')
         for line in catdata:
             if '\n' in line: line.replace('\n', '')

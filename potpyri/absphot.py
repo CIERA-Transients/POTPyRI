@@ -218,9 +218,9 @@ class absphot(object):
             header['ZPTMUCER'] = zpterr
 
             # Add limiting magnitudes
-            if 'FWHM' in header.keys() and 'SKYADU' in header.keys():
+            if 'FWHM' in header.keys() and 'SKYSIG' in header.keys():
                 fwhm = header['FWHM']
-                sky = header['SKYADU']
+                sky = header['SKYSIG']
                 Npix_per_FWHM_Area = 2.5 * 2.5 * fwhm * fwhm
                 skysig_per_FWHM_Area = np.sqrt(Npix_per_FWHM_Area * (sky*sky))
                 header['M3SIGMA']=-2.5*np.log10(3.0*skysig_per_FWHM_Area)+zpt
@@ -234,8 +234,8 @@ class absphot(object):
             if os.path.exists(cmpfile.replace('.pcmp','.fits')):
                 hdu = fits.open(cmpfile.replace('.pcmp','.fits'))
                 hdu[0].header['ZPTNSTAR']=len(flux)
-                header['ZPTMAG'] = zpt
-                header['ZPTMUCER'] = zpterr
+                hdu[0].header['ZPTMAG'] = zpt
+                hdu[0].header['ZPTMUCER'] = zpterr
 
                 hdu.writeto(cmpfile.replace('.pcmp','.fits'), overwrite=True,
                     output_verify='silentfix')
@@ -309,5 +309,4 @@ class absphot(object):
 if __name__=="__main__":
     zp_cal = absphot()
 
-    zp, zp_err = zp_cal.find_zeropoint('/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/red/meertrap_wf_hos_R_1R_11.pcmp', 'R', 'PS1', plot=True, log=None)
-    print(zp, zp_err)
+    zp, zp_err = zp_cal.find_zeropoint('/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/red/R155_host.R.ut240629.1R.11.stk.pcmp', 'R', 'PS1', plot=True, log=None)
