@@ -21,7 +21,7 @@ from astropy.coordinates import SkyCoord
 from astropy.table import Table
 from astropy.utils.exceptions import AstropyWarning, AstropyDeprecationWarning
 from astropy.visualization import ImageNormalize, ZScaleInterval
-from psf import write_out_catalog as woc
+from photometry import write_out_catalog as woc
 from photutils import DAOStarFinder
 from astropy.stats import sigma_clipped_stats
 from astroquery.gaia import Gaia
@@ -671,7 +671,15 @@ def solve_astrometry(directory, file, tel, radius=0.5, replace=True, log=None):
 
         if replace or newfile=='tmp.fits':
             output_file = fullfile
-            os.rename(newfile, output_file)
+
+            # astrometry.net replaces extra extensions, so instead of renaming
+            # copy the new header into the old file
+            newhdu = fits.open(newfile)
+            hdu = fits.open(output_file)
+
+            hdu[0].header = newhdu[0].header
+            hdu.writeto(output_file, overwrite=True, output_verify='silentfix')
+            os.remove(newfile)
         else:
             output_file = fullfile.replace(exten,'.solved.fits')
 

@@ -5,7 +5,7 @@
 
 __version__ = "2.7" #last updated 18/08/2021
 
-from astropy.io import fits
+from astropy.io import fits, ascii
 from astropy.table import Table
 import os
 import time
@@ -223,12 +223,15 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
         if file_type=='BIAS':
             # Bias only depends on amplifier and bin mode
             cal_type = f'{amp}_{binn}'
+            target = 'BIAS'
         elif file_type=='DARK':
             # Dark depends on exposure, amplifier, and bin
             cal_type = f'{exp}_{amp}_{binn}'
+            target = 'DARK'
         elif file_type=='FLAT':
             # Flat depends on filter, amplifier, and bin
             cal_type = f'{fil}_{amp}_{binn}'
+            target = 'FLAT'
         elif file_type=='SCIENCE':
             # Science is grouped by target, filter, amplifier, bin
             cal_type = f'{target}_{fil}_{amp}_{binn}'
@@ -244,8 +247,10 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
         if (file_type!='BAD' and file_type!='SPEC') or incl_bad:
             file_table.add_row((currfile,target,fil,amp,binn,exp,file_type,
                 cal_type,file_time))
-    
-    file_table.write(file_list, format='ascii.ecsv')
+
+    file_table.sort(['Type','Target','CalType'])
+    ascii.write(file_table, file_list, format='fixed_width',
+        formats={'Time':'%5.6f'})
 
     if sci_num>0 and log: log.info(f'{sci_num} imaging science files found.')
     if bias_num>0 and log: log.info(f'{bias_num} bias files found.')

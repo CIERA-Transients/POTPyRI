@@ -68,7 +68,8 @@ def align_stars(images, tel, hdu=0, mask=None, log=None):
             except ZeroDivisionError:
                 pass
             if rewrite:
-                fits.writeto(f.replace('.fits','_flipped.fits'),data,header,overwrite=True)
+                fits.writeto(f.replace('.fits','_flipped.fits'),
+                    data,header,overwrite=True)
                 images[i] = f.replace('.fits','_flipped.fits')
     
     #run sextractor
@@ -78,8 +79,10 @@ def align_stars(images, tel, hdu=0, mask=None, log=None):
     ratios_list = []
     for f in images:
         if log:
-            log.info('Loading file: '+f)
+            log.info(f'Loading file: {f}')
             log.info('Running SExtracor.')
+
+        # Trim image if needed
         if tel.trim(f):
             with fits.open(f) as fo:
                 header = fo[hdu].header
@@ -87,20 +90,34 @@ def align_stars(images, tel, hdu=0, mask=None, log=None):
             data = tel.trim_section(data)
             f = f.replace('.fits','_trim.fits')
             fits.writeto(f,data,header,overwrite=True)
+
+        # Set up catalog and config data
         cat_name = f.replace('.fits','.cat')
         config_file = os.path.abspath(os.path.join('potpyri','config'))
+        
+        # Run sextractor
         table = solve_wcs.run_sextractor(f, cat_name, tel, 
             sex_config_dir=config_file, log=log)
-        table = table[(table['FLAGS']==0)&(table['EXT_NUMBER']==tel.wcs_extension()+1)]
-        if mask[0] and os.path.exists(mask[0]):
+
+        # Mask the table
+        fmask = table['FLAGS']==0
+        emask = table['EXT_NUMBER']==tel.wcs_extension()+1
+        table = table[fmask & emask]
+
+        if mask and os.path.exists(mask):
             with fits.open(mask) as mask_hdu:
                 stat_mask = mask_hdu[0].data
-            table = table[(stat_mask[table['YWIN_IMAGE'].astype(int)-1,table['XWIN_IMAGE'].astype(int)-1]!=0)]
+            yval = table['YWIN_IMAGE'].astype(int)-1
+            xval = table['XWIN_IMAGE'].astype(int)-1
+            table = table[(stat_mask[yval, xval]!=0)]
+        
         table.sort('MAG_BEST')
         if log:
-            log.info('Creating quads with the 10 brightest non-saturated stars.')
+            log.info('Creating quads with brightest non-saturated stars.')
         stars, d, ds, ratios = solve_wcs.make_quads(table['XWIN_IMAGE'],
                 table['YWIN_IMAGE'], use=10)
+        
+        # Grab all metadata from quad generation
         stars_list.append(stars)
         d_list.append(d)
         ds_list.append(ds)
@@ -109,25 +126,33 @@ def align_stars(images, tel, hdu=0, mask=None, log=None):
     #match quads and calculate shifts
     if log:
         log.info('Matching quads and calculating shifts.')
-        log.info('Using '+images[0]+' as the reference image.')
+        log.info(f'Using {images[0]} as the reference image.')
     shift_x = []
     shift_y = []
     aligned_images = []
     aligned_images.append(images[0])
     for i in range(len(stars_list)-1):
         try:
-            starsx1, starsy1, starsx2, starsy2 = solve_wcs.match_quads(stars_list[0],stars_list[i+1],
-                    d_list[0],d_list[i+1],ds_list[0],ds_list[i+1],ratios_list[0],ratios_list[i+1],sky_coords=False)
+            starsx1, starsy1, starsx2, starsy2 = solve_wcs.match_quads(
+                stars_list[0],stars_list[i+1],
+                d_list[0],d_list[i+1],ds_list[0],ds_list[i+1],
+                ratios_list[0],ratios_list[i+1], sky_coords=False)
+            nstar = len(starsx1)
+            img = images[i+1]
             if log:
-                log.info('Found '+str(len(starsx1))+' unique star matches for image '+images[i+1])
+                nstar = len(starsx1)
+                img = images[i+1]
+                log.info(f'Found {nstar} unique star matches for image {img}')
         except:
             if log:
-                log.error(images[i+1]+' failed to alignment, removing from stack.')
+                log.error(f'{img} failed to alignment, removing from stack.')
             else:
-                print(images[i+1]+' failed to alignment, removing from stack.')
+                print(f'{img} failed to alignment, removing from stack.')
             continue
-        x_shift = np.median([np.array(starsx1[j])-np.array(starsx2[j]) for j in range(len(starsx1))])
-        y_shift = np.median([np.array(starsy1[j])-np.array(starsy2[j]) for j in range(len(starsy1))])
+        x_shift = np.median([np.array(starsx1[j])-np.array(starsx2[j]) 
+            for j in range(len(starsx1))])
+        y_shift = np.median([np.array(starsy1[j])-np.array(starsy2[j]) 
+            for j in range(len(starsy1))])
         shift_x.append(x_shift)
         shift_y.append(y_shift)
         if log:
@@ -139,28 +164,36 @@ def align_stars(images, tel, hdu=0, mask=None, log=None):
         log.info('Applying shifts.')
     image_arrays = []
     header_arrays = []
+    aligned_arrays = []
     for i, f in enumerate(aligned_images):
         with fits.open(f) as fo:
             image_data = fo[hdu].data
             image_arrays.append(np.nan_to_num(image_data).astype(np.float64))
             header_arrays.append(fo[hdu].header)
-    aligned_arrays = []
-    aligned_arrays.append(CCDData(image_arrays[0],meta=header_arrays[0],unit=u.electron/u.second))
+    
+    aligned_arrays.append(CCDData(image_arrays[0],meta=header_arrays[0],
+        unit=u.electron))
     for i in range(len(image_arrays)-1):
-        tform = tf.EuclideanTransform(rotation=0, translation=(-shift_x[i], -shift_y[i]))
-        aligned_arrays.append(CCDData(tf.warp(image_arrays[i+1], tform),meta=header_arrays[i],unit=u.electron/u.second))
+        tform = tf.EuclideanTransform(rotation=0, 
+            translation=(-shift_x[i], -shift_y[i]))
+        aligned_arrays.append(CCDData(tf.warp(image_arrays[i+1], tform),
+            meta=header_arrays[i+1],unit=u.electron))
 
     if log:
         log.info('Writing out aligned images.')
 
     for i in range(len(aligned_arrays)):
         aligned_images[i] = aligned_images[i].replace('.fits','_aligned.fits')
+        if log:
+            log.info(f'Writing out aligned image: {aligned_images[i]}')
+        else:
+            print(f'Writing out aligned image: {aligned_images[i]}')
         aligned_arrays[i].write(aligned_images[i],overwrite=True)
 
     t_end = time.time()
     if log:
-        log.info('Align_quads ran in '+str(t_end-t_start)+' sec')
+        log.info(f'Align_quads ran in {t_end-t_start} sec')
     else:
-        print('Align_quads ran in '+str(t_end-t_start)+' sec')
+        print(f'Align_quads ran in {t_end-t_start} sec')
 
     return aligned_images, aligned_arrays 

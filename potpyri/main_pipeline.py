@@ -24,11 +24,10 @@ from custom_logger import get_log
 from utilities import util
 import Sort_files
 import solve_wcs
-import psf
+import photometry
 import absphot
-import cal_procs
+import calibration
 import image_procs
-import Find_target_phot as tp
 
 def main_pipeline(telescope:str,
                   data_path:str,
@@ -53,13 +52,16 @@ def main_pipeline(telescope:str,
         sys.exit(-1)
 
     # Get path to code directory
-    paths = {'data': data_path}
+    paths = {'data': os.path.abspath(data_path)}
     paths['abspath']=os.path.abspath(sys.argv[0])
     paths['code']=os.path.split(paths['abspath'])[0]
     paths['config']=os.path.join(paths['code'], 'config')
     paths['raw']=os.path.join(data_path, 'raw') #path containing the raw data
     paths['bad']=os.path.join(data_path, 'bad') #path containing the unused data
     paths['red']=os.path.join(data_path, 'red') #path to write the reduced files
+    paths['log']=os.path.join(data_path, 'red', 'log')
+    paths['cal']=os.path.join(data_path, 'red', 'cals')
+    paths['work']=os.path.join(data_path, 'red', 'workspace')
     for key in paths.keys():
         if not os.path.exists(paths[key]): os.makedirs(paths[key])
 
@@ -68,7 +70,7 @@ def main_pipeline(telescope:str,
         shutil.copytree(paths['config'], os.path.join(paths['data'], 'config'))
 
     # Generate logfile
-    log = get_log(paths['red'])
+    log = get_log(paths['log'])
 
     log.info(f'Running main pipeline version {__version__}')
     log.info(f'Running telescope paramater file version {tel.__version__}')
@@ -97,9 +99,9 @@ def main_pipeline(telescope:str,
     bias_files = file_table[file_table['Type']=='BIAS']
     flat_files = file_table[file_table['Type']=='FLAT']
     dark_files = file_table[file_table['Type']=='DARK']
-    cal_procs.do_bias(bias_files, tel, paths['red'], skip_red=skip_red, log=log)
-    cal_procs.do_dark(dark_files, tel, paths['red'], skip_red=skip_red, log=log)
-    cal_procs.do_flat(flat_files, tel, paths['red'], skip_red=skip_red, log=log)
+    calibration.do_bias(bias_files, tel, paths['cal'], skip_red=skip_red, log=log)
+    calibration.do_dark(dark_files, tel, paths['cal'], skip_red=skip_red, log=log)
+    calibration.do_flat(flat_files, tel, paths['cal'], skip_red=skip_red, log=log)
 
     # Science files
     ##################
@@ -123,8 +125,8 @@ def main_pipeline(telescope:str,
             if target_table['Target'][0]!=input_target: continue
 
         files = target_table['File']
-        stack = image_procs.image_proc(target_table, tel, paths['red'], 
-            proc=proc, log=log)
+        stack = image_procs.image_proc(target_table, tel, paths, proc=proc, 
+            log=log)
 
         # Auto-WCS solution
         if tel.run_wcs():
@@ -133,14 +135,14 @@ def main_pipeline(telescope:str,
 
         # Photometry and flux calibration
         if tel.run_phot():
-            log.info('Running psf photometry.')
-            for snthresh_final in [5.0, 10.0, 20.0]:
+            log.info('Running psf photometry loop for zero point.')
+            for snthresh_final in [40.0, 20.0, 10.0, 5.0, 3.0]:
                 try:
                     log.info(f'Trying photometry with final S/N={snthresh_final}')
                     star_param={'snthresh_psf': snthresh_final*2.0, 
                                 'fwhm_init': 5.0, 
                                 'snthresh_final': snthresh_final}
-                    psf.do_phot(stack, star_param=star_param, log=log)
+                    photometry.do_phot(stack, star_param=star_param, log=log)
                     break
                 except:
                     pass
