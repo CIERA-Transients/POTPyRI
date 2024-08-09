@@ -3,29 +3,54 @@ import os
 import astropy
 import datetime
 import numpy as np
+import ccdproc
+import glob
+
 from astropy.coordinates import SkyCoord
-from photutils import Background2D, MeanBackground
-
-use_segm = False
-try:
-    from photutils import make_source_mask
-except ImportError:
-    use_segm=True
-    from astropy.stats import sigma_clipped_stats, SigmaClip
-    from photutils.segmentation import SegmentationImage,detect_sources,detect_threshold
-    from photutils.utils import circular_footprint
-
+from astropy.stats import sigma_clipped_stats
+from astropy.stats import SigmaClip
+from astropy.modeling import models
 from astropy.stats import SigmaClip
 from astropy.io import fits
 from astropy.time import Time
 from astropy.nddata import CCDData
-import astropy.units.astrophys as u
+from astropy.wcs import WCS
 import astropy.units as u
-import ccdproc
-from astropy.modeling import models
-import glob
+
+from photutils import Background2D
+from photutils import MeanBackground
+from photutils.segmentation import SegmentationImage
+from photutils.segmentation import detect_sources
+from photutils.segmentation import detect_threshold
+from photutils.utils import circular_footprint
 
 __version__ = 1.9 #last edited 18/11/2022
+
+
+class LRIS():
+
+    def __init__(self, proc=None, ):
+
+        self.name = 'LRIS'
+        
+        # Detector parameters
+        self.pixel_scale = 0.135
+
+        # See LRIS non-linearity: 
+        # https://www2.keck.hawaii.edu/inst/lris/lris-red-upgrade-notes_vol2.html
+        self.saturation = 55000.0
+
+        self.static_mask = ''
+
+        # Which calibrations do we require
+        self.use_dark = False
+        self.use_bias = True
+        self.use_flat = True
+
+        if str(proc)=='True':
+            self.raw_format = '*.fits.gz'
+        elif str(proc)=='raw':
+            self.raw_format = '*[b,r]*.fits'
 
 def name():
     return 'LRIS'
@@ -33,28 +58,20 @@ def name():
 def static_mask(proc):
     return ''
 
-def run_wcs():
-    return True
-
-def wcs_extension():
-    return 0
-
 def pixscale():
     return 0.135 #arcsec/pixel
+
+# Minimum exposure time for science exposures
+def min_exptime():
+    return 15.0
 
 def saturation(hdr):
     # See LRIS non-linearity: 
     # https://www2.keck.hawaii.edu/inst/lris/lris-red-upgrade-notes_vol2.html
     return 55000
 
-def WCS_keywords_old(): #WCS keywords
-    return []
-
-def WCS_keywords(): #WCS keywords
-    return ['CRPIX1','CRPIX2','CD1_1','CD1_2','CD2_1','CD2_2']
-
-def cal_path():
-    return None
+def raw_header_ext():
+    return 0
 
 def raw_format(proc):
     if str(proc)=='True':
@@ -70,9 +87,6 @@ def bias():
 
 def flat():
     return True
-
-def raw_header_ext():
-    return 0
 
 def science_keyword():
     return ['KOAIMTYP','SLITNAME','GRANAME','TRAPDOOR']
@@ -157,6 +171,35 @@ def load_bias(red_path, amp, binn):
     mbias = [CCDData.read(bias,hdu=x+1,unit=u.electron) for x in range(int(amp[0]))]
     return mbias
 
+
+def import_file(filename, amp):
+
+    hdu = fits.open(filename)
+    raw = []
+    if amp=='1R':
+        hdu[0].header['CUNIT1'] = 'deg'
+        hdu[0].header['CUNIT2'] = 'deg'
+
+        image = CCDData(hdu[0].data, meta=hdu[0].header, 
+            wcs=WCS(hdu[0].header), unit='adu')
+        raw.append(image)
+    elif amp=='4B':
+        for i in np.arange(4):
+            for key in hdu[0].header.keys():
+                if key not in hdu[i+1].header.keys():
+                    try:
+                        hdu[i+1].header[key]=hdu[0].header[key]
+                    except ValueError:
+                        pass
+
+            hdu[i+1].header['CUNIT1'] = 'deg'
+            hdu[i+1].header['CUNIT2'] = 'deg'
+            image = CCDData(hdu[i+1].data, meta=hdu[i+1].header, 
+                wcs=WCS(hdu[i+1].header), unit='adu')
+            raw.append(image)
+
+    return(raw)
+
 def create_bias(cal_list, amp, binn, red_path, log):
 
     gains = gain(amp)
@@ -172,11 +215,17 @@ def create_bias(cal_list, amp, binn, red_path, log):
         with fits.open(bias) as hdr:
             header = hdr[0].header
         if amp=='1R':
-            raw = [CCDData.read(bias, hdu=x, unit='adu') for x in range(int(amp[0]))]
-            red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), gain=gains[j]*u.electron/u.adu, readnoise=readnoises[j]*u.electron) for j,x in enumerate(raw)]
+            raw = import_file(bias, amp)
+            red = [ccdproc.ccd_process(x, oscan=oscan_reg, 
+                oscan_model=models.Chebyshev1D(3), 
+                gain=gains[j]*u.electron/u.adu, 
+                readnoise=readnoises[j]*u.electron) for j,x in enumerate(raw)]
         else:
-            raw = [CCDData.read(bias, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
-            red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=x.header['DATASEC'], gain=gains[j]*u.electron/u.adu, readnoise=readnoises[j]*u.electron) for j,x in enumerate(raw)]
+            raw = import_file(bias, amp)
+            red = [ccdproc.ccd_process(x, oscan=oscan_reg, 
+                oscan_model=models.Chebyshev1D(3), 
+                trim=x.header['DATASEC'], gain=gains[j]*u.electron/u.adu, 
+                readnoise=readnoises[j]*u.electron) for j,x in enumerate(raw)]
         
         bias_hdu = fits.HDUList([fits.PrimaryHDU(header=header)])
         for x in red: bias_hdu.append(fits.ImageHDU(x.data,header=x.header))
@@ -222,9 +271,9 @@ def format_datasec(sec_string, binning=1):
 
     return(sec_string)
 
-def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
-    log.info('Processing files for filter: '+fil)
-    log.info(str(len(flat_list))+' files found.')
+def create_flat(flat_list, fil, amp, binn, red_path, mbias=None, log=None):
+    log.info(f'Processing files for filter: {fil}')
+    log.info(f'{len(flat_list)} files found.')
     scale = []
     flats = []
     gains = gain(amp)
@@ -235,31 +284,44 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
         log.info(f'Loading file: {flat}')
         with fits.open(flat) as hdr:
             header = hdr[0].header
+        
         try:
             n_sat = header['NPIXSAT']
         except KeyError:
-            log.error('No saturation keyword in header, continuing anyway. Please manually check flats and rerun if needed.')
+            log.error('''No saturation keyword in header, continuing anyway. 
+                Please manually check flats and rerun if needed.''')
             n_sat = 0
         if n_sat < 10000:
             if amp == '1R':
                 bin1,bin2 = header['BINNING'].split(',')
                 bin1 = float(bin1) ; bin2=float(bin2)
 
-                raw = [CCDData.read(flat, hdu=x, unit='adu') for x in range(int(amp[0]))]
-                red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
+                raw = import_file(flat, amp)
+                red = [ccdproc.ccd_process(x, oscan=oscan_reg, 
+                    oscan_model=models.Chebyshev1D(3), 
+                    gain=gains[k]*u.electron/u.adu, 
+                    readnoise=readnoises[k]*u.electron, master_bias=mbias[k], 
+                    gain_corrected=True) for k,x in enumerate(raw)]
                 
                 sl1 = str_to_slice(get_1R_datasec(1,binning=bin1))
                 sl2 = str_to_slice(get_1R_datasec(2,binning=bin1))
                 sl3 = str_to_slice(get_1R_datasec(3,binning=bin2))
                 sl4 = str_to_slice(get_1R_datasec(4,binning=bin2))
 
-                flat_full = CCDData(np.concatenate([np.concatenate([red[0][sl1],red[0][sl2]],axis=1),np.concatenate([red[0][sl3],red[0][sl4]],axis=1)],axis=0),header=header,unit=u.electron)
+                flat_full = CCDData(np.concatenate([np.concatenate(
+                    [red[0][sl1],red[0][sl2]],axis=1),
+                    np.concatenate([red[0][sl3],red[0][sl4]],axis=1)],
+                    axis=0),header=header,unit=u.electron)
             else:
-                raw = [CCDData.read(flat, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
+                raw = import_file(flat, amp)
                 red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=x.header['DATASEC'], gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
                 if amp == '4B':
-                    flat_full = CCDData(np.concatenate([red[0],np.fliplr(red[1]),np.zeros([np.shape(red[1])[0],111]),red[2],np.fliplr(red[3])],axis=1),header=header,unit=u.electron)
-                    flat_full = ccdproc.trim_image(flat_full[700:3315,350:3940])
+                    flat_full = CCDData(np.concatenate([red[0],
+                        np.fliplr(red[1]),
+                        np.zeros([np.shape(red[1])[0],111]),
+                        red[2],np.fliplr(red[3])],axis=1),
+                        header=header,unit=u.electron)
+                    flat_full = ccdproc.trim_image(flat_full[700:3120,396:3940])
                 if amp == '4R':
                     flat_full = CCDData(np.concatenate([red[1],np.fliplr(red[0]),np.zeros([np.shape(red[0])[0],200]),red[3],np.fliplr(red[2])],axis=1),header=header,unit=u.electron)
             log.info('Exposure time of image is '+str(flat_full.header['ELAPTIME']))
@@ -267,13 +329,16 @@ def create_flat(flat_list,fil,amp,binn,red_path,mbias=None,log=None):
             log.info('Flat normalization: '+str(norm))
             scale.append(norm)
             flats.append(flat_full)
+    
     mflat = ccdproc.combine(flats,method='median',scale=scale,sigma_clip=True)
-    log.info('Created master flat for filter: '+fil+' and '+amp+' amp '+binn+' biinning.')
-    mflat.header['VER'] = (__version__, 'Version of telescope parameter file used.')
+    log.info(f'Created master flat for filter: {fil} and {amp} amp {binn} binning.')
+    mflat.header['VER'] = (__version__, 
+        'Version of telescope parameter file used.')
 
     flat_filename = get_mflat_name(red_path, fil, amp, binn)
     mflat.write(flat_filename, overwrite=True)
     log.info(f'Master flat written to {flat_filename}')
+    
     return
 
 # Data sections for new red amplifier
@@ -317,7 +382,6 @@ def str_to_slice(sec_string):
 def process_science(sci_list, fil, amp, binn, red_path, mbias=None,
     mflat=None, proc=None, log=None):
     
-    masks = []
     processed = []
     gains = gain(amp)
     readnoises = readnoise(amp)
@@ -351,7 +415,7 @@ def process_science(sci_list, fil, amp, binn, red_path, mbias=None,
             bin1,bin2 = header['BINNING'].split(',')
             bin1 = float(bin1) ; bin2=float(bin2)
                 
-            raw = [CCDData.read(sci, hdu=x, unit='adu') for x in range(int(amp[0]))]
+            raw = import_file(sci, amp)
             red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
             
             sl1 = str_to_slice(get_1R_datasec(1,binning=bin1))
@@ -361,12 +425,20 @@ def process_science(sci_list, fil, amp, binn, red_path, mbias=None,
 
             sci_full = CCDData(np.concatenate([np.concatenate([red[0][sl1],red[0][sl2]],axis=1),np.concatenate([red[0][sl3],red[0][sl4]],axis=1)],axis=0),header=header,unit=u.electron)
         else:
-            raw = [CCDData.read(sci, hdu=x+1, unit='adu') for x in range(int(amp[0]))]
-            red = [ccdproc.ccd_process(x, oscan=oscan_reg, oscan_model=models.Chebyshev1D(3), trim=trim_sec[k], gain=gains[k]*u.electron/u.adu, readnoise=readnoises[k]*u.electron, master_bias=mbias[k], gain_corrected=True) for k,x in enumerate(raw)]
+            raw = import_file(sci, amp)
+            red = [ccdproc.ccd_process(x, oscan=oscan_reg, 
+                oscan_model=models.Chebyshev1D(3), trim=trim_sec[k], 
+                gain=gains[k]*u.electron/u.adu, 
+                readnoise=readnoises[k]*u.electron, master_bias=mbias[k], 
+                gain_corrected=True) for k,x in enumerate(raw)]
         flat_image = CCDData(np.copy(mflat),unit=u.electron,meta=mflat.meta,mask=mflat.mask,uncertainty=mflat.uncertainty)
         if amp == '4B':
-            sci_full = CCDData(np.concatenate([red[0],np.fliplr(red[1]),np.zeros([np.shape(red[1])[0],111]),red[2],np.fliplr(red[3])],axis=1),header=header,unit=u.electron)
-            sci_full = ccdproc.trim_image(sci_full[700:3315,350:3940])
+            sci_full = CCDData(np.concatenate([red[0],
+                        np.fliplr(red[1]),
+                        np.zeros([np.shape(red[1])[0],111]),
+                        red[2],np.fliplr(red[3])],axis=1),
+                        header=header,unit=u.electron)
+            sci_full = ccdproc.trim_image(sci_full[700:3120,396:3940])
         if amp == '4R':
             sci_full = CCDData(np.concatenate([red[1],np.fliplr(red[0]),np.zeros([np.shape(red[0])[0],200]),red[3],np.fliplr(red[2])],axis=1),header=header,unit=u.electron)
             if window and np.shape(sci_full)!=np.shape(flat_image):
@@ -381,14 +453,8 @@ def process_science(sci_list, fil, amp, binn, red_path, mbias=None,
         sci_full.header['SATURATE'] = saturation(hdr)
         
         processed_data = ccdproc.flat_correct(sci_full, flat_image)
-        proc_basefile = os.path.basename(sci).replace('.fits','_proc.fits')
-        proc_basefile = proc_basefile.replace('.gz','')
-        proc_outfile_name = os.path.join(red_path, proc_basefile)
-        fits.writeto(proc_outfile_name,np.array(processed_data.data),overwrite=True)
-        if log: log.info(f'Wrote processed to: {proc_outfile_name}')
         
         if log: log.info('File proccessed.')
-        if log: log.info('Cleaning cosmic rays and creating mask.')
         
         if log: log.info('Calculating 2D background.')
         bkg = Background2D(processed_data, (64, 64), filter_size=(3, 3),
@@ -405,7 +471,7 @@ def process_science(sci_list, fil, amp, binn, red_path, mbias=None,
         if log: log.info(f'Wrote background to: {bkg_outfile_name}')
         
         final = processed_data.subtract(CCDData(bkg.background,unit=u.electron),
-            propagate_uncertainties=True,handle_meta='first_found')
+            propagate_uncertainties=True, handle_meta='first_found')
 
         final.header['SATURATE'] -= med_background.value
         final.header['SKYBKG'] = med_background.value
@@ -491,26 +557,41 @@ def rdnoise(header):
         readnoise = 4
     return readnoise
 
-def binning():
-    return [4,4]
-
-def cr_clean_sigclip():
-    return 50
-
-def cr_clean_sigcfrac():
-    return 0.1
-
-def cr_clean_objlim():
-    return 100
-
-def run_phot():
-    return True
-
 def catalog_zp():
     return 'PS1'
 
 def exptime(hdr):
     return hdr['ELAPTIME']
+
+def stack_method(header):
+    instrument = header['INSTRUME']
+    side=''
+    if instrument == 'LRISBLUE':
+        side = 'B'
+    if instrument == 'LRIS':
+        side = 'R'
+
+    if side=='R':
+        return('median')
+    elif side=='B':
+        return('average')
+    else:
+        return(None)
+
+def detrend(header):
+    instrument = header['INSTRUME']
+    side=''
+    if instrument == 'LRISBLUE':
+        side = 'B'
+    if instrument == 'LRIS':
+        side = 'R'
+
+    if side=='R':
+        return(True)
+    elif side=='B':
+        return(False)
+    else:
+        return(False)
 
 def gain(amp):
     if  amp=='4B':
@@ -556,6 +637,29 @@ def trim(f):
         return True
     else:
         return False
+
+def number_keyword(hdr):
+    return hdr['FRAMENO']
+
+def get_base_science_name(image):
+
+    hdu = fits.open(image, mode='readonly')
+    hdr = hdu[0].header
+
+    tkwd = target_keyword()
+    target = hdr[tkwd].replace(' ','')
+    fil = filter_keyword(hdr)
+    amp = amp_keyword(hdr)
+    binn = bin_keyword(hdr)
+    file_time = time_format(hdr)
+    number = number_keyword(hdr)
+    number = str(number).zfill(5)
+
+    datestr = Time(file_time, format='mjd').datetime.strftime('ut%y%m%d')
+
+    filename = f'{target}.{fil}.{datestr}.{amp}.{binn}.{number}.fits'
+
+    return(filename)
 
 def trim_section(data):
     return data[625:1875,0:3600]

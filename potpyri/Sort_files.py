@@ -10,10 +10,10 @@ from astropy.table import Table
 import os
 import time
 import shutil
-import importlib
 import params
 import glob
 import numpy as np
+import logging
 
 def is_bad(hdr, tel):
     bad_keyword = tel.bad_keyword()
@@ -59,6 +59,12 @@ def is_science(hdr, tel):
 
     science = np.all([hdr[science_keyword[j]] == science_files[j] 
         for j in range(len(science_keyword))])
+
+    # Check minimum exposure time
+    if tel.min_exptime():
+        exptime = tel.exptime(hdr)
+        if exptime < tel.min_exptime():
+            science = False
 
     return(science)
 
@@ -178,7 +184,8 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
             exp = str(tel.exptime(hdr))
             file_time = tel.time_format(hdr)
 
-            if is_bad(hdr, tel):
+            if (is_bad(hdr, tel) and not is_bias(hdr, tel) and 
+                not is_dark(hdr, tel) and not is_flat(hdr, tel)):
                 file_type = 'BAD'
                 moved_path = paths['bad']
                 if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
@@ -217,7 +224,7 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
             if log: log.error(f'Moving file {f} to bad due to error: {e}')
             file_type = 'BAD'
             moved_path = paths['bad']
-            shutil.move(f, paths['bad'])
+            if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
             bad_num += 1
 
         if file_type=='BIAS':
