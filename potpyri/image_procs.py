@@ -4,22 +4,56 @@ import time
 import importlib
 import numpy as np
 import astroscrappy
+import logging
 
 import astropy.units as u
-from astropy.io import fits
+from astropy.io import fits, ascii
 from astropy.table import Table
 from astropy.stats import SigmaClip
+from astropy.stats import sigma_clipped_stats
 from astropy.nddata import CCDData
+from astropy.wcs import WCS
+
+from ccdproc import wcs_project
+from ccdproc import CCDData
+from ccdproc import combine
+from ccdproc import cosmicray_lacosmic
 
 from photutils.background import Background2D
 from photutils.background import MeanBackground
 from photutils.segmentation import detect_threshold, detect_sources
 
 # Internal dependencies
-import align_quads
-import quality_check
+import solve_wcs
 
-__version__ = "1.2"
+# Edited on 2024-07-29
+__version__ = "1.3"
+
+def align_images(reduced_files, paths, tel, use_wcs=None, log=None):
+
+    aligned_images = []
+    aligned_data = []
+    for file in reduced_files:
+        success = solve_wcs.solve_astrometry(paths['work'], file, 
+            tel, log=log)
+        if success:
+            hdu = fits.open(file)
+            wcs = WCS(hdu[0].header)
+            image = CCDData(hdu[0].data, meta=hdu[0].header,
+                wcs=wcs, unit=u.electron)
+            
+            if not use_wcs:
+                use_wcs = wcs
+
+            reprojected = wcs_project(image, use_wcs, order='bilinear')
+            outfile = file.replace('.fits','_reproj.fits')
+            reprojected.write(file.replace('.fits','_reproj.fits'),
+                overwrite=True)
+
+            aligned_images.append(outfile)
+            aligned_data.append(reprojected)
+
+    return(aligned_images, aligned_data)
 
 def image_proc(image_data, tel, paths, proc=None, log=None):
 
@@ -32,8 +66,6 @@ def image_proc(image_data, tel, paths, proc=None, log=None):
     # All data in the table should be for one target
     assert np.all([image_data['Target']==image_data['Target'][0]])
     assert np.all([image_data['CalType']==image_data['CalType'][0]])
-
-    stack = tel.stacked_image(image_data[0], red_path)
     
     cal_type = image_data['CalType'][0]
     target = image_data['Target'][0]
@@ -45,7 +77,7 @@ def image_proc(image_data, tel, paths, proc=None, log=None):
     if tel.bias():
         if log: log.info('Loading master bias.')
         try:
-            mbias = tel.load_bias(cal_path,amp,binn)
+            mbias = tel.load_bias(cal_path, amp, binn)
         except:
             if log: log.error(f'''No master bias found for this configuration, 
                 skipping reduction for: {cal_type}''')
@@ -60,7 +92,6 @@ def image_proc(image_data, tel, paths, proc=None, log=None):
         if log: log.error(f'''No master flat present for filter {fil}, skipping 
             data reduction for {tar}. Check data before rerunning.''')
         return(None)
-        
     flat_data = tel.load_flat(master_flat)
         
     t1 = time.time()
@@ -68,9 +99,9 @@ def image_proc(image_data, tel, paths, proc=None, log=None):
 
     # Bias subtraction, gain correction, flat correction, and flat fielding
     files = image_data['File']
-    masks = []
+    staticmask = tel.static_mask(paths)
     processed = tel.process_science(files, fil, amp, binn, work_path,
-        mbias=mbias, mflat=flat_data, proc=proc, log=log)
+        mbias=mbias, mflat=flat_data, proc=proc, staticmask=staticmask, log=log)
         
     t2 = time.time()
     if log: log.info(f'Data processed in {t2-t1} sec')
@@ -78,17 +109,12 @@ def image_proc(image_data, tel, paths, proc=None, log=None):
     # Background subtraction
     # IR image?
     if wavelength=='NIR':
-        processed=background_subtraction(processed, masks, image_data, log=log)
-
-    # Optical image?
-    if wavelength=='OPT' and tel.fringe_correction(fil):
-        processed=fringe_correction(stack, processed, masks, work_path, log=log)
+        processed=sky_background_subtraction(processed, image_data, log=log)
             
     # Write reduced data to file and stack images with the same pointing
     if log: log.info('Writing out reduced data.')
     
-    reduced_files = [os.path.join(work_path, 
-        os.path.basename(sci).replace('.fits','_red.fits').replace('.gz','').replace('.bz2',''))
+    reduced_files = [os.path.join(work_path, tel.get_base_science_name(sci))
         for sci in image_data['File']]
     
     for j,process_data in enumerate(processed):
@@ -96,31 +122,40 @@ def image_proc(image_data, tel, paths, proc=None, log=None):
         process_data.write(reduced_files[j], overwrite=True)
 
     if log: log.info('Aligning images.')
-    static_mask = tel.static_mask(proc)
-    aligned_images, aligned_data = align_quads.align_stars(reduced_files,
-        tel, hdu=tel.wcs_extension(), mask=static_mask, log=log)
-    
-    if log: log.info('Checking qualty of images.')
-    stacking_data, mid_time, total_time = quality_check.quality_check(
-        aligned_images, aligned_data, tel, log=log)
+
+    # Sort files so deepest exposure is first
+    exptimes = []
+    for file in reduced_files:
+        hdu = fits.open(file)
+        exptimes.append(tel.exptime(hdu[0].header))
+    idx = np.flip(np.argsort(exptimes))
+    reduced_files = np.array(reduced_files)[idx]
+
+    aligned_images, aligned_data = align_images(reduced_files, paths, tel, 
+        log=log)
 
     if log: log.info('Creating mask and error arrays.')
     masks = []
     errors = []
-    for stack_img in stacking_data:
-        clean, mask = create_mask(stack_img, static_mask,
-            stack_img.header['SATURATE'], tel.rdnoise(stack_img.header),
+    for stack_img in aligned_images:
+        hdu = fits.open(stack_img, mode='readonly')
+        clean, mask = create_mask(stack_img,
+            hdu[0].header['SATURATE'], tel.rdnoise(hdu[0].header),
             log=log, outpath=work_path)
-        error = create_error(stack_img, mask, tel.rdnoise(stack_img.header))
+        error = create_error(stack_img, mask, tel.rdnoise(hdu[0].header))
 
         masks.append(mask)
         errors.append(error)
 
+        # Set nan values to 0 now that they are masked
+        data = hdu[0].data
+        data[np.isnan(data)] = 0.0
+
         # Create final image triplet before stacking with data, mask, and error
         hdulist = fits.HDUList()
         sci_hdu = fits.ImageHDU()
-        sci_hdu.data = stack_img.data
-        sci_hdu.header = stack_img.header
+        sci_hdu.data = data
+        sci_hdu.header = hdu[0].header
         msk_hdu = fits.ImageHDU()
         msk_hdu.data = mask.data
         msk_hdu.header = mask.header
@@ -136,7 +171,7 @@ def image_proc(image_data, tel, paths, proc=None, log=None):
         hdulist[1].name='MASK'
         hdulist[2].name='ERROR'
 
-        filename = hdulist[0].header['FILENAME'].replace('_red.fits',
+        filename = hdulist[0].header['FILENAME'].replace('.fits',
             '_data.fits')
         fullfilename = os.path.join(work_path, filename)
 
@@ -147,10 +182,13 @@ def image_proc(image_data, tel, paths, proc=None, log=None):
         hdulist.writeto(fullfilename, overwrite=True, output_verify='silentfix')
     
     if log: log.info('Creating median stack.') 
-    sci_med = stack_data(stacking_data, masks, errors)
+    sci_med = stack_data(aligned_data, tel, masks, errors, log=log)
     sci_med = sci_med.to_hdu()
 
-    sci_med = add_stack_mask(sci_med, stacking_data)
+    sci_med = add_stack_mask(sci_med, aligned_data)
+
+    if tel.detrend(sci_med[0].header):
+        sci_med = detrend_stack(sci_med)
 
     sci_med[0].data = sci_med[0].data.astype(np.float32)
     sci_med[1].data = sci_med[1].data.astype(np.uint8)
@@ -159,39 +197,51 @@ def image_proc(image_data, tel, paths, proc=None, log=None):
     sci_med[1].header['BITPIX'] = 8
     sci_med[2].header['BITPIX'] = -32
 
+    # Get time parameters from aligned data
+    mid_time = np.average([tel.time_format(d.header) for d in aligned_data])
+    exptimes = np.array([tel.exptime(d.header) for d in aligned_data])
+    eff_time = np.sum(exptimes**2)/np.sum(exptimes)
+    total_time = np.sum(exptimes)
+
     sci_med[0].header['MJD-OBS'] = (mid_time, 
-        'Mid-MJD of the observation sequence calculated using DATE-OBS.')
-    sci_med[0].header['EXPTIME'] = (total_time, 
-        'Effective expsoure tiime for the stack in seconds.')
+        'Mid-MJD of the observation sequence.')
+    # Since we generated stack with median, effective exposure should be a 
+    # weighted average of the input exposure times
+    sci_med[0].header['EXPTIME'] = (eff_time, 
+        'Effective expsoure time in seconds.')
     sci_med[0].header['EXPTOT'] = (total_time, 
-        'Total exposure time of stack in seconds')
-    sci_med[0].header['GAIN'] = (len(stacking_data), 
+        'Total exposure time in seconds')
+    sci_med[0].header['GAIN'] = (len(aligned_data), 
         'Effecetive gain for stack.')
 
     # Calculate read noise
-    rdnoise = tel.rdnoise(sci_med[0].header)/np.sqrt(len(stacking_data))
+    rdnoise = tel.rdnoise(sci_med[0].header)/np.sqrt(len(aligned_data))
     sci_med[0].header['RDNOISE'] = (rdnoise, 'Readnoise of stack.')
     
-    sci_med[0].header['NFILES'] = (len(stacking_data), 
+    sci_med[0].header['NFILES'] = (len(aligned_data), 
         'Number of images in stack')
     sci_med[0].header['FILTER'] = fil
     sci_med[0].header['OBSTYPE'] = 'OBJECT'
 
     sci_med = tel.edit_stack_headers(sci_med)
     
-    sci_med.writeto(stack, overwrite=True, output_verify='silentfix')
+    # Generate stack name and write out
+    stackname = tel.stacked_image(image_data[0], red_path)
+    sci_med.writeto(stackname, overwrite=True, output_verify='silentfix')
                 
     if log: 
-        log.info(f'Median stack made for {stack}')
+        log.info(f'Median stack made for {stackname}')
     else:
-        print(f'Median stack made for {stack}')
+        print(f'Median stack made for {stackname}')
 
-    return(stack)
+    return(stackname)
 
-def background_subtraction(processed, masks, image_data, log=None):
+def sky_background_subtraction(processed, image_data, log=None):
 
     t1 = time.time()
-    if log: log.info('NIR data, creating NIR sky maps.')
+    if log: 
+        log.info('NIR data, creating NIR sky maps.')
+
     for j,n in enumerate(processed):
         
         if log: log.info(f'Creating map for file {j+1}/{len(processed)}')
@@ -226,7 +276,7 @@ def background_subtraction(processed, masks, image_data, log=None):
                 'Name of file used in creation of sky.')
                 
         # Image combination procedure
-        sky = ccdproc.combine(sky_masked_data,method='median',
+        sky = combine(sky_masked_data,method='median',
             sigma_clip=True,sigma_clip_func=np.ma.median,mask=sky_mask)
                 
         # Apply header
@@ -248,55 +298,40 @@ def background_subtraction(processed, masks, image_data, log=None):
 
     return(processed)
 
-def fringe_correction(stack, processed, masks, work_path, log=None):
+def detrend_stack(stack):
 
-    t1 = time.time()
-    dimen = len(stack)
-    for m in range(dimen):
-        fringe_data = []
-        if dimen == 1:
-            suffix = ['.fits']
-            for k,n in enumerate(processed):
-                bkg = Background2D(n, (20, 20), filter_size=(3, 3),
-                    sigma_clip=SigmaClip(sigma=3), 
-                    bkg_estimator=MeanBackground(), 
-                    mask=masks[k], exclude_percentile=80)
-                masked = np.array(n)
-                masked[masks[k]] = bkg.background[masks[k]]
-                fringe_data.append(CCDData(masked,unit=u.electron/u.second))
-            
-            fringe_map = ccdproc.combine(fringe_data,method='median',
-                sigma_clip=True,sigma_clip_func=np.ma.median,mask=masks)
-            fringe_map.write(os.path.join(work_path, 
-                'fringe_map_'+fil+'_'+amp+'_'+binn+suffix[m]),overwrite=True)
-            for j,n in enumerate(processed):
-                processed[j] = n.subtract(fringe_map,
-                    propagate_uncertainties=True, handle_meta='first_found')
+    data = stack[0].data
+    mask = stack[1].data.astype(bool)
+
+    mean, med, stddev = sigma_clipped_stats(data, mask=mask, axis=1)
+    med[np.isnan(med)]=0.
+    data = data - med[:,None]
+
+    row_med = np.nanmedian(med)
+
+    mean, med, stddev = sigma_clipped_stats(data, mask=mask, axis=0)
+    data = data - med[None,:]
+
+    col_med = np.nanmedian(med)
+
+    # Reapply mask to data
+    data[mask] = 0.0
+
+    stack[0].data = data
+    stack[0].header['SATURATE'] = stack[0].header['SATURATE'] - (row_med+col_med)
+
+    return(stack)
+
+def stack_data(stacking_data, tel, masks, errors, log=None):
+
+    stack_method = tel.stack_method(stacking_data[0].header)
+    if not stack_method:
+        if log:
+            log.critical('Could not get stacking method for these images')
+            logging.shutdown()
+            sys.exit(-1)
         else:
-            suffix = [s.replace('_red','') for s in tel.suffix()]
-            for k,n in enumerate(processed[m]):
-                bkg = Background2D(n, (20, 20), filter_size=(3, 3),
-                    sigma_clip=SigmaClip(sigma=3), 
-                    bkg_estimator=MeanBackground(), 
-                    mask=masks[m][k], exclude_percentile=80)
-                masked = np.array(n)
-                masked[masks[m][k]] = bkg.background[masks[m][k]]
-                fringe_data.append(CCDData(masked,unit=u.electron/u.second))
-            
-            fringe_map = ccdproc.combine(fringe_data,method='median',
-                sigma_clip=True,sigma_clip_func=np.ma.median,mask=masks)
-            fringe_map.write(os.path.join(work_path, 
-                'fringe_map_'+fil+'_'+amp+'_'+binn+suffix[m]),overwrite=True)
-            for j,n in enumerate(processed[m]):
-                processed[m][j] = n.subtract(fringe_map,
-                    propagate_uncertainties=True,handle_meta='first_found')
-    
-    t2 = time.time()
-    if log: log.info(f'Fringe correction complete and subtracted in {t2-t1} sec')
-
-    return(processed)
-
-def stack_data(stacking_data, masks, errors):
+            raise Exception('Could not get stacking method for these images')
 
     weights = []
     for i,error in enumerate(errors):
@@ -306,8 +341,15 @@ def stack_data(stacking_data, masks, errors):
         weights.append(ivar)
     weights=np.array(weights)
 
-    sci_med = ccdproc.combine(stacking_data, weights=weights, 
-        method='median', sigma_clip=True, sigma_clip_func=np.ma.median)
+    new_data = []
+    for i,stk in enumerate(stacking_data):
+        mask = masks[i].data.astype(bool)
+        stacking_data[i].data[mask] = np.nan
+
+    all_data = np.array([s.data for s in stacking_data])
+
+    sci_med = combine(stacking_data, weights=weights, 
+        method=stack_method)
 
     return(sci_med)
 
@@ -315,9 +357,11 @@ def add_stack_mask(stack, stacking_data, sat_grow=3):
 
     data = stack[0].data
     mask = stack[1].data
+    error = stack[2].data
 
     # Keep track of original masked values
-    bp_mask = mask > 0
+    bp_mask = (mask > 0) | (data==0.0) | np.isnan(data) | np.isnan(mask) |\
+        np.isnan(error) | (error==0.0)
 
     # Reset mask
     mask = np.zeros(mask.shape).astype(np.uint8)
@@ -331,71 +375,94 @@ def add_stack_mask(stack, stacking_data, sat_grow=3):
     sat_mask = data >= sat
     mask[sat_mask] = 4
 
+    data[mask>0] = 0.0
+    error[mask>0] = 0.0
+
     stack[0].data = data
     stack[1].data = mask
+    stack[2].data = error
 
     return(stack)
 
-def create_mask(science_data, static_mask, saturation, rdnoise, sigclip=2.5, 
-    sigfrac=0.1, objlim=2.5, niter=6, outpath='', log=None):
+def create_mask(science_data, saturation, rdnoise, sigclip=3.5, 
+    sigfrac=0.2, objlim=4.5, niter=6, outpath='', log=None):
 
     t_start = time.time()
     
-    if log: log.info(f'Running create_mask version: {__version__}')
+    if log:
+        log.info(f'Running astroscrappy on {science_data}')
+    else:
+        print(f'Running astroscrappy on {science_data}')
 
-    data = np.ascontiguousarray(science_data.data.astype(np.float32))
+    hdu = fits.open(science_data)
+    data = np.ascontiguousarray(hdu[0].data.astype(np.float32))
 
     # Astroscrappy requires added sky background, so add this value back
-    data = data + science_data.header['SKYBKG']
+    data = data + hdu[0].header['SKYBKG']
     
     if log: log.info('Masking saturated pixels.')
 
-    mask_bp = data==0.0
+    mask_bp = (data==0.0) | np.isnan(data)
 
     mask_sat = np.zeros(data.shape).astype(bool) # create empty mask
-    astroscrappy.update_mask(data, mask_sat, saturation, True) #add saturated stars to mask
     mask_sat = mask_sat.astype(np.uint8) #set saturated star mask type
     mask_sat[data >= saturation] = 4 #set saturated pixel flag
-    mask_sat[mask_sat == 1] = 8 #set connected to saturated pixel flag
 
     if log: log.info('Cleaning and masking cosmic rays.')
     if log: log.info(f'Using sigclip={sigclip}, sigfrac={sigfrac}, objlim={objlim}')
     #clean science image of cosmic rays and create cosmic ray mask
     inmask = (mask_sat+mask_bp).astype(bool)
-    mask_cr, clean = astroscrappy.detect_cosmics(data,
-        inmask=inmask, sigclip=sigclip, sigfrac=sigfrac, readnoise=rdnoise, 
-        satlevel=saturation, objlim=objlim, niter=niter)
+
+    scidata = CCDData(data, unit=u.electron, mask=inmask, 
+        wcs=WCS(hdu[0].header), meta=hdu[0].header)
+
+    newdata, mask_cr = cosmicray_lacosmic(data,
+        readnoise=rdnoise, satlevel=saturation, verbose=True,
+        sigclip=sigclip, sigfrac=sigfrac, objlim=objlim, niter=niter)
 
     mask_cr = mask_cr.astype(np.uint8) #set cosmic ray mask type
     mask_cr[mask_cr == 1] = 2 #set cosmic ray flag
 
      #combine bad pixel, cosmic ray, saturated star and satellite trail masks
     mask = mask_bp+mask_sat+mask_cr
+
+    # Get number of bad, cosmic-ray flagged, and saturated pixels
+    nbad = np.sum(mask & 1 == 1)
+    ncr = np.sum(mask & 2 == 2)
+    nsat = np.sum(mask & 4 == 4)
     
     mask_hdu = fits.PrimaryHDU(mask) #create mask Primary HDU
-    mask_hdu.header['VER'] = (__version__, 'Version of create mask used.') #name of log file
-    mask_hdu.header['USE'] = ('Complex mask using additive flags.', 'e.g. 6 = 2 + 4') #header comment
+    mask_hdu.header['VER'] = (__version__, 
+        'Version of image procedures used.') #name of log file
+    mask_hdu.header['USE'] = 'Complex mask using additive flags.' #header comment
     mask_hdu.header['M-BP'] = (1, 'Value of masked bad pixels.')
-    mask_hdu.header['M-BPNUM'] = (np.sum(mask & 1 == 1), 'Number of bad pixels.')
+    mask_hdu.header['M-BPNUM'] = (nbad, 'Number of bad pixels.')
     mask_hdu.header['M-CR'] = (2, 'Value of masked cosmic ray pixels.')
-    mask_hdu.header['M-CRNUM'] = (np.sum(mask & 2 == 2), 'Number of cosmic ray pixels.')
+    mask_hdu.header['M-CRNUM'] = (ncr, 'Number of cosmic ray pixels.')
     mask_hdu.header['SATURATE'] = (saturation, 'Level of saturation.')
     mask_hdu.header['M-SP'] = (4, 'Value of masked saturated pixels.')
-    mask_hdu.header['M-SPNUM'] = (np.sum(mask & 4 == 4), 'Number of saturated pixels.')
-    mask_hdu.header['M-CSP'] = (8, 'Value of masked saturated-connected pixels.')
-    mask_hdu.header['M-CSPNUM'] = (np.sum(mask & 8 == 8), 'Number of saturated-connected pixels.')
+    mask_hdu.header['M-SPNUM'] = (nsat, 'Number of saturated pixels.')
     
-    if log: log.info('Mask created.')
+    if log: 
+        log.info('Mask created.')
+        log.info(f'{nbad} bad, {ncr} cosmic-ray, and {nsat} saturated pixels')
+    else:
+        print('Mask created.')
+        print(f'{nbad} bad, {ncr} cosmic-ray, and {nsat} saturated pixels')
 
     t_end = time.time()
-    if log: log.info(f'Mask creation completed in {t_end-t_start} sec')
+    if log: 
+        log.info(f'Mask creation completed in {t_end-t_start} sec')
+    else:
+        print(f'Mask creation completed in {t_end-t_start} sec')
 
-    return clean, mask_hdu
+    return newdata, mask_hdu
 
 
 def create_error(science_data, mask_data, rdnoise):
 
-    img_data = science_data.data.astype(np.float32)
+    hdu = fits.open(science_data)
+    img_data = hdu[0].data.astype(np.float32)
     mask = mask_data.data.astype(bool)
 
     rms = 0.5 * (
@@ -407,8 +474,9 @@ def create_error(science_data, mask_data, rdnoise):
     error = np.sqrt(img_data + rms**2 + rdnoise)
 
     error_hdu = fits.PrimaryHDU(error) #create mask Primary HDU
-    error_hdu.header['VER'] = (__version__, 'Version of create mask used.') #name of log file
-    error_hdu.header['USE'] = ('Error array based on Poisson, read, and RMS noise', '') #header comment
+    error_hdu.header['VER'] = (__version__, 
+        'Version of image procedures used used.')
+    error_hdu.header['USE'] = 'Error array for Poisson, read, and RMS noise'
     error_hdu.header['BUNIT'] = ('ELECTRONS', 'Units of the error array.')
 
     return(error_hdu)
@@ -416,8 +484,8 @@ def create_error(science_data, mask_data, rdnoise):
 
 if __name__=="__main__":
 
-    t = Table.read('/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/file_list.txt',
-        format='ascii.ecsv')
+    t = ascii.read('/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/file_list.txt',
+        format='fixed_width')
     mask = t['Target']=='R155_host'
     t = t[mask]
 
@@ -426,7 +494,10 @@ if __name__=="__main__":
     global tel
     tel = importlib.import_module('params.LRIS')
 
-    red_path='/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/red'
+    paths={}
+    paths['red']='/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/red'
+    paths['work']='/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/red/workspace'
+    paths['cal']='/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/red/cals'
 
-    image_proc(t, tel, red_path, proc=None, log=None)
+    image_proc(t, tel, paths, proc=None, log=None)
 

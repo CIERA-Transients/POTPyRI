@@ -19,6 +19,8 @@ import logging
 import importlib
 import numpy as np
 
+from astropy.io import fits
+
 # Internal dependencies
 from custom_logger import get_log
 from utilities import util
@@ -32,24 +34,19 @@ import image_procs
 def main_pipeline(telescope:str,
                   data_path:str,
                   input_target:list=None,
-                  skip_red:bool=None,
                   proc:str=None,
-                  reset:bool=None,
                   incl_bad:bool=None,
                   no_redo_sort:bool=None,
-                  file_list_name:str='file_list.txt')->None:
+                  phot_sn_min:float=None,
+                  phot_sn_max:float=None,
+                  fwhm_init:float=None,
+                  file_list_name:str=None)->None:
 
     # start time
     t1 = time.time()
+    
     # import telescope parameter file
-    global tel
-    try:
-        tel = importlib.import_module(f'params.{telescope}')
-    except ImportError:
-        telfile=f'params.{telescope}'
-        print(f'''No such telescope file {telfile}, please check that you have 
-            entered the correct name or this telescope is available.''')
-        sys.exit(-1)
+    tel = importlib.import_module(f'params.{telescope}')
 
     # Get path to code directory
     paths = {'data': os.path.abspath(data_path)}
@@ -95,26 +92,25 @@ def main_pipeline(telescope:str,
         logging.shutdown()
         sys.exit(-1)
 
+    # Calibration images
+    ####################
     # Master bias, dark, and flat creation (will skip if unnecessary)
     bias_files = file_table[file_table['Type']=='BIAS']
     flat_files = file_table[file_table['Type']=='FLAT']
     dark_files = file_table[file_table['Type']=='DARK']
-    calibration.do_bias(bias_files, tel, paths['cal'], skip_red=skip_red, log=log)
-    calibration.do_dark(dark_files, tel, paths['cal'], skip_red=skip_red, log=log)
-    calibration.do_flat(flat_files, tel, paths['cal'], skip_red=skip_red, log=log)
+    calibration.do_bias(bias_files, tel, paths['cal'], log=log)
+    calibration.do_dark(dark_files, tel, paths['cal'], log=log)
+    calibration.do_flat(flat_files, tel, paths['cal'], log=log)
 
-    # Science files
-    ##################
+    # Science images
+    ################
     # Basic processing
     # Does it even need to run?
     science_data = file_table[file_table['Type']=='SCIENCE']
     if len(science_data)==0:
-        log.critical('No science files, check data before rerunning.')
+        if log: log.critical('No science files, check data before re-running.')
         logging.shutdown()
         sys.exit(-1)
-
-    if input_target is not None:
-        log.info(f'User input target for reduction: {input_target}')
 
     # Begin processing
     for tar in np.unique(science_data['CalType']):
@@ -123,44 +119,36 @@ def main_pipeline(telescope:str,
 
         if input_target is not None:
             if target_table['Target'][0]!=input_target: continue
+        else:
+            if log: log.info(f'User input target for reduction: {input_target}')
 
         files = target_table['File']
         stack = image_procs.image_proc(target_table, tel, paths, proc=proc, 
             log=log)
 
         # Auto-WCS solution
-        if tel.run_wcs():
-            log.info('Solving WCS.')
-            solve_wcs.solve_astrometry(paths['red'], stack, tel, log=log)
+        if log: log.info('Solving WCS.')
+        solve_wcs.solve_astrometry(paths['red'], stack, tel, log=log)
 
         # Photometry and flux calibration
-        if tel.run_phot():
-            log.info('Running psf photometry loop for zero point.')
-            for snthresh_final in [40.0, 20.0, 10.0, 5.0, 3.0]:
-                try:
-                    log.info(f'Trying photometry with final S/N={snthresh_final}')
-                    star_param={'snthresh_psf': snthresh_final*2.0, 
-                                'fwhm_init': 5.0, 
-                                'snthresh_final': snthresh_final}
-                    photometry.do_phot(stack, star_param=star_param, log=log)
-                    break
-                except:
-                    pass
+        if log: log.info('Running psf photometry loop for zero point.')
+        epsf, fwhm=photometry.photloop(stack, phot_sn_min=phot_sn_min,
+            fwhm_init=fwhm_init, phot_sn_max=phot_sn_max, log=log)
 
-            log.info('Calculating zeropint.')
-            photfile = stack.replace('.fits','.pcmp')
-            if os.path.exists(photfile):
-                cat = tel.catalog_zp()
-                cal = absphot.absphot()
-                cal.find_zeropoint(photfile, target_table['Filter'][0], cat, 
-                    log=log)
-            else:
-                log.error(f'Could not generate PSF photometry for {stack}')
+        log.info('Calculating zeropint.')
+        photfile = stack.replace('.fits','.pcmp')
+        if os.path.exists(photfile):
+            hdu = fits.open(stack)
+            cat = tel.catalog_zp(hdu[0].header)
+            cal = absphot.absphot()
+            cal.find_zeropoint(photfile, target_table['Filter'][0], cat, 
+                log=log)
+        else:
+            if log: log.error(f'Could not generate PSF photometry for {stack}')
         
     t2 = time.time()
-    log.info('Pipeline finshed.')
-    log.info(f'Total runtime: {t2-t1} sec')
-
+    if log: log.info('Pipeline finshed.')
+    if log: log.info(f'Total runtime: {t2-t1} sec')
 
 def main():
     import argparse
@@ -174,12 +162,6 @@ def main():
         default=None, 
         help='''Path of data to reduce. See manual for specific details. 
         Required to run pipeline.''')
-    params.add_argument('--skip_red', 
-        type=str, 
-        default=None, 
-        help='''Option to skip reduction i.e. the creation of master files used 
-        for calibration or the stacked image for science targets. See manual 
-        for specific details. Optional parameter.''')
     params.add_argument('--target', 
         type=str, 
         default=None, 
@@ -191,11 +173,6 @@ def main():
         default=True, 
         help='''Option to use the _proc data from MMT. Optional parameter. 
         Default is False.''')
-    params.add_argument('--reset', 
-        type=str, 
-        default=None, 
-        help='''Option to reset data files sorted previously by pipeline. 
-        Optional parameter.''')
     params.add_argument('--include-bad','--incl-bad', 
         default=False,
         action='store_true', 
@@ -208,12 +185,24 @@ def main():
         type=str, 
         default='file_list.txt', 
         help='''Change the name of the archive file list.''')
+    params.add_argument('--phot-sn-min',
+        type=float,
+        default=3.0,
+        help='''Minimum signal-to-noise to try in photometry loop.''')
+    params.add_argument('--phot-sn-max',
+        type=float,
+        default=40.0,
+        help='''Maximum signal-to-noise to try in photometry loop.''')
+    params.add_argument('--fwhm-init',
+        type=float,
+        default=5.0,
+        help='''Initial FWHM (in pixels) for photometry loop.''')
     args = params.parse_args()
 
     main_pipeline(args.instrument, args.data_path, input_target=args.target, 
-        skip_red=args.skip_red, proc=args.proc, reset=args.reset,
-        no_redo_sort=args.no_redo_sort,
-        file_list_name=args.file_list_name)
+        proc=args.proc, no_redo_sort=args.no_redo_sort, 
+        file_list_name=args.file_list_name, phot_sn_min=args.phot_sn_min, 
+        phot_sn_max=args.phot_sn_max, fwhm_init=args.fwhm_init)
 
 if __name__ == "__main__":
     main()

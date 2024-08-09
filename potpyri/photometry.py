@@ -1,12 +1,10 @@
 from photutils.aperture import ApertureStats
 from photutils.aperture import CircularAperture
-from photutils.background import MMMBackground
 from photutils.background import MADStdBackgroundRMS
-from photutils.background import Background2D
 from photutils.detection import DAOStarFinder
 from photutils.psf import EPSFModel
-from photutils.psf import extract_stars
 from photutils.psf import EPSFBuilder
+from photutils.psf import extract_stars
 from photutils.psf import PSFPhotometry
 from photutils.psf import SourceGrouper
 
@@ -14,10 +12,16 @@ from astropy.io import fits
 from astropy.stats import sigma_clipped_stats
 from astropy.stats import SigmaClip
 from astropy.nddata import NDData
-from astropy.table import Table, unique, Column, hstack, vstack
+from astropy.table import Table
+from astropy.table import unique
+from astropy.table import Column
+from astropy.table import hstack
+from astropy.table import vstack
 from astropy.visualization import simple_norm
 from astropy.wcs import WCS
-from astropy.modeling import models, fitting, functional_models
+from astropy.modeling import models
+from astropy.modeling import fitting
+from astropy.modeling import functional_models
 
 import matplotlib.pyplot as plt
 
@@ -34,24 +38,19 @@ from utilities import util
 import warnings
 warnings.filterwarnings('ignore')
 
-
-def extract_aperture_stats(img_file, stars, aperture_radius=10.0):
+def extract_aperture_stats(img_data, img_mask, img_error, stars, 
+    aperture_radius=10.0):
 
     apertable = Table([[0.],[0.],[0.],[0.],[0.],[0.]], 
         names=('fwhm','semimajor_sigma','semiminor_sigma',
         'orientation','eccentricity','signal_to_noise')).copy()[:0]
 
-    img_hdu = fits.open(img_file)
-    data = img_hdu[0].data 
-    mask = img_hdu[1].data.astype(bool)
-    error = img_hdu[2].data
-
     for star in stars:
-
         aper = CircularAperture((star['xcentroid'], star['ycentroid']),
             aperture_radius)
 
-        aperstats = ApertureStats(data, aper, mask=mask, error=error)
+        aperstats = ApertureStats(img_data, aper, mask=img_mask, 
+            error=img_error)
 
         apertable.add_row([aperstats.fwhm.value, aperstats.semimajor_sigma.value,
             aperstats.semiminor_sigma.value, aperstats.orientation.value,
@@ -73,14 +72,14 @@ def generate_epsf(img_file, x, y, size=11, oversampling=2, maxiters=5,
     stars = extract_stars(ndimage, stars_tbl, size=size)
 
     if log:
-        log.info('Extracted {0} stars.  Building EPSF...'.format(len(stars)))
+        log.info(f'Extracted {len(stars)} stars.  Building EPSF...')
     else:
-        print('Extracted {0} stars.  Building EPSF...'.format(len(stars)))
+        print(f'Extracted {len(stars)} stars.  Building EPSF...')
 
     epsf_builder = EPSFBuilder(oversampling=oversampling,
-        maxiters=maxiters, progress_bar=True,
-        sigma_clip=SigmaClip(sigma=3, sigma_lower=3, sigma_upper=3, 
-            maxiters=10, cenfunc='median', stdfunc='std', grow=False))
+        maxiters=maxiters, progress_bar=True, smoothing_kernel='quadratic',
+        sigma_clip=SigmaClip(sigma=5, sigma_lower=5, sigma_upper=5, 
+            maxiters=20, cenfunc='median', stdfunc='std', grow=False))
 
     epsf, fitted_stars = epsf_builder(stars)
 
@@ -88,16 +87,25 @@ def generate_epsf(img_file, x, y, size=11, oversampling=2, maxiters=5,
 
 def extract_fwhm_from_epsf(epsf, fwhm_init):
 
+    # Get the raw data for the FWHM and size in x and y
     data = epsf.normalized_data
     x = np.arange(data.shape[0])
     y = np.arange(data.shape[1])
     xx, yy = np.meshgrid(x, y) 
 
+    # Fit to Moffat2D model in astropy, initial guess is amplitude,
+    # centroid in x and y, core width of
+    # Moffat model and power index scaling of model
     p_init = functional_models.Moffat2D(amplitude=0.5, x_0=data.shape[0]/2.,
         y_0=data.shape[1]/2., gamma=fwhm_init, alpha=1.)
+    
     fit_p = fitting.LevMarLSQFitter()
 
+    # Fit functional model to the data
     p = fit_p(p_init, xx, yy, data)
+
+    # Extract and round FWHM
+    fwhm = float('%.4f'%p.fwhm)
 
     return(p.fwhm)
 
@@ -149,28 +157,13 @@ def run_photometry(img_file, epsf, fwhm, threshold, shape, stars):
 
     return(result_tab)
 
-def rotate_psf_to_img(psf_file, img_file, pa=0.0):
-    psf_hdu = fits.open(psf_file)
-    img_hdu = fits.open(img_file)
+# Identifies stars and gets aperture photometry and statistics using 
+# photutils.aperture.ApertureStats
+def get_star_catalog(img_data, img_mask, img_error, fwhm_init=5.0, 
+    threshold=50.0, log=None):
 
-    mask = img_hdu[0].data == img_hdu[0].data[0,0]
-    img_hdu[0].data[mask]=np.nan
-
-    # Rotate PSF to the angle of the input image
-    psf_rot = rotate(psf_hdu[0].data, pa)
-
-    return(psf_rot)
-
-def get_star_catalog(img_file, fwhm_init=5.0, threshold=3.5, log=None):
-
-    img_hdu = fits.open(img_file)
-    data = img_hdu[0].data
-    mask = img_hdu[1].data.astype(bool)
-    err = img_hdu[2].data
-
-    bkgrms = MADStdBackgroundRMS()
-    std = bkgrms(data)
-    daofind = DAOStarFinder(fwhm=fwhm_init, threshold=threshold*std,
+    # Construct the finder with input FWHM and threshold
+    daofind = DAOStarFinder(fwhm=fwhm_init, threshold=threshold,
         exclude_border=True, min_separation=fwhm_init)
 
     # Get initial set of stars in image with iraffind
@@ -179,12 +172,19 @@ def get_star_catalog(img_file, fwhm_init=5.0, threshold=3.5, log=None):
     else:
         print('Finding stars...')
 
-    stars = daofind(data, mask=mask)
+    # Do the finding...
+    stars = daofind(img_data, mask=img_mask)
 
+    # Ignore stars whose peak is below the background-subtracted level
     mask = stars['peak'] > 0.
     stars = stars[mask]
 
     stars.sort('flux')
+
+    # Extract the aperture stats from each star and append to the output catalog
+    stats = extract_aperture_stats(img_data, img_mask, img_error, stars, 
+        aperture_radius=2.5*fwhm_init)
+    stars = hstack([stars, stats])
     
     return(stars)
 
@@ -223,25 +223,25 @@ def write_out_catalog(catalog, img_file, columns, sigfig, outfile, metadata):
         
     util.write_catalog(outfile, header, catdata)
 
-def do_phot(img_file, write_out_back=False,
-    write_out_epsf_img=True, write_out_epsf_file=True, write_out_psf_stars=True,
-    fwhm_scale_psf=3.5, log=None, oversampling=2,
-    star_param={'snthresh_psf': 20.0, 'fwhm_init': 8.0, 'snthresh_final': 10.0}):
-
-    stars = get_star_catalog(img_file, fwhm_init=star_param['fwhm_init'],
-        threshold=star_param['snthresh_final']/2.0, log=log)
-
-    stats = extract_aperture_stats(img_file, stars, 
-        aperture_radius=2.5*star_param['fwhm_init'])
-
-    stars = hstack([stars, stats])
+def do_phot(img_file, write_out_epsf_img=True, 
+    write_out_epsf_file=True, write_out_psf_stars=True,
+    fwhm_scale_psf=3.5, oversampling=2,
+    star_param={'snthresh_psf': 20.0, 'fwhm_init': 8.0, 'snthresh_final': 10.0},
+    log=None):
 
     img_hdu = fits.open(img_file)
 
     # Get image statistics
     data = img_hdu[0].data
     mask = img_hdu[1].data.astype(bool)
+    error = img_hdu[2].data
     mean, median, std_sky = sigma_clipped_stats(data[~mask], sigma=5.0)
+
+    # Threshold for constructing star catalog
+    threshold = std_sky*star_param['snthresh_final']/2.0
+
+    stars = get_star_catalog(data, mask, error, 
+        fwhm_init=star_param['fwhm_init'], threshold=threshold, log=log)
 
     metadata={'SKYADU':median, 'SKYSIG': std_sky}
 
@@ -249,9 +249,6 @@ def do_phot(img_file, write_out_back=False,
         log.info(f'Found {len(stars)} stars')
     else:
         print(f'Found {len(stars)} stars')
-
-    # Estimate the uncertainty from sky and flux values
-    stars['flux_err'] = stars['flux']/stars['signal_to_noise']
 
     med_sharp = np.median(stars['sharpness'])
     med_round = np.median(stars['roundness1'])
@@ -280,9 +277,9 @@ def do_phot(img_file, write_out_back=False,
     std_fwhm = float('%.4f'%std_fwhm)
     
     if log:
-        log.info(f'''Masked to {len(fwhm_stars)} stars''')
+        log.info(f'Masked to {len(fwhm_stars)} stars based on sharpness, roundness, FWHM')
     else:
-        print(f'''Masked to {len(fwhm_stars)} stars''')
+        print(f'Masked to {len(fwhm_stars)} stars based on sharpness, roundness, FWHM')
 
     mask = (fwhm_stars['signal_to_noise'] > star_param['snthresh_psf'])
     bright = fwhm_stars[mask]
@@ -317,6 +314,7 @@ def do_phot(img_file, write_out_back=False,
     fwhm = extract_fwhm_from_epsf(epsf, fwhm*oversampling)
     # Scale by oversampling
     fwhm = fwhm/oversampling
+    fwhm = float('%.4f'%fwhm)
 
     if log:
         log.info(f'FWHM={fwhm} pixels')
@@ -327,15 +325,17 @@ def do_phot(img_file, write_out_back=False,
 
     mask = (stars['signal_to_noise'] > star_param['snthresh_final'])
     final_stars = stars[mask]
-    if log:
-        log.info(f'Final catalog is {len(final_stars)} stars')
-        log.info('Getting final photometry...')
-    else:
-        print(f'Final catalog is {len(final_stars)} stars')
-        print('Getting final photometry...')
 
     photometry = run_photometry(img_file, epsf, fwhm, 
         star_param['snthresh_final'], size, final_stars)
+
+    # Record final number of objects to write out
+    metadata['NOBJECT']=len(photometry)
+
+    if log:
+        log.info(f'Final catalog is {len(photometry)} stars')
+    else:
+        print(f'Final catalog is {len(photometry)} stars')
 
     # Get RA/Dec from final positions
     w = WCS(img_hdu[0].header)
@@ -369,8 +369,6 @@ def do_phot(img_file, write_out_back=False,
     else:
         print(f'Got {len(photometry)} stars for final photometry')
 
-    metadata['NOBJECT']=len(photometry)
-
     # We should always write out catalog for stars
     phot_file = img_file.replace('.fits','.pcmp')
     write_out_catalog(photometry, img_file, colnames, sigfig, phot_file,
@@ -398,12 +396,34 @@ def do_phot(img_file, write_out_back=False,
     # Finally return EPSF
     return(epsf, fwhm)
 
+def photloop(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
+    signal_to_noise = phot_sn_max
+
+    epsf = None ; fwhm = None
+    while signal_to_noise > phot_sn_min:
+
+        if log: log.info(f'Trying photometry with final S/N={signal_to_noise}')
+        star_param = {'snthresh_psf': signal_to_noise*2.0,
+                      'fwhm_init': fwhm_init,
+                      'snthresh_final': signal_to_noise}
+        try:
+            epsf, fwhm = do_phot(stack, star_param=star_param) 
+        except:
+            signal_to_noise = signal_to_noise / 2.0
+            continue
+        break
+
+    return(epsf, fwhm)
+
 if __name__=="__main__":
 
-    snthresh_final = 10.0
-    star_param={'snthresh_psf': snthresh_final*2.0, 
-                                'fwhm_init': 5.0, 
-                                'snthresh_final': snthresh_final}
+    # Pick image you want to test on
+    test = '/Users/ckilpatrick/Downloads/gemini_data/red/FRB20240209A.r.ut240808.12.22.stk.fits'
 
-    do_phot('/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/red/R155_host.R.ut240629.1R.11.stk.fits',
-        star_param=star_param)
+    # For testing - give different names so the module doesn't consider them
+    # global variables that override the values in methods
+    f = 40.0
+    s={'snthresh_psf': f*2.0, 'fwhm_init': 5.0, 'snthresh_final': f}
+
+    # Run methods
+    do_phot(test, star_param=s)

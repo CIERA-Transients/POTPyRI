@@ -111,7 +111,8 @@ class absphot(object):
 
             if catalog=='2MASS' and filt=='Y':
                 cat = cat[~np.isnan(cat['Kmag'])]
-                cat['mag'], cat['mag_err'] = self.Y_band(cat['mag'], cat['mag_err'], cat['Kmag'], cat['e_Kmag'])
+                cat['mag'], cat['mag_err'] = self.Y_band(cat['mag'], 
+                    cat['mag_err'], cat['Kmag'], cat['e_Kmag'])
 
             return(cat)
 
@@ -145,20 +146,6 @@ class absphot(object):
         cat = self.get_catalog(coords, catalog, filt, log=log)
 
         if cat:
-            if catalog=='PS1':
-                if log:
-                    log.info('Calculating and applying PS1 to SDSS conversion.')
-                if filt=='g':
-                    cat = cat[~np.isnan(cat['rmag'])]
-                    cat['mag'] = self.PS1_correction(filt, cat['mag'], cat['mag'], cat['rmag'])
-                elif filt=='r':
-                    cat = cat[~np.isnan(cat['mag'])]
-                    cat['mag'] = self.PS1_correction(filt, cat['mag'], cat['mag'], cat['mag'])
-                else:
-                    cat = cat[~np.isnan(cat['gmag'])]
-                    cat = cat[~np.isnan(cat['rmag'])]
-                    cat['mag'] = self.PS1_correction(filt, cat['mag'], cat['mag'], cat['mag'])
-
             coords_cat = SkyCoord(cat['ra'], cat['dec'], unit='deg')
 
             idx, d2, d3 = coords_cat.match_to_catalog_sky(coords)
@@ -266,18 +253,6 @@ class absphot(object):
         JKY_err = 0.46*(J-K)*np.sqrt((0.02/0.46)**2+(JK_err/(J-K))**2)
         Y_err = np.sqrt(J_err**2+JKY_err**2)
         return Y, Y_err
-
-    def PS1_correction(self, fil, mag_ps1, g_ps1, r_ps1):
-        g_r = g_ps1-r_ps1
-        if fil=='g':
-            mag_sdss = 0.013 + 0.1451*g_r + 0.019*g_r**2 + mag_ps1
-        elif fil=='r':
-            mag_sdss = -0.001 + 0.004*g_r + 0.007*g_r**2 + mag_ps1
-        elif fil=='i':
-            mag_sdss = -0.005 + 0.011*g_r + 0.010*g_r**2 + mag_ps1
-        elif fil=='z':
-            mag_sdss = 0.013 - 0.039*g_r - 0.012*g_r**2 + mag_ps1
-        return mag_sdss
 
     def convert_filter_name(self, filt):
         if filt=='uG0308' or filt=='uG0332' or filt=='U':
