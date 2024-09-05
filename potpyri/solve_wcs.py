@@ -13,14 +13,24 @@ import astropy
 import argparse
 import subprocess
 import os
-import astropy.units as u
-import astropy.wcs as wcs
 
+import matplotlib.pyplot as plt
+
+from photutils.aperture import ApertureStats
+from photutils.aperture import CircularAperture
+
+from astroquery.vizier import Vizier
+
+import astropy.units as u
+from astropy.stats import sigma_clipped_stats
 from astropy.io import fits
 from astropy.io import ascii
 from astropy.coordinates import SkyCoord
-from astropy.table import Table
+from astropy.table import Table, Column
 from astropy.utils.exceptions import AstropyWarning
+from astropy.wcs import WCS
+from astropy.wcs.utils import fit_wcs_from_points
+
 from scipy.optimize import curve_fit
 from utilities import util
 
@@ -64,6 +74,45 @@ def run_sextractor(input_file, cat_name, tel, sex_config_dir='./Config',
             log.error(e)
         raise Exception(e.format(cat_name))
 
+
+def get_gaia_catalog(input_file, log=None):
+
+    hdu = fits.open(input_file)
+    data = hdu[0].data
+    header = hdu[0].header
+    hkeys = list(header.keys())
+
+    check_pairs = [('RA','DEC'),('CRVAL1','CRVAL2'),('OBJCTRA','OBJCTDEC')]
+    coord = None
+
+    for pair in check_pairs:
+        if pair[0] in header.keys() and pair[1] in header.keys():
+            ra = header[pair[0]]
+            dec = header[pair[1]]
+            coord = util.parse_coord(ra, dec)
+            if coord:
+                break
+
+    if not coord:
+        if log: log.error(f'Could not parse RA/DEC from header of {file}')
+        return(False)
+
+    vizier = Vizier(columns=['RA_ICRS', 'DE_ICRS', 'Plx', 'PSS'])
+    vizier.ROW_LIMIT = -1
+
+    cat = vizier.query_region(coord, width=20 * u.arcmin, 
+        catalog='I/355/gaiadr3')
+
+    if len(cat)>0:
+        cat = cat[0]
+    else:
+        return(None)
+
+    mask = (cat['PSS'] > 0.99) & (cat['Plx'] < 20)
+    cat = cat[mask]
+
+    return(cat)
+
 def clean_up_astrometry(directory, file, exten):
     filelist = [file.replace(exten,'.axy'),
                 file.replace(exten,'.corr'),
@@ -79,14 +128,12 @@ def clean_up_astrometry(directory, file, exten):
         if os.path.exists(f):
             os.remove(f)
 
-def solve_astrometry(directory, file, tel, radius=0.5, replace=True, 
-    shift_only=True, log=None):
+def solve_astrometry(file, tel, radius=0.5, replace=True, 
+    shift_only=False, log=None):
 
     # Starting solve, print file and directory for reference
-    if os.path.basename(file)==file:
-        fullfile = os.path.join(directory, file)
-    else:
-        fullfile = file
+    fullfile = os.path.abspath(file)
+    directory = os.path.dirname(file)
 
     if log: 
         log.info(f'Trying to solve file: {file}')
@@ -133,7 +180,7 @@ def solve_astrometry(directory, file, tel, radius=0.5, replace=True,
         newfile = fullfile.replace(exten,'.solved.fits')
 
     # Handle pixel scale guess
-    scale = tel.pixscale()
+    scale = tel.pixscale(header)
     scale_high = float('%.4f'%(scale * 1.2))
     scale_low = float('%.4f'%(scale * 0.8))
 
@@ -145,8 +192,9 @@ def solve_astrometry(directory, file, tel, radius=0.5, replace=True,
     args = '--scale-units arcsecperpix '
     args += f'--scale-low {scale_low} --scale-high {scale_high} '
     args += f'--ra {ra} --dec {dec} '
-    args += f' --radius {radius} --no-plots '
+    args += f' --radius {radius} --no-plots -T '
     args += f'--overwrite -N {newfile} --dir {directory} '
+    args += '--use-sextractor '
 
     extra_opts = '--downsample 2 --no-verify --odds-to-tune-up 1e4 --objs 15'
 
@@ -170,7 +218,7 @@ def solve_astrometry(directory, file, tel, radius=0.5, replace=True,
 
         p = subprocess.Popen(process, stdout=FNULL, stderr=subprocess.STDOUT)
         try:
-            p.wait(30)
+            p.wait(90)
         except subprocess.TimeoutExpired:
             p.kill()
 
@@ -184,6 +232,7 @@ def solve_astrometry(directory, file, tel, radius=0.5, replace=True,
                 extra_opts=''
 
     file_exists=os.path.exists(newfile)
+
     if log: 
         log.info(f'{newfile} exists: {file_exists}')
     else:
@@ -264,5 +313,136 @@ def solve_astrometry(directory, file, tel, radius=0.5, replace=True,
         clean_up_astrometry(directory, file, exten)
         return(False)
 
+def align_to_gaia(file, tel, radius=0.5, log=None):
+
+    cat = get_gaia_catalog(file, log=log)
+
+    if cat is None or len(cat)==0:
+        log.error(f'Could not get Gaia catalog or no stars for {file}')
+        return(False)
+
+    if log: log.info(f'Got {len(cat)} Gaia DR3 alignment stars')
+
+    # Estimate sources that land within the image using WCS from header
+    hdu = fits.open(file)
+    w = WCS(hdu[0].header)
+    naxis1 = hdu[0].header['NAXIS1']
+    naxis2 = hdu[0].header['NAXIS2']
+
+    # Get pixel coordinates of all stars in image
+    coords = SkyCoord(cat['RA_ICRS'], cat['DE_ICRS'], unit=(u.deg, u.deg))
+    x_pix, y_pix = w.world_to_pixel(coords)
+
+    # Mask to stars that are nominally in image
+    mask = (x_pix > 0) & (x_pix < naxis1) & (y_pix > 0) & (y_pix < naxis2)
+    x_pix = x_pix[mask] ; y_pix = y_pix[mask]
+    # Also mask catalog
+    cat = cat[mask]
+
+    if cat is None or len(cat)==0:
+        log.error(f'No stars found in {file}')
+        return(False)
+
+    if log: log.info(f'Found {len(cat)} stars in the image')
+
+    x_cent = [] ; y_cent = [] ; aper_area = []
+    for i,row in enumerate(cat):
+        aper = CircularAperture((x_pix[i], y_pix[i]), 20.0)
+        aperstats = ApertureStats(hdu[0].data, aper)
+
+        x_cent.append(aperstats.xcentroid)
+        y_cent.append(aperstats.ycentroid)
+        aper_area.append(aperstats.center_aper_area.value)
+
+    aper_area = np.array(aper_area)
+    max_aper_area = np.max(aper_area[~np.isnan(aper_area)])
+
+    # Add centroids to the catalog
+    cat.add_column(Column(x_cent, name='xcentroid'))
+    cat.add_column(Column(y_cent, name='ycentroid'))
+    cat.add_column(Column(aper_area/max_aper_area, name='aper_area_frac'))
+
+    mask = ~np.isnan(cat['xcentroid']) & ~np.isnan(cat['ycentroid']) &\
+        (cat['aper_area_frac']>0.99)
+    cat = cat[mask]
+
+    if cat is None or len(cat)==0:
+        log.error(f'Could not centroid on any stars in {file}')
+        return(False)
+
+    if log: log.info(f'Centroided on {len(cat)} stars')
+
+    # Get central coordinate of image based on centroiding
+    central_pix = (float(naxis1)/2., float(naxis2)/2.)
+    central_coo = w.pixel_to_world(*central_pix)
+
+    # Bootstrap WCS solution and get center pixel
+    ra_cent = [] ; de_cent = []
+    coords = SkyCoord(cat['RA_ICRS'], cat['DE_ICRS'], unit=(u.deg, u.deg))
+
+    sip_degree = None
+    if len(coords)>50:
+        sip_degree = 2
+    if len(coords)>500:
+        sip_degree = 4
+    if len(coords)>2500:
+        sip_degree = 6
+
+    for i in np.arange(500):
+        idx = np.arange(len(cat))
+        size = int(len(cat)/2)
+
+        idxs = np.random.choice(idx, size=size, replace=False)
+
+        xy = (cat['xcentroid'][idxs], cat['ycentroid'][idxs])
+        c = coords[idxs]
+
+        new_wcs = fit_wcs_from_points(xy, c, proj_point=central_coo,
+            sip_degree=sip_degree)
+
+        cent_coord = new_wcs.pixel_to_world(*central_pix)
+        ra_cent.append(cent_coord.ra.degree)
+        de_cent.append(cent_coord.dec.degree)
+
+    # Estimate systematic precision of new WCS
+    mean_ra, med_ra, std_ra = sigma_clipped_stats(ra_cent)
+    mean_de, med_de, std_de = sigma_clipped_stats(de_cent)
+
+    fig, ax = plt.subplots()
+    ax.scatter(ra_cent, de_cent)
+    plt.savefig(file.replace('.fits','_centroids.png'))
+
+    # Generate "final" WCS
+    xy = (cat['xcentroid'], cat['ycentroid'])
+    proj_point = SkyCoord(mean_ra, mean_de, unit='deg')
+    new_wcs = fit_wcs_from_points(xy, coords, sip_degree=sip_degree,
+        proj_point=proj_point)
+
+    header = new_wcs.to_header()
+
+    header['CRVAL1']=mean_ra
+    header['CRVAL2']=mean_de
+    header['CRPIX1']=central_pix[0]
+    header['CRPIX2']=central_pix[1]
+
+    hdu[0].header.update(header)
+
+    # Add header variables for dispersion in WCS solution
+    hdu[0].header['RADISP']=(std_ra*3600.0*np.cos(np.pi/180.0 * mean_de),
+        'Dispersion in R.A. of WCS solution [Arcsec]')
+    hdu[0].header['DEDISP']=(std_de*3600.0,
+        'Dispersion in Decl. of WCS solution [Arcsec]')
+
+    hdu.writeto(file, overwrite=True, output_verify='silentfix')
+
+    return(True)
+
 if __name__ == "__main__":
-    pass
+    file='/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/DEIMOS/red/workspace/FRB20230827.Z.ut231007.4.11.1381143942.fits'
+
+    import importlib
+    global tel
+    tel = importlib.import_module('params.DEIMOS')
+
+    solve_astrometry(file, tel, radius=0.5, replace=True, 
+        shift_only=False, log=None)

@@ -8,8 +8,6 @@ from astropy.coordinates import SkyCoord
 from astropy.table import Table
 from astropy.io import fits
 
-import matplotlib.pyplot as plt
-
 from utilities.Vizier_catalogs import find_catalog
 from utilities import util
 from utilities import catreg
@@ -70,15 +68,21 @@ class absphot(object):
             flux=flux[mask] ; fluxerr=fluxerr[mask]
             mag=mag[mask] ; magerr=magerr[mask]
 
-            m=f'''Iteration {i}: {nobj} obj, zpt = {zpt}+/-{zpterr}, {self.sigma}-sigma 
-                clip to {len(flux)} obj'''
+            zpt = float('%.6f'%zpt)
+            zpterr = float('%.6f'%zpterr)
+
+            message = f'Iteration {i+1}/{self.iterations}: {nobj} obj, '
+            message += f'zpt={zpt}+/-{zpterr}, '
+            message += f'{self.sigma}-sigma clip to {len(flux)} obj'
             if log: 
-                log.info(m)
+                log.info(message)
             else:
-                print(m)
+                print(message)
         
         if log:
-            log.info('Number of stars used to calculate final zeropoint: '+str(len(flux)))
+            log.info(f'{len(flux)} stars used to calculate final zeropoint.')
+        else:
+            print(f'{len(flux)} stars used to calculate final zeropoint.')
         
         master_mask = np.array([i in idx for i in np.arange(nobj_orig)])
 
@@ -95,7 +99,7 @@ class absphot(object):
         coord_ra = np.median([c.ra.degree for c in coords])
         coord_dec = np.median([c.dec.degree for c in coords])
         med_coord = SkyCoord(coord_ra, coord_dec, unit='deg')
-
+        
         vizier = Vizier(columns=[cat_ra, cat_dec, cat_mag, cat_err])
         vizier.ROW_LIMIT = -1
         cat = vizier.query_region(med_coord, width=size*u.degree, catalog=cat_ID)
@@ -126,24 +130,29 @@ class absphot(object):
             return(None)
 
     def find_zeropoint(self, cmpfile, filt, catalog, match_radius=2.5*u.arcsec,
-        plot=False, log=None):
+        min_mag=17.0, phottable='APPPHOT', log=None):
 
         if log:
-            log.info('Importing catalog file: {0}'.format(cmpfile))
+            log.info(f'Importing catalog file: {cmpfile}')
         else:
-            print('Importing catalog file: {0}'.format(cmpfile))
-        header, table = util.import_catalog(cmpfile)
+            print(f'Importing catalog file: {cmpfile}')
+
+        hdu = fits.open(cmpfile)
+        header = hdu['PRIMARY'].header
+        table = Table(hdu[phottable].data, meta=hdu[phottable].header)
         coords = SkyCoord(table['RA'], table['Dec'], unit='deg')
+
+        # New metadata to update
+        metadata = {}
 
         filt = self.convert_filter_name(filt)
         if log:
-            log.info('Downloading {0} catalog in {1}'.format(
-                catalog, filt))
+            log.info(f'Downloading {catalog} catalog in {filt}')
         else:
-            print('Downloading {0} catalog in {1}'.format(
-                catalog, filt))
+            print(f'Downloading {catalog} catalog in {filt}')
 
         cat = self.get_catalog(coords, catalog, filt, log=log)
+        cat = cat[cat['mag']>min_mag]
 
         if cat:
             coords_cat = SkyCoord(cat['ra'], cat['dec'], unit='deg')
@@ -188,21 +197,10 @@ class absphot(object):
             zpt, zpterr, master_mask = self.zpt_iteration(flux, fluxerr,
                 cat_mag, cat_magerr, log=log)
 
-            if log:
-                log.info('Calculating AB correction.')
-            
-            cor = self.AB_conversion(catalog,filt)
-            zpt+=cor
-
-            if log:
-                log.info('Added AB correction of %2.3f mag.'%cor)
-                log.info('Final zeropoint calculated:')
-                log.info('zpt = %2.4f +/- %2.4f AB mag'%(zpt,zpterr))
-
             # Set header variables
-            header['ZPTNSTAR']=len(flux)
-            header['ZPTMAG'] = zpt
-            header['ZPTMUCER'] = zpterr
+            metadata['ZPTNSTAR']=len(flux)
+            metadata['ZPTMAG']=zpt
+            metadata['ZPTMUCER']=zpterr
 
             # Add limiting magnitudes
             if 'FWHM' in header.keys() and 'SKYSIG' in header.keys():
@@ -210,22 +208,24 @@ class absphot(object):
                 sky = header['SKYSIG']
                 Npix_per_FWHM_Area = 2.5 * 2.5 * fwhm * fwhm
                 skysig_per_FWHM_Area = np.sqrt(Npix_per_FWHM_Area * (sky*sky))
-                header['M3SIGMA']=-2.5*np.log10(3.0*skysig_per_FWHM_Area)+zpt
-                header['M5SIGMA']=-2.5*np.log10(5.0*skysig_per_FWHM_Area)+zpt
-                header['M10SIGMA']=-2.5*np.log10(10.0*skysig_per_FWHM_Area)+zpt
+                m3sigma = -2.5*np.log10(3.0*skysig_per_FWHM_Area)+zpt
+                m5sigma = -2.5*np.log10(5.0*skysig_per_FWHM_Area)+zpt
+                m10sigma = -2.5*np.log10(10.0*skysig_per_FWHM_Area)+zpt
+                m3sigma = float('%.6f'%m3sigma)
+                m5sigma = float('%.6f'%m5sigma)
+                m10sigma = float('%.6f'%m10sigma)
+                metadata['M3SIGMA']=m3sigma
+                metadata['M5SIGMA']=m5sigma
+                metadata['M10SIGMA']=m10sigma
                 if log:
-                    log.info('3 sigma limiting mag of image = '+str(-2.5*np.log10(3.0*skysig_per_FWHM_Area)+zpt))
+                    log.info(f'3-sigma limiting mag of image is {m3sigma}')
+                else:
+                    print(f'3-sigma limiting mag of image is {m3sigma}')
 
-            util.modify_catalog(cmpfile, header)
+            hdu['PRIMARY'].header.update(metadata)
+            hdu[phottable].header.update(metadata)
 
-            if os.path.exists(cmpfile.replace('.pcmp','.fits')):
-                hdu = fits.open(cmpfile.replace('.pcmp','.fits'))
-                hdu[0].header['ZPTNSTAR']=len(flux)
-                hdu[0].header['ZPTMAG'] = zpt
-                hdu[0].header['ZPTMUCER'] = zpterr
-
-                hdu.writeto(cmpfile.replace('.pcmp','.fits'), overwrite=True,
-                    output_verify='silentfix')
+            hdu.writeto(cmpfile, overwrite=True)
             
             return(zpt, zpterr)
         else:
@@ -284,4 +284,6 @@ class absphot(object):
 if __name__=="__main__":
     zp_cal = absphot()
 
-    zp, zp_err = zp_cal.find_zeropoint('/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/red/R155_host.R.ut240629.1R.11.stk.pcmp', 'R', 'PS1', plot=True, log=None)
+    zp, zp_err = zp_cal.find_zeropoint(
+        '/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/MMIRS/red/GRB231117A_J.J.ut231204.32.11.stk.fits', 
+        'J', '2MASS', min_mag=14.0, log=None)

@@ -1,6 +1,7 @@
 from photutils.aperture import ApertureStats
 from photutils.aperture import CircularAperture
-from photutils.background import MADStdBackgroundRMS
+from photutils.background import LocalBackground
+from photutils.background import MMMBackground
 from photutils.detection import DAOStarFinder
 from photutils.psf import EPSFModel
 from photutils.psf import EPSFBuilder
@@ -39,11 +40,34 @@ import warnings
 warnings.filterwarnings('ignore')
 
 def extract_aperture_stats(img_data, img_mask, img_error, stars, 
-    aperture_radius=10.0):
+    aperture_radius=10.0, log=None):
 
-    apertable = Table([[0.],[0.],[0.],[0.],[0.],[0.]], 
+    apertable = Table([[0.],[0.],[0.],[0.],[0.],[0.],[0.],[0.],[0.],[0.],
+        [0.],[0.]], 
         names=('fwhm','semimajor_sigma','semiminor_sigma',
-        'orientation','eccentricity','signal_to_noise')).copy()[:0]
+        'orientation','eccentricity','signal_to_noise',
+        'flux_best', 'flux_best_err','Xpos','Ypos',
+        'Xpos_err','Ypos_err')).copy()[:0]
+
+    # Estimate a reasonable aperture radius and centroid for sources
+    fwhms=[]
+    for i,star in enumerate(stars):
+        aper = CircularAperture((star['xcentroid'], star['ycentroid']),
+            aperture_radius)
+        aperstats = ApertureStats(img_data, aper, mask=img_mask, 
+            error=img_error)
+
+        fwhms.append(aperstats.fwhm.value)
+        stars[i]['xcentroid']=aperstats.xcentroid
+        stars[i]['ycentroid']=aperstats.ycentroid
+
+    if aperture_radius<2.5*np.nanmean(fwhms):
+        aperture_radius=2.5*np.nanmean(fwhms)
+
+    if log:
+        log.info(f'New aperture radius={aperture_radius}')
+    else:
+        print(f'New aperture radius={aperture_radius}')
 
     for star in stars:
         aper = CircularAperture((star['xcentroid'], star['ycentroid']),
@@ -54,12 +78,15 @@ def extract_aperture_stats(img_data, img_mask, img_error, stars,
 
         apertable.add_row([aperstats.fwhm.value, aperstats.semimajor_sigma.value,
             aperstats.semiminor_sigma.value, aperstats.orientation.value,
-            aperstats.eccentricity,aperstats.sum/aperstats.sum_err])
+            aperstats.eccentricity, aperstats.sum/aperstats.sum_err,
+            aperstats.sum, aperstats.sum_err, aperstats.xcentroid,
+            aperstats.ycentroid, np.sqrt(aperstats.covar_sigx2.value),
+            np.sqrt(aperstats.covar_sigy2.value)])
     
     return(apertable)
 
 
-def generate_epsf(img_file, x, y, size=11, oversampling=2, maxiters=5,
+def generate_epsf(img_file, x, y, size=11, oversampling=2, maxiters=11,
     log=None):
     # Construct stars table from bright
     stars_tbl = Table()
@@ -119,43 +146,34 @@ def run_photometry(img_file, epsf, fwhm, threshold, shape, stars):
 
     psf = copy.copy(epsf)
 
+    # Generate initial guesses for star centroid and flux from aperture table
     stars_tbl = Table()
-    stars_tbl['x'] = stars['xcentroid']
-    stars_tbl['y'] = stars['ycentroid']
-    size = int(np.round(2.5*fwhm))
-    if size%2==0: size = size+1
-    stars = extract_stars(ndimage, stars_tbl, size=size)
-
-    stars_tbl['flux'] = np.array([stars[0].estimate_flux()])
-
-    targets = Table()
-    targets['x_0'] = stars_tbl['x']
-    targets['y_0'] = stars_tbl['y']
-    targets['flux_0'] = stars_tbl['flux']
-
-    grouper = SourceGrouper(min_separation=shape)
-    finder = DAOStarFinder(threshold, fwhm)
+    stars_tbl['x_0'] = stars['xcentroid']
+    stars_tbl['y_0'] = stars['ycentroid']
+    stars_tbl['flux_0'] = stars['flux_best']
+    stars_tbl['local_bkg'] = np.array([0.]*len(stars))
 
     photometry = PSFPhotometry(psf_model=psf, fit_shape=(shape,shape),
-        grouper=grouper, aperture_radius=int(shape*1.5), finder=finder,
-        progress_bar=True)
+        aperture_radius=int(shape*1.5), progress_bar=True)
 
     result_tab = photometry(image, mask=mask, error=error,
-        init_params=targets)
+        init_params=stars_tbl)
 
+    # Also generate a residual image for quality control
+    residual_image = photometry.make_residual_image(image, (shape, shape),
+        include_localbkg=True)
+
+    # Mask results table for sources with bad flux error, fit flux, or centroid
     mask = ~np.isnan(result_tab['flux_err'])
     result_tab = result_tab[mask]
-
     mask = result_tab['flux_fit'] > 0.
     result_tab = result_tab[mask]
-
     mask = ~np.isnan(result_tab['x_err'])
     result_tab = result_tab[mask]
-
     mask = ~np.isnan(result_tab['y_err'])
     result_tab = result_tab[mask]
 
-    return(result_tab)
+    return(result_tab, residual_image)
 
 # Identifies stars and gets aperture photometry and statistics using 
 # photutils.aperture.ApertureStats
@@ -183,7 +201,7 @@ def get_star_catalog(img_data, img_mask, img_error, fwhm_init=5.0,
 
     # Extract the aperture stats from each star and append to the output catalog
     stats = extract_aperture_stats(img_data, img_mask, img_error, stars, 
-        aperture_radius=2.5*fwhm_init)
+        aperture_radius=2.5*fwhm_init, log=log)
     stars = hstack([stars, stats])
     
     return(stars)
@@ -223,9 +241,8 @@ def write_out_catalog(catalog, img_file, columns, sigfig, outfile, metadata):
         
     util.write_catalog(outfile, header, catdata)
 
-def do_phot(img_file, write_out_epsf_img=True, 
-    write_out_epsf_file=True, write_out_psf_stars=True,
-    fwhm_scale_psf=3.5, oversampling=2,
+def do_phot(img_file,
+    fwhm_scale_psf=4.5, oversampling=1,
     star_param={'snthresh_psf': 20.0, 'fwhm_init': 8.0, 'snthresh_final': 10.0},
     log=None):
 
@@ -309,7 +326,7 @@ def do_phot(img_file, write_out_epsf_img=True,
         print(f'EPSF size will be {size} pixels')
 
     epsf = generate_epsf(img_file, bright['xcentroid'], bright['ycentroid'], 
-        size=size, oversampling=oversampling, maxiters=5, log=log)
+        size=size, oversampling=oversampling, maxiters=11, log=log)
 
     fwhm = extract_fwhm_from_epsf(epsf, fwhm*oversampling)
     # Scale by oversampling
@@ -323,11 +340,50 @@ def do_phot(img_file, write_out_epsf_img=True,
 
     metadata['FWHM']=fwhm
 
+    # Also update img_hdu['PRIMARY'] with FWHM
+    img_hdu['PRIMARY'].header['FWHM']=(fwhm, 
+        'Full-width at half-maximum [pixels]')
+
     mask = (stars['signal_to_noise'] > star_param['snthresh_final'])
     final_stars = stars[mask]
 
-    photometry = run_photometry(img_file, epsf, fwhm, 
+    photometry, residual_image = run_photometry(img_file, epsf, fwhm, 
         star_param['snthresh_final'], size, final_stars)
+
+    # Format final stars table and add as APPPHOT to img_hdu
+    w = WCS(img_hdu[0].header)
+    coords = w.pixel_to_world(final_stars['Xpos'], final_stars['Ypos'])
+    final_stars['flux'] = final_stars['flux_best']
+    final_stars['flux_err'] = final_stars['flux_best_err']
+    final_stars['SN'] = final_stars['flux']/final_stars['flux_best_err']
+    final_stars['mag'] = -2.5*np.log10(final_stars['flux'])
+    final_stars['mag_err'] = 2.5/np.log(10) * 1./final_stars['SN']
+    final_stars['RA'] = [c.ra.degree for c in coords]
+    final_stars['Dec'] = [c.dec.degree for c in coords]
+    final_stars['sky'] = np.array([0.]*len(final_stars))
+    final_stars['FWHM'] = final_stars['fwhm']
+    # Sort from brightest to faintest
+    final_stars.sort('flux', reverse=True)
+
+    # Get final list of column names we want in catalog in order and the number
+    # of significant figures they should all have
+    colnames=['Xpos','Ypos','Xpos_err','Ypos_err','mag','mag_err','flux',
+        'flux_err','SN','FWHM','sky','RA','Dec']
+    sigfig=[4,4,4,4,4,4,4,4,4,4,4,7,7]
+
+    final_stars = final_stars[*colnames]
+    for col,sig in zip(colnames, sigfig):
+        final_stars[col] = np.array([float(f'%.{sig}f'%val) 
+            for val in final_stars[col].data])
+
+    # Create a new HDU for the photometry table
+    newhdu = fits.BinTableHDU(final_stars)
+    newhdu.header.update(metadata)
+    newhdu.name='APPPHOT'
+    if newhdu.name in [h.name for h in img_hdu]:
+        img_hdu[newhdu.name] = newhdu
+    else:
+        img_hdu.append(newhdu)
 
     # Record final number of objects to write out
     metadata['NOBJECT']=len(photometry)
@@ -354,47 +410,67 @@ def do_phot(img_file, write_out_epsf_img=True,
     photometry.rename_column('x_err', 'Xpos_err')
     photometry.rename_column('y_err', 'Ypos_err')
     photometry.rename_column('flux_fit','flux')
-    photometry.rename_column('local_bkg','SKY')
+    photometry.rename_column('local_bkg','sky')
     # Sort from brightest to faintest
     photometry.sort('flux', reverse=True)
 
     # Get final list of column names we want in catalog in order and the number
     # of significant figures they should all have
     colnames=['Xpos','Ypos','Xpos_err','Ypos_err','mag','mag_err','flux',
-        'flux_err','SN','SKY','RA','Dec']
-    sigfig=[4,4,4,4,4,4,4,4,4,4,7,7]
+        'flux_err','SN','FWHM','sky','RA','Dec']
+    sigfig=[4,4,4,4,4,4,4,4,4,4,4,7,7]
 
-    if log:
-        log.info(f'Got {len(photometry)} stars for final photometry')
+    photometry = photometry[*colnames]
+    for col,sig in zip(colnames, sigfig):
+        photometry[col] = np.array([float(f'%.{sig}f'%val) 
+            for val in photometry[col].data])
+
+    # Update primary header with metadata
+    img_hdu['PRIMARY'].header.update(metadata)
+
+    # Create a new HDU for the photometry table
+    newhdu = fits.BinTableHDU(photometry)
+    newhdu.header.update(metadata)
+    newhdu.name='PSFPHOT'
+    if newhdu.name in [h.name for h in img_hdu]:
+        img_hdu[newhdu.name] = newhdu
     else:
-        print(f'Got {len(photometry)} stars for final photometry')
+        img_hdu.append(newhdu)
 
-    # We should always write out catalog for stars
-    phot_file = img_file.replace('.fits','.pcmp')
-    write_out_catalog(photometry, img_file, colnames, sigfig, phot_file,
-        metadata)
+    # Add PSF stars to img_hdu
+    bright.sort('flux')
+    newhdu = fits.BinTableHDU(bright)
+    newhdu.name='PSFSTARS'
+    if newhdu.name in [h.name for h in img_hdu]:
+        img_hdu[newhdu.name] = newhdu
+    else:
+        img_hdu.append(newhdu)
 
-    if write_out_psf_stars:
-        bright.sort('flux')
-        outname = img_file.replace('.fits','.psf.stars')
-        bright.write(outname, format='ascii', overwrite=True)
+    # Write out a EPSF quality image and add raw data to img_hdu
+    norm = simple_norm(epsf.data, 'log', percent=99.)
+    plt.imshow(epsf.data, norm=norm, origin='lower', cmap='viridis')
+    plt.colorbar()
+    outname = img_file.replace('.fits','.epsf.png')
+    plt.savefig(outname)
+    plt.clf()
 
-    if write_out_epsf_img:
-        norm = simple_norm(epsf.data, 'log', percent=99.)
-        plt.imshow(epsf.data, norm=norm, origin='lower', cmap='viridis')
-        plt.colorbar()
-        outname = img_file.replace('.fits','.epsf.png')
-        plt.savefig(outname)
-        plt.clf()
+    # Add the residual image to img_hdu
+    newhdu = fits.ImageHDU(residual_image)
+    newhdu.name = 'RESIDUAL'
+    if newhdu.name in [h.name for h in img_hdu]:
+        img_hdu[newhdu.name] = newhdu
+    else:
+        img_hdu.append(newhdu)
 
-    if write_out_epsf_file:
-        hdu = fits.PrimaryHDU(epsf.data)
-        hdu.header['FWHM']=fwhm
-        outname = img_file.replace('.fits','.psf.fits')
-        hdu.writeto(outname, overwrite=True)
+    newhdu = fits.ImageHDU(epsf.data)
+    newhdu.name='PSF'
+    if newhdu.name in [h.name for h in img_hdu]:
+        img_hdu[newhdu.name] = newhdu
+    else:
+        img_hdu.append(newhdu)
 
-    # Finally return EPSF
-    return(epsf, fwhm)
+    # Finally, write out img_hdu to save all data
+    img_hdu.writeto(img_file, overwrite=True)
 
 def photloop(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
     signal_to_noise = phot_sn_max
@@ -407,18 +483,16 @@ def photloop(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
                       'fwhm_init': fwhm_init,
                       'snthresh_final': signal_to_noise}
         try:
-            epsf, fwhm = do_phot(stack, star_param=star_param) 
+            do_phot(stack, star_param=star_param) 
         except:
             signal_to_noise = signal_to_noise / 2.0
             continue
         break
 
-    return(epsf, fwhm)
-
 if __name__=="__main__":
 
     # Pick image you want to test on
-    test = '/Users/ckilpatrick/Downloads/gemini_data/red/FRB20240209A.r.ut240808.12.22.stk.fits'
+    test = '/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/Binospec/red/GRB240809A_r_ep1.r.ut240812.2.11.stk.fits'
 
     # For testing - give different names so the module doesn't consider them
     # global variables that override the values in methods

@@ -1,8 +1,8 @@
 #parameter file for GMOS/Gemini
-
 import os
 import astropy
 import datetime
+import copy
 import ccdproc
 import numpy as np
 
@@ -10,14 +10,15 @@ from photutils import Background2D
 from photutils import MeanBackground
 
 from astropy.coordinates import SkyCoord
-from astropy.stats import SigmaClip
-from astropy.stats import sigma_clipped_stats
 from astropy.io import fits
-from astropy.time import Time
-from astropy.nddata import CCDData
 from astropy.modeling import models
-import astropy.units.astrophys as u
+from astropy.nddata import CCDData
+from astropy.stats import sigma_clipped_stats
+from astropy.stats import SigmaClip
+from astropy.time import Time
+
 import astropy.units as u
+import astropy.wcs as wcs
 
 __version__ = 1.2 #last edited 09/11/2021
 
@@ -66,6 +67,12 @@ def flat():
 
 def raw_header_ext():
     return 0
+
+# Keywords for selecting files from Sort_files object
+# This allows a single file type to be used for multiple purposes (e.g., for
+# generating a flat-field image from science exposures)
+def filetype_keywords():
+    return {'SCIENCE':'SCIENCE', 'FLAT':'FLAT', 'DARK':'DARK','BIAS':'BIAS'}
 
 def science_keyword():
     return ['SHUTTER','GRATING','OBSCLASS','OBSTYPE']
@@ -118,7 +125,7 @@ def amp_keyword(hdr):
     return amp
 
 def bin_keyword(hdr):
-    return '22' #hdr['CCDSUM'].replace(' ','') keyword in different ext - check how to calculate
+    return '22'
 
 def time_format(hdr):
     return Time(hdr['DATE-OBS']+'T'+hdr['TIME-OBS']).mjd
@@ -126,17 +133,23 @@ def time_format(hdr):
 def wavelength():
     return 'OPT'
 
+# Bias and flat names
 def get_mbias_name(red_path, amp, binn):
     return(os.path.join(red_path, f'mbias_{amp}_{binn}.fits'))
 
 def get_mflat_name(red_path, fil, amp, binn):
     return(os.path.join(red_path, f'mflat_{fil}_{amp}_{binn}.fits'))
 
+# Loading bias and flat
 def load_bias(red_path, amp, binn):
     bias = get_mbias_name(red_path, amp, binn)
     mbias = [CCDData.read(bias,hdu=x+1,unit=u.electron) 
         for x in range(int(amp))]
     return mbias
+
+def load_flat(flat):
+    mflat = CCDData.read(flat)
+    return mflat
 
 def create_bias(cal_list, amp, binn, red_path, log):
 
@@ -188,10 +201,6 @@ def create_bias(cal_list, amp, binn, red_path, log):
     for bias in outlist: os.remove(bias)
     
     return
-
-def load_flat(flat):
-    mflat = CCDData.read(flat,unit=u.electron)
-    return mflat
 
 def create_flat(flat_list, fil, amp, binn, red_path, mbias=None, log=None):
 
@@ -257,7 +266,7 @@ def create_flat(flat_list, fil, amp, binn, red_path, mbias=None, log=None):
     return
 
 def process_science(sci_list, fil, amp, binn, red_path, mbias=None,
-    mflat=None, proc=None, staticmask=None, log=None):
+    mflat=None, proc=None, staticmask=None, skip_skysub=False, log=None):
 
     if staticmask is not None and os.path.exists(staticmask[0]):
         hdu = fits.open(staticmask[0])
@@ -315,15 +324,20 @@ def process_science(sci_list, fil, amp, binn, red_path, mbias=None,
         sci_full.header['SATURATE'] = saturation(hdr)
 
         processed_data = ccdproc.flat_correct(sci_full, mflat)
-        if log: log.info('File proccessed.')
-        if log: log.info('Cleaning cosmic rays and creating mask.')
+        
         if log: log.info('Calculating 2D background.')
-
         mean, median, stddev = sigma_clipped_stats(processed_data.data)
+        # Add to input mask
+        addmask = processed_data.data < median - 3 * stddev
+
+        if imgmask is None:
+            input_mask = addmask
+        else:
+            input_mask = imgmask | addmask
         
         bkg = Background2D(processed_data, (128, 128), filter_size=(3, 3),
             sigma_clip=SigmaClip(sigma=3), bkg_estimator=MeanBackground(),
-            exclude_percentile=80, mask=imgmask, fill_value=median)
+            exclude_percentile=80, mask=input_mask, fill_value=median)
         med_background = np.nanmedian(bkg.background)
         if log: log.info(f'Median background: {med_background}')
 
@@ -341,7 +355,7 @@ def process_science(sci_list, fil, amp, binn, red_path, mbias=None,
 
         # Mask out excessively negative pixels
         mean, median, stddev  = sigma_clipped_stats(final.data, mask=imgmask)
-        mask = final.data < median - 5 * stddev
+        mask = final.data < median - 3 * stddev
         final.data[mask] = np.nan
 
         final.header['SATURATE'] -= med_background.value
@@ -378,18 +392,6 @@ def rdnoise(header):
 
 def binning():
     return [4,4]
-
-def cr_clean_sigclip():
-    return 50
-
-def cr_clean_sigcfrac():
-    return 0.1
-
-def cr_clean_objlim():
-    return 100
-
-def run_phot():
-    return True
 
 def catalog_zp(hdr):
     coord = SkyCoord(hdr['RA'], hdr['DEC'], unit=(u.deg, u.deg))
@@ -473,3 +475,6 @@ def edit_stack_headers(stack):
 
 
     return(stack)
+
+def edit_raw_headers(files, log=None):
+    pass

@@ -50,11 +50,12 @@ def do_dark(dark_table, tel, red_path, log=None):
         amp = cal_type.split('_')[1]
         binn = cal_type.split('_')[2]
 
-        dark_name = tel.get_mdark_name(red_path, exp, amp, binn)
+        dark_name = tel.get_mdark_name(red_path, amp, binn)
 
         if os.path.exists(dark_name):
             if log: log.info(f'Master dark {dark_name} exists.')
         else:
+            mbias = None
             if tel.bias():
                 if log: log.info('Loading master bias.')
                 try:
@@ -64,11 +65,10 @@ def do_dark(dark_table, tel, red_path, log=None):
                         configuration, skipping master dark creation for 
                         exposure {exp}, {amp} amps and {binn} binning.''')
                     continue
-                else:
-                    mbias = None
 
             t1 = time.time()
-            tel.create_dark(cal_table['File'],cal,mbias,red_path,log)
+            tel.create_dark(cal_table['File'], amp, binn,
+                red_path, mbias=mbias, log=log)
             t2 = time.time()
             if log: log.info(f'Master dark creation completed in {t2-t1} sec.')
 
@@ -81,16 +81,18 @@ def do_flat(flat_table, tel, red_path, log=None):
     for cal_type in np.unique(flat_table['CalType']):
         mask = flat_table['CalType']==cal_type
         cal_table = flat_table[mask]
-            
-        fil = cal_type.split('_')[0]
-        amp = cal_type.split('_')[1]
-        binn = cal_type.split('_')[2]
+
+        fil = flat_table[mask]['Filter'][0]
+        amp = flat_table[mask]['Amp'][0]
+        binn = flat_table[mask]['Binning'][0]
 
         flat_name = tel.get_mflat_name(red_path, fil, amp, binn)
 
         if os.path.exists(flat_name):
             if log: log.info(f'Master flat {flat_name} exists.')
         else:
+            mbias = None
+            mdark = None
             if tel.bias():
                 if log: log.info('Loading master bias.')
                 try:
@@ -100,12 +102,20 @@ def do_flat(flat_table, tel, red_path, log=None):
                         configuration, skipping master flat creation for 
                         filter {fil}, {amp} amps, {binn} binning.''')
                     continue
-            else:
-                mbias = None
+
+            if tel.dark():
+                if log: log.info('Loading master dark.')
+                if True:
+                    mdark = tel.load_dark(red_path, amp, binn)
+                #except:
+                #    if log: log.error(f''''No master dark found for this 
+                #        configuration, skipping master flat creation for 
+                #        filter {fil}, {amp} amps and {binn} binning.''')
+                #    continue
 
             t1 = time.time()
             tel.create_flat(cal_table['File'], fil, amp, binn,
-                red_path, mbias=mbias, log=log)
+                red_path, mbias=mbias, mdark=mdark, log=log)
             t2 = time.time()            
             if log: log.info(f'Master flat creation completed in {t2-t1} sec')
 
