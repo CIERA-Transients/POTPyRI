@@ -1,12 +1,17 @@
 #!/usr/bin/env python
 
-"""Automatic generalized pipeline for imaging reduction. Creates median coadded 
-images for each target. Individual images should be checked and removed from 
-sci path.
+"""
+Automatic generalized pipeline for imaging reduction. Creates coadded images 
+for each target.  Files are automatically sorted and categorized based on 
+expected header keywords.  Pixel-level processing is performed with ccdproc, 
+WCS alignment is performed with astrometry.net and astropy/photutils, 
+photometry is performed with photutils, and flux calibration with astroquery
+and numpy.
 
 Author: Kerry Paterson
 This project was funded by AST 
-If you use this code for your work, please consider citing."""
+If you use this code for your work, please consider citing the package release.
+"""
 
 # Refactor on 2024-07-19
 __version__ = "1.22"
@@ -30,60 +35,42 @@ import photometry
 import absphot
 import calibration
 import image_procs
+import options
 
-def main_pipeline(telescope:str,
+# Check options.py - all named parameters need to correspond to options that are
+# provided via argparse.
+def main_pipeline(instrument:str,
                   data_path:str,
-                  input_target:list=None,
+                  target:list=None,
                   proc:str=None,
                   incl_bad:bool=None,
                   no_redo_sort:bool=None,
                   phot_sn_min:float=None,
                   phot_sn_max:float=None,
                   fwhm_init:float=None,
-                  file_list_name:str=None)->None:
+                  skip_skysub:bool=None,
+                  file_list_name:str=None,
+                  fieldcenter:list=None,
+                  out_size:int=None,
+                  **kwargs)->None:
 
     # start time
     t1 = time.time()
     
     # import telescope parameter file
-    tel = importlib.import_module(f'params.{telescope}')
+    tel = importlib.import_module(f'params.{instrument.upper()}')
 
-    # Get path to code directory
-    paths = {'data': os.path.abspath(data_path)}
-    paths['abspath']=os.path.abspath(sys.argv[0])
-    paths['code']=os.path.split(paths['abspath'])[0]
-    paths['config']=os.path.join(paths['code'], 'config')
-    paths['raw']=os.path.join(data_path, 'raw') #path containing the raw data
-    paths['bad']=os.path.join(data_path, 'bad') #path containing the unused data
-    paths['red']=os.path.join(data_path, 'red') #path to write the reduced files
-    paths['log']=os.path.join(data_path, 'red', 'log')
-    paths['cal']=os.path.join(data_path, 'red', 'cals')
-    paths['work']=os.path.join(data_path, 'red', 'workspace')
-    for key in paths.keys():
-        if not os.path.exists(paths[key]): os.makedirs(paths[key])
+    # Generate code and data paths based on input path
+    paths = options.add_paths(data_path)
 
-    # Copy config directory to data path
-    if not os.path.exists(os.path.join(paths['data'], 'config')):
-        shutil.copytree(paths['config'], os.path.join(paths['data'], 'config'))
-
-    # Generate logfile
+    # Generate log file in corresponding directory for log
     log = get_log(paths['log'])
 
-    log.info(f'Running main pipeline version {__version__}')
-    log.info(f'Running telescope paramater file version {tel.__version__}')
-
-    # CDK - added editing for headers with LRIS raw data files (*[b,r]*.fits)
-    # TODO: Refactor so this is a method that happens for every telescope,
-    # rename edit_headers with proc as a variable, then call every time
-    if ((telescope=='LRIS' and proc and str(proc)=='raw') or
-        (telescope=='DEIMOS' and proc and str(proc)=='raw')):
-        log.info('Edit raw headers')
-        tel.edit_raw_headers(paths['data'])
-        tel.edit_raw_headers(paths['raw'])
-
-    file_list = os.path.join(paths['data'], file_list_name)
+    if log: log.info(f'Running main pipeline version {__version__}')
+    if log: log.info(f'Running instrument paramater file version {tel.__version__}')
 
     # This contains all of the file data
+    file_list = os.path.join(paths['data'], file_list_name)
     file_table = Sort_files.handle_files(file_list, tel, paths, 
         incl_bad=incl_bad, proc=proc, no_redo=no_redo_sort, log=log)
 
@@ -95,9 +82,10 @@ def main_pipeline(telescope:str,
     # Calibration images
     ####################
     # Master bias, dark, and flat creation (will skip if unnecessary)
-    bias_files = file_table[file_table['Type']=='BIAS']
-    flat_files = file_table[file_table['Type']=='FLAT']
-    dark_files = file_table[file_table['Type']=='DARK']
+    kwds = tel.filetype_keywords()
+    bias_files = file_table[file_table['Type']==kwds['BIAS']]
+    flat_files = file_table[file_table['Type']==kwds['FLAT']]
+    dark_files = file_table[file_table['Type']==kwds['DARK']]
     calibration.do_bias(bias_files, tel, paths['cal'], log=log)
     calibration.do_dark(dark_files, tel, paths['cal'], log=log)
     calibration.do_flat(flat_files, tel, paths['cal'], log=log)
@@ -106,7 +94,7 @@ def main_pipeline(telescope:str,
     ################
     # Basic processing
     # Does it even need to run?
-    science_data = file_table[file_table['Type']=='SCIENCE']
+    science_data = file_table[file_table['Type']==kwds['SCIENCE']]
     if len(science_data)==0:
         if log: log.critical('No science files, check data before re-running.')
         logging.shutdown()
@@ -117,92 +105,45 @@ def main_pipeline(telescope:str,
         mask = science_data['CalType']==tar
         target_table = science_data[mask]
 
-        if input_target is not None:
-            if target_table['Target'][0]!=input_target: continue
+        if target is not None:
+            if target_table['Target'][0]!=target: continue
         else:
-            if log: log.info(f'User input target for reduction: {input_target}')
+            if log: log.info(f'User input target for reduction: {target}')
 
         files = target_table['File']
         stack = image_procs.image_proc(target_table, tel, paths, proc=proc, 
+            skip_skysub=skip_skysub, fieldcenter=fieldcenter, out_size=out_size,
             log=log)
 
-        # Auto-WCS solution
-        if log: log.info('Solving WCS.')
-        solve_wcs.solve_astrometry(paths['red'], stack, tel, log=log)
+        # Auto-WCS solution - only run if we have not already pre-aligned to
+        # a specific input coordinate
+        if fieldcenter is None and out_size is None:
+            if log: log.info('Solving WCS.')
+            solve_wcs.solve_astrometry(stack, tel, log=log)
 
         # Photometry and flux calibration
         if log: log.info('Running psf photometry loop for zero point.')
-        epsf, fwhm=photometry.photloop(stack, phot_sn_min=phot_sn_min,
+        photometry.photloop(stack, phot_sn_min=phot_sn_min,
             fwhm_init=fwhm_init, phot_sn_max=phot_sn_max, log=log)
 
-        log.info('Calculating zeropint.')
-        photfile = stack.replace('.fits','.pcmp')
-        if os.path.exists(photfile):
-            hdu = fits.open(stack)
-            cat = tel.catalog_zp(hdu[0].header)
-            cal = absphot.absphot()
-            cal.find_zeropoint(photfile, target_table['Filter'][0], cat, 
-                log=log)
-        else:
-            if log: log.error(f'Could not generate PSF photometry for {stack}')
+        if log: log.info('Calculating zeropint.')
+        hdu = fits.open(stack)
+        cat = tel.catalog_zp(hdu[0].header)
+        min_mag = tel.min_cat_mag(hdu[0].header)
+        cal = absphot.absphot()
+        try:
+            cal.find_zeropoint(stack, target_table['Filter'][0], cat, 
+                min_mag=min_mag, log=log)
+        except:
+            if log: log.error(f'Could not calibrate photometry for {stack}')
         
     t2 = time.time()
     if log: log.info('Pipeline finshed.')
     if log: log.info(f'Total runtime: {t2-t1} sec')
 
 def main():
-    import argparse
-    params = argparse.ArgumentParser(description='Path of data.')
-    params.add_argument('instrument', 
-        default=None, 
-        choices=['Binospec','DEIMOS','GMOS','LRIS','MMIRS','MOSFIRE','TEST'],
-        help='''Name of instrument (must be in params folder) of data to 
-        reduce. Required to run pipeline. Use TEST for pipeline test.''')
-    params.add_argument('data_path', 
-        default=None, 
-        help='''Path of data to reduce. See manual for specific details. 
-        Required to run pipeline.''')
-    params.add_argument('--target', 
-        type=str, 
-        default=None, 
-        help='''Option to only reduce a specific target. String used here must 
-        be contained within the target name in file headers. Optional 
-        parameter.''')
-    params.add_argument('--proc', 
-        type=str, 
-        default=True, 
-        help='''Option to use the _proc data from MMT. Optional parameter. 
-        Default is False.''')
-    params.add_argument('--include-bad','--incl-bad', 
-        default=False,
-        action='store_true', 
-        help='''Include files flagged as bad in the file list.''')
-    params.add_argument('--no-redo-sort',
-        default=False,
-        action='store_true', 
-        help='''Do not resort files and generate new file list.''')
-    params.add_argument('--file-list-name', 
-        type=str, 
-        default='file_list.txt', 
-        help='''Change the name of the archive file list.''')
-    params.add_argument('--phot-sn-min',
-        type=float,
-        default=3.0,
-        help='''Minimum signal-to-noise to try in photometry loop.''')
-    params.add_argument('--phot-sn-max',
-        type=float,
-        default=40.0,
-        help='''Maximum signal-to-noise to try in photometry loop.''')
-    params.add_argument('--fwhm-init',
-        type=float,
-        default=5.0,
-        help='''Initial FWHM (in pixels) for photometry loop.''')
-    args = params.parse_args()
-
-    main_pipeline(args.instrument, args.data_path, input_target=args.target, 
-        proc=args.proc, no_redo_sort=args.no_redo_sort, 
-        file_list_name=args.file_list_name, phot_sn_min=args.phot_sn_min, 
-        phot_sn_max=args.phot_sn_max, fwhm_init=args.fwhm_init)
+    args = options.add_options()
+    main_pipeline(**vars(args))
 
 if __name__ == "__main__":
     main()

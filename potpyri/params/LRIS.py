@@ -380,7 +380,7 @@ def str_to_slice(sec_string):
     return(sl)
 
 def process_science(sci_list, fil, amp, binn, red_path, mbias=None,
-    mflat=None, proc=None, log=None):
+    mflat=None, proc=None, staticmask=None, skip_skysub=False, log=None):
     
     processed = []
     gains = gain(amp)
@@ -470,12 +470,16 @@ def process_science(sci_list, fil, amp, binn, red_path, mbias=None,
         fits.writeto(bkg_outfile_name,np.array(bkg.background),overwrite=True)
         if log: log.info(f'Wrote background to: {bkg_outfile_name}')
         
-        final = processed_data.subtract(CCDData(bkg.background,unit=u.electron),
-            propagate_uncertainties=True, handle_meta='first_found')
-
-        final.header['SATURATE'] -= med_background.value
-        final.header['SKYBKG'] = med_background.value
-        if log: log.info('Background subtracted and updated saturation.')
+        if not skip_skysub:
+            final = processed_data.subtract(CCDData(bkg.background,
+                unit=u.electron), propagate_uncertainties=True, 
+                handle_meta='first_found')
+            final.header['SATURATE'] -= med_background.value
+            final.header['SKYBKG'] = med_background.value
+            if log: log.info('Background subtracted and updated saturation.')
+        else:
+            final = processed_data
+            final.header['SKYBKG'] = 0.0
         
         if window:
             if log: log.info('Image windowed, adding padding.')
@@ -514,8 +518,9 @@ def process_science(sci_list, fil, amp, binn, red_path, mbias=None,
             final.header['CD2_2'] = -pixsc/3600*np.sin(np.pi/180.*(int(np.round(final.header['ROTPOSN'],0))+90))
         final.header['DATASEC'] = ('[1:%s,1:%s]'%(np.shape(final)[1],np.shape(final)[0]))
         
-        final_basefile = os.path.basename(sci).replace('.gz','')
+        final_basefile = get_base_science_name(sci)
         final_outfile_name = os.path.join(red_path, final_basefile)
+        
         if log: 
             log.info(f'Writing: {final_outfile_name}')
         else:
@@ -557,7 +562,7 @@ def rdnoise(header):
         readnoise = 4
     return readnoise
 
-def catalog_zp():
+def catalog_zp(hdr):
     return 'PS1'
 
 def exptime(hdr):
@@ -664,7 +669,7 @@ def get_base_science_name(image):
 def trim_section(data):
     return data[625:1875,0:3600]
 
-def edit_raw_headers(rawdir, log=None):
+def edit_raw_headers(files, log=None):
 
     for file in sorted(glob.glob(os.path.join(rawdir, '*.fits'))):
 
@@ -737,11 +742,12 @@ def edit_raw_headers(rawdir, log=None):
             hdu[0].header['CRVAL1']=coord.ra.degree
             hdu[0].header['CRVAL2']=coord.dec.degree
 
-            pa = h['ROTPOSN']
-            hdu[0].header['CD1_2']=np.sin(pa * np.pi/180.0)*3.75E-05
-            hdu[0].header['CD2_1']=-np.sin(pa * np.pi/180.0)*3.75E-05
-            hdu[0].header['CD1_1']=np.cos(pa * np.pi/180.0)*3.75E-05
-            hdu[0].header['CD2_2']=-np.cos(pa * np.pi/180.0)*3.75E-05
+            if 'ROTPOSN' in list(h.keys()):
+                pa = h['ROTPOSN']
+                hdu[0].header['CD1_2']=np.sin(pa * np.pi/180.0)*3.75E-05
+                hdu[0].header['CD2_1']=-np.sin(pa * np.pi/180.0)*3.75E-05
+                hdu[0].header['CD1_1']=np.cos(pa * np.pi/180.0)*3.75E-05
+                hdu[0].header['CD2_2']=-np.cos(pa * np.pi/180.0)*3.75E-05
 
             for i in np.arange(len(hdu)):
                 if i==0: continue

@@ -13,7 +13,10 @@ import shutil
 import params
 import glob
 import numpy as np
+import gzip
+import zlib
 import logging
+import sys
 
 def is_bad(hdr, tel):
     bad_keyword = tel.bad_keyword()
@@ -145,6 +148,9 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
     
     if log: log.info(f'Running sort_files version: {__version__}')
 
+    # Edit raw data headers if necessary
+    tel.edit_raw_headers(files, log=log)
+
     ext = tel.raw_header_ext()
     target_keyword = tel.target_keyword()
 
@@ -171,7 +177,8 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
                 continue
             try:
                 check_data = file_open[ext].data
-            except TypeError:
+                file_open._verify()
+            except (TypeError, gzip.BadGzipFile, zlib.error):
                 if log: log.error(f'Moving file {f} to bad due to corrupted data.')
                 moved_path = paths['bad']
                 if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
@@ -188,44 +195,44 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
                 not is_dark(hdr, tel) and not is_flat(hdr, tel)):
                 file_type = 'BAD'
                 moved_path = paths['bad']
-                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
                 bad_num += 1            
             elif is_spec(hdr, tel):
                 file_type = 'SPEC'
                 moved_path = paths['bad']
-                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
                 spec_num += 1
             elif is_flat(hdr, tel):
                 file_type = 'FLAT'
                 moved_path = paths['raw']
-                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['raw']) 
                 flat_num += 1
             elif is_bias(hdr, tel):
                 file_type = 'BIAS'
                 moved_path = paths['raw']
-                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['raw'])
                 bias_num += 1
             elif is_science(hdr, tel):
                 file_type = 'SCIENCE'
                 moved_path = paths['raw']
-                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['raw'])
                 sci_num += 1
             elif is_dark(hdr, tel):
                 file_type = 'DARK'
                 moved_path = paths['raw']
-                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['raw'])
                 dark_num += 1
             else:
                 file_type = 'BAD'
                 moved_path = paths['bad']
-                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
                 bad_num += 1
         except Exception as e:
             if log: log.error(f'Moving file {f} to bad due to error: {e}')
             file_type = 'BAD'
             moved_path = paths['bad']
-            if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
             bad_num += 1
+
+        if os.path.dirname(f)!=moved_path:
+            newfile = os.path.join(moved_path, os.path.basename(f))
+            if not os.path.exists(newfile):
+                shutil.move(f, moved_path)
+            else:
+                if log: log.info(f'Removing existing file: {f}')
+                os.remove(f)
 
         if file_type=='BIAS':
             # Bias only depends on amplifier and bin mode
@@ -255,7 +262,7 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
             file_table.add_row((currfile,target,fil,amp,binn,exp,file_type,
                 cal_type,file_time))
 
-    file_table.sort(['Type','Target','CalType'])
+    file_table.sort(['Type','Target','CalType','File'])
     ascii.write(file_table, file_list, format='fixed_width',
         formats={'Time':'%5.6f'})
 

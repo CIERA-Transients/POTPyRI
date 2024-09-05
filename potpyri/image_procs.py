@@ -5,6 +5,11 @@ import importlib
 import numpy as np
 import astroscrappy
 import logging
+import sys
+
+# Needed for satellite trail detection - dependency can be removed later if 
+# we turn off satellite masking or use some other algorithm (e.g., the Rubin one)
+import acstools
 
 import astropy.units as u
 from astropy.io import fits, ascii
@@ -25,37 +30,131 @@ from photutils.segmentation import detect_threshold, detect_sources
 
 # Internal dependencies
 import solve_wcs
+from utilities import util
 
 # Edited on 2024-07-29
 __version__ = "1.3"
 
-def align_images(reduced_files, paths, tel, use_wcs=None, log=None):
+def remove_pv_distortion(header):
 
+    done = False
+    while not done:
+        bad_key = False
+        for key in header.keys():
+            if key.startswith('PV'):
+                if key in header.keys():
+                    bad_key = True
+                    del header[key]
+
+        if not bad_key: done = True
+
+    return(header)
+
+def get_fieldcenter(images):
+
+    ras=[] ; des = []
+    for file in images:
+        hdu = fits.open(file)
+        w = WCS(hdu[0].header)
+
+        data_shape = hdu[0].data.shape
+        center_pix = (data_shape[0]/2., data_shape[1]/2.)
+
+        coord = w.pixel_to_world(*center_pix)
+
+        ras.append(coord.ra.degree)
+        des.append(coord.dec.degree)
+
+    mean_ra = np.mean(ras)
+    mean_de = np.mean(des)
+
+    return([mean_ra, mean_de])
+
+def generate_wcs(tel, binn, fieldcenter, out_size):
+
+    w = {'NAXES':2, 'NAXIS1': out_size, 'NAXIS2': out_size,
+        'EQUINOX': 2000.0, 'LONPOLE': 180.0, 'LATPOLE': 0.0}
+
+    pixscale = tel.pixscale(None)
+    cdelt = pixscale * int(str(binn)[0])/3600.0
+
+    w['CDELT1'] = -1.0 * cdelt
+    w['CDELT2'] = cdelt
+
+    w['CTYPE1']='RA---TAN'
+    w['CTYPE2']='DEC--TAN'
+    w['CUNIT1']='deg'
+    w['CUNIT2']='deg'
+
+    w['CRPIX1']=float(out_size)/2 + 0.5
+    w['CRPIX2']=float(out_size)/2 + 0.5
+
+    coord = util.parse_coord(fieldcenter[0], fieldcenter[1])
+
+    w['CRVAL1']=coord.ra.degree
+    w['CRVAL2']=coord.dec.degree
+
+    w = WCS(w)
+
+    return(w)
+
+def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None,
+    out_size=None, log=None):
+
+    solved_images = []
     aligned_images = []
     aligned_data = []
     for file in reduced_files:
-        success = solve_wcs.solve_astrometry(paths['work'], file, 
-            tel, log=log)
-        if success:
-            hdu = fits.open(file)
-            wcs = WCS(hdu[0].header)
-            image = CCDData(hdu[0].data, meta=hdu[0].header,
-                wcs=wcs, unit=u.electron)
-            
-            if not use_wcs:
-                use_wcs = wcs
+        # Coarse WCS solution using astrometry.net
+        success = solve_wcs.solve_astrometry(file, tel, shift_only=False, 
+            log=log)
+        if not success: continue
 
-            reprojected = wcs_project(image, use_wcs, order='bilinear')
-            outfile = file.replace('.fits','_reproj.fits')
-            reprojected.write(file.replace('.fits','_reproj.fits'),
-                overwrite=True)
+        # Fine WCS solution using Gaia DR3 point sources
+        success = solve_wcs.align_to_gaia(file, tel, log=log)
+        if not success: continue
 
-            aligned_images.append(outfile)
-            aligned_data.append(reprojected)
+        solved_images.append(file)
+
+    # Determine what the value of use_wcs should be
+    if use_wcs is None:
+        if fieldcenter is None:
+            fieldcenter = get_fieldcenter(solved_images)
+            use_wcs = generate_wcs(tel, binn, fieldcenter, out_size)
+
+    for file in solved_images:
+        if log: log.info(f'Reprojecting {file}...')
+
+        # Create a reprojection of the file in a common astrometric frame
+        hdu = fits.open(file)
+        header = remove_pv_distortion(hdu[0].header)
+        wcs = WCS(hdu[0].header)
+
+        if use_wcs is None:
+            use_wcs = wcs
+
+        image = CCDData(hdu[0].data, meta=hdu[0].header, wcs=wcs, 
+            unit=u.electron)
+
+        if out_size:
+            target_shape = (out_size, out_size)
+        else:
+            target_shape = None
+
+        reprojected = wcs_project(image, target_wcs=use_wcs, order='bilinear',
+            target_shape=target_shape)
+        # Get rid of mask in data
+        reprojected.mask = None
+        outfile = file.replace('.fits','_reproj.fits')
+        reprojected.write(file.replace('.fits','_reproj.fits'), overwrite=True)
+
+        aligned_images.append(outfile)
+        aligned_data.append(reprojected)
 
     return(aligned_images, aligned_data)
 
-def image_proc(image_data, tel, paths, proc=None, log=None):
+def image_proc(image_data, tel, paths, proc=None, skip_skysub=False, 
+    fieldcenter=None, out_size=None, satellites=True, log=None):
 
     wavelength = tel.wavelength()
 
@@ -85,14 +184,29 @@ def image_proc(image_data, tel, paths, proc=None, log=None):
     else:
         mbias = None
 
+    # Load bias frame
+    if tel.dark():
+        if log: log.info('Loading master dark.')
+        try:
+            mdark = tel.load_dark(cal_path, amp, binn)
+        except:
+            if log: log.error(f'''No master dark found for this configuration, 
+                skipping reduction for: {cal_type}''')
+            return(None)
+    else:
+        mdark = None
+
     # Load flat frame
-    if log: log.info('Loading master flat.')
-    master_flat = tel.get_mflat_name(cal_path, fil, amp, binn)
-    if not os.path.exists(master_flat):
-        if log: log.error(f'''No master flat present for filter {fil}, skipping 
-            data reduction for {tar}. Check data before rerunning.''')
-        return(None)
-    flat_data = tel.load_flat(master_flat)
+    if tel.flat():
+        if log: log.info('Loading master flat.')
+        master_flat = tel.get_mflat_name(cal_path, fil, amp, binn)
+        if not os.path.exists(master_flat):
+            if log: log.error(f'''No master flat present for filter {fil}, skipping 
+                data reduction for {tar}. Check data before rerunning.''')
+            return(None)
+        mflat = tel.load_flat(master_flat)
+    else:
+        mflat = None
         
     t1 = time.time()
     if log: log.info(f'Processing data for {cal_type}')
@@ -101,16 +215,17 @@ def image_proc(image_data, tel, paths, proc=None, log=None):
     files = image_data['File']
     staticmask = tel.static_mask(paths)
     processed = tel.process_science(files, fil, amp, binn, work_path,
-        mbias=mbias, mflat=flat_data, proc=proc, staticmask=staticmask, log=log)
+        mbias=mbias, mflat=mflat, mdark=mdark, proc=proc, 
+        staticmask=staticmask, skip_skysub=skip_skysub, log=log)
+
+    # If masking satellite trails, this needs to be done before reprojection so
+    # that the acstools algorithm accurately models the edges of the detector
+    if satellites:
+        mask_satellites(processed, files, log=log)
         
     t2 = time.time()
     if log: log.info(f'Data processed in {t2-t1} sec')
 
-    # Background subtraction
-    # IR image?
-    if wavelength=='NIR':
-        processed=sky_background_subtraction(processed, image_data, log=log)
-            
     # Write reduced data to file and stack images with the same pointing
     if log: log.info('Writing out reduced data.')
     
@@ -131,8 +246,16 @@ def image_proc(image_data, tel, paths, proc=None, log=None):
     idx = np.flip(np.argsort(exptimes))
     reduced_files = np.array(reduced_files)[idx]
 
-    aligned_images, aligned_data = align_images(reduced_files, paths, tel, 
-        log=log)
+    if out_size is None:
+        out_size = tel.out_size()
+
+    if fieldcenter is not None:
+        use_wcs = generate_wcs(tel, binn, fieldcenter, out_size)
+    else:
+        use_wcs = None
+
+    aligned_images, aligned_data = align_images(reduced_files, paths, tel, binn,
+        use_wcs=use_wcs, fieldcenter=fieldcenter, out_size=out_size, log=log)
 
     if log: log.info('Creating mask and error arrays.')
     masks = []
@@ -228,75 +351,13 @@ def image_proc(image_data, tel, paths, proc=None, log=None):
     # Generate stack name and write out
     stackname = tel.stacked_image(image_data[0], red_path)
     sci_med.writeto(stackname, overwrite=True, output_verify='silentfix')
-                
+    
     if log: 
-        log.info(f'Median stack made for {stackname}')
+        log.info(f'Stack made for {stackname}')
     else:
-        print(f'Median stack made for {stackname}')
+        print(f'Stack made for {stackname}')
 
     return(stackname)
-
-def sky_background_subtraction(processed, image_data, log=None):
-
-    t1 = time.time()
-    if log: 
-        log.info('NIR data, creating NIR sky maps.')
-
-    for j,n in enumerate(processed):
-        
-        if log: log.info(f'Creating map for file {j+1}/{len(processed)}')
-
-        time_diff = sorted([(abs(image_data['Time']-n2),k) 
-            for k,n2 in enumerate(image_data['Time'])])
-
-        sky_list = [files[k] for _,k in time_diff[0:5]]
-        sky_data = [processed[k] for _,k in time_diff[0:5]]
-        sky_mask = [masks[k] for _,k in time_diff[0:5]]
-        sky_masked_data = []
-                
-        for k in range(len(sky_data)):
-            # Make a background array from sky_data
-            bkg = Background2D(sky_data[k], (20, 20), 
-                filter_size=(3, 3),sigma_clip=SigmaClip(sigma=3), 
-                bkg_estimator=MeanBackground(), mask=sky_mask[k], 
-                exclude_percentile=80)
-
-            # Do masking on sky
-            masked = np.array(sky_data[k])
-            masked[sky_mask[k]] = bkg.background[sky_mask[k]]
-            sky_masked_data.append(CCDData(masked, unit=u.electron/u.second))
-
-        # Generate sky output file and edit headers
-        sky_hdu = fits.PrimaryHDU()
-        sky_hdu.header['FILE'] = (os.path.basename(image_data['File'][j]), 
-            'NIR sky flat for file.')
-                
-        for k,m in enumerate(sky_list):
-            sky_hdu.header['FILE'+str(k+1)] = (os.path.basename(str(m)), 
-                'Name of file used in creation of sky.')
-                
-        # Image combination procedure
-        sky = combine(sky_masked_data,method='median',
-            sigma_clip=True,sigma_clip_func=np.ma.median,mask=sky_mask)
-                
-        # Apply header
-        sky.header = sky_hdu.header
-
-        # Write out file to 
-        baseskyfile = os.path.basename(image_data['File'][j])
-        baseskyfile = baseskyfile.replace('.fits','_sky.fits')
-        baseskyfile = baseskyfile.replace('.gz','')
-        baseskyfile = baseskyfile.replace('.bz2','')
-        sky.write(os.path.join(work_path, baseskyfile), overwrite=True)
-                
-        # Process files by subtracting sky data
-        processed[j] = n.subtract(sky, propagate_uncertainties=True,
-            handle_meta='first_found')
-
-    t2 = time.time()
-    if log: log.info(f'Sky maps complete and subtracted in {t2-t1} sec')
-
-    return(processed)
 
 def detrend_stack(stack):
 
@@ -304,7 +365,6 @@ def detrend_stack(stack):
     mask = stack[1].data.astype(bool)
 
     mean, med, stddev = sigma_clipped_stats(data, mask=mask, axis=1)
-    med[np.isnan(med)]=0.
     data = data - med[:,None]
 
     row_med = np.nanmedian(med)
@@ -342,18 +402,23 @@ def stack_data(stacking_data, tel, masks, errors, log=None):
     weights=np.array(weights)
 
     new_data = []
+    exptimes = []
     for i,stk in enumerate(stacking_data):
         mask = masks[i].data.astype(bool)
         stacking_data[i].data[mask] = np.nan
+        exptimes.append(float(tel.exptime(stk.header)))
+
+    exptimes = np.array(exptimes)
+    scale = 1./exptimes
 
     all_data = np.array([s.data for s in stacking_data])
 
-    sci_med = combine(stacking_data, weights=weights, 
-        method=stack_method)
+    sci_med = combine(stacking_data, weights=weights, scale=scale,
+        method=stack_method, mem_limit=64e9)
 
     return(sci_med)
 
-def add_stack_mask(stack, stacking_data, sat_grow=3):
+def add_stack_mask(stack, stacking_data):
 
     data = stack[0].data
     mask = stack[1].data
@@ -384,8 +449,51 @@ def add_stack_mask(stack, stacking_data, sat_grow=3):
 
     return(stack)
 
+def mask_satellites(images, filenames, log=None):
+
+    out_data = []
+    for i,science_data in enumerate(images):
+
+        data = np.ascontiguousarray(science_data.data.astype(np.float32))
+
+        tmphdu = fits.PrimaryHDU()
+        tmpfile = filenames[i].replace('.fits','.tmp.fits')
+
+        tmphdu.data = data
+        tmphdu.writeto(tmpfile, overwrite=True)
+
+        tmpshape = data.shape
+        buf = int(np.round(np.max(tmpshape)/10.))
+
+        results, errors = acstools.satdet.detsat(tmpfile,
+            chips=[0], sigma=4, h_thresh=0.1, buf=buf, verbose=False)
+
+        trail_coords = results[(tmpfile, 0)]
+
+        if len(trail_coords)>0:
+            n_trails = len(trail_coords)
+            trail_masks = []
+            for i,coord in enumerate(trail_coords):
+                if log: log.info(f'Masking for satellite trail {i+1}/{n_trails}')
+                try:
+                    mask = acstools.satdet.make_mask(tmpfile, 0, coord, 
+                        verbose=False)
+                except ValueError:
+                    continue
+                trail_masks.append(mask)
+
+            trail_mask = np.any(trail_masks, axis=0)
+            
+            # Set actual pixel values to nan so they don't contribute to image
+            science_data.data[trail_mask] = np.nan
+
+        out_data.append(science_data)
+
+        os.remove(tmpfile)
+
 def create_mask(science_data, saturation, rdnoise, sigclip=3.5, 
-    sigfrac=0.2, objlim=4.5, niter=6, outpath='', log=None):
+    sigfrac=0.2, objlim=4.5, niter=6, outpath='', grow=0, satellites=True,
+    log=None):
 
     t_start = time.time()
     
@@ -426,15 +534,32 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
      #combine bad pixel, cosmic ray, saturated star and satellite trail masks
     mask = mask_bp+mask_sat+mask_cr
 
+    if grow>0:
+        shape = mask.shape
+        grow_mask = np.zeros(shape)
+        shape = mask.shape
+        mask = data > 0
+        xs, ys = np.where(mask.astype(bool))
+        # Grow mask by grow factor
+        g = int(np.ceil((grow-1)/2))
+        for p in zip(xs, ys):
+            grow_mask[np.max([p[0]-g,0]):np.min([p[0]+g,shape[0]-1]),
+                      np.max([p[1]-g,0]):np.min([p[1]+g,shape[1]-1])]=8
+
+        grow_mask = grow_mask.astype(np.uint8)
+
+        mask = mask_bp+mask_sat+mask_cr+grow_mask
+
     # Get number of bad, cosmic-ray flagged, and saturated pixels
     nbad = np.sum(mask & 1 == 1)
     ncr = np.sum(mask & 2 == 2)
     nsat = np.sum(mask & 4 == 4)
+    ngrow = np.sum(mask & 8 == 8)
     
     mask_hdu = fits.PrimaryHDU(mask) #create mask Primary HDU
     mask_hdu.header['VER'] = (__version__, 
         'Version of image procedures used.') #name of log file
-    mask_hdu.header['USE'] = 'Complex mask using additive flags.' #header comment
+    mask_hdu.header['USE'] = 'Complex mask using additive flags.'#header comment
     mask_hdu.header['M-BP'] = (1, 'Value of masked bad pixels.')
     mask_hdu.header['M-BPNUM'] = (nbad, 'Number of bad pixels.')
     mask_hdu.header['M-CR'] = (2, 'Value of masked cosmic ray pixels.')
@@ -442,13 +567,17 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
     mask_hdu.header['SATURATE'] = (saturation, 'Level of saturation.')
     mask_hdu.header['M-SP'] = (4, 'Value of masked saturated pixels.')
     mask_hdu.header['M-SPNUM'] = (nsat, 'Number of saturated pixels.')
+    mask_hdu.header['M-NE'] = (8, 'Value of masked neighbor pixels.')
+    mask_hdu.header['M-NENUM'] = (ngrow, 'Number of neighboring masked pixels.')
     
     if log: 
         log.info('Mask created.')
         log.info(f'{nbad} bad, {ncr} cosmic-ray, and {nsat} saturated pixels')
+        log.info(f'{ngrow} neighbor masked pixels.')
     else:
         print('Mask created.')
         print(f'{nbad} bad, {ncr} cosmic-ray, and {nsat} saturated pixels')
+        print(f'{ngrow} neighbor masked pixels.')
 
     t_end = time.time()
     if log: 
@@ -465,10 +594,14 @@ def create_error(science_data, mask_data, rdnoise):
     img_data = hdu[0].data.astype(np.float32)
     mask = mask_data.data.astype(bool)
 
-    rms = 0.5 * (
-        np.percentile(img_data[~mask], 84.13)
-        - np.percentile(img_data[~mask], 15.86)
-    )
+    # Check for issue with all of the file being masked
+    if np.all(mask):
+        rms = hdu[0].header['SATURATE']
+    else:
+        rms = 0.5 * (
+            np.percentile(img_data[~mask], 84.13)
+            - np.percentile(img_data[~mask], 15.86)
+        )
 
     poisson = img_data[img_data < 0.]=0.
     error = np.sqrt(img_data + rms**2 + rdnoise)
@@ -484,20 +617,22 @@ def create_error(science_data, mask_data, rdnoise):
 
 if __name__=="__main__":
 
-    t = ascii.read('/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/file_list.txt',
+    t = ascii.read('/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/Binospec/file_list.txt',
         format='fixed_width')
-    mask = t['Target']=='R155_host'
+    mask = t['Target']=='GRB240809A_r_ep1'
     t = t[mask]
 
     t.sort('File')
 
     global tel
-    tel = importlib.import_module('params.LRIS')
+    tel = importlib.import_module('params.BINOSPEC')
 
     paths={}
-    paths['red']='/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/red'
-    paths['work']='/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/red/workspace'
-    paths['cal']='/Users/ckilpatrick/Dropbox/Data/FRB/FRB240619/R_band/red/cals'
+    paths['red']='/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/Binospec/red'
+    paths['work']='/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/Binospec/red/workspace'
+    paths['cal']='/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/Binospec/red/cals'
+    paths['code']=os.path.dirname(sys.argv[0])
 
-    image_proc(t, tel, paths, proc=None, log=None)
+    image_proc(t, tel, paths, fieldcenter=['15:50:08.0920','-2:16:08.617'],
+        out_size=5000, proc=None, log=None)
 
