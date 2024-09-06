@@ -27,9 +27,8 @@ import numpy as np
 from astropy.io import fits
 
 # Internal dependencies
-from custom_logger import get_log
-from utilities import util
-import Sort_files
+import logger
+import sort_files
 import solve_wcs
 import photometry
 import absphot
@@ -58,20 +57,20 @@ def main_pipeline(instrument:str,
     t1 = time.time()
     
     # import telescope parameter file
-    tel = importlib.import_module(f'params.{instrument.upper()}')
+    tel = importlib.import_module(f'instruments.{instrument.upper()}')
 
     # Generate code and data paths based on input path
     paths = options.add_paths(data_path)
 
     # Generate log file in corresponding directory for log
-    log = get_log(paths['log'])
+    log = logger.get_log(paths['log'])
 
     if log: log.info(f'Running main pipeline version {__version__}')
     if log: log.info(f'Running instrument paramater file version {tel.__version__}')
 
     # This contains all of the file data
     file_list = os.path.join(paths['data'], file_list_name)
-    file_table = Sort_files.handle_files(file_list, tel, paths, 
+    file_table = sort_files.handle_files(file_list, tel, paths, 
         incl_bad=incl_bad, proc=proc, no_redo=no_redo_sort, log=log)
 
     if not file_table or len(file_table)==0:
@@ -129,11 +128,9 @@ def main_pipeline(instrument:str,
         if log: log.info('Calculating zeropint.')
         hdu = fits.open(stack)
         cat = tel.catalog_zp(hdu[0].header)
-        min_mag = tel.min_cat_mag(hdu[0].header)
         cal = absphot.absphot()
         try:
-            cal.find_zeropoint(stack, target_table['Filter'][0], cat, 
-                min_mag=min_mag, log=log)
+            cal.find_zeropoint(stack, target_table['Filter'][0], cat, log=log)
         except:
             if log: log.error(f'Could not calibrate photometry for {stack}')
         

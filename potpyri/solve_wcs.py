@@ -31,8 +31,8 @@ from astropy.utils.exceptions import AstropyWarning
 from astropy.wcs import WCS
 from astropy.wcs.utils import fit_wcs_from_points
 
-from scipy.optimize import curve_fit
-from utilities import util
+# Internal dependency
+import utilities
 
 #turn Astropy warnings off
 import warnings
@@ -89,7 +89,7 @@ def get_gaia_catalog(input_file, log=None):
         if pair[0] in header.keys() and pair[1] in header.keys():
             ra = header[pair[0]]
             dec = header[pair[1]]
-            coord = util.parse_coord(ra, dec)
+            coord = utilities.parse_coord(ra, dec)
             if coord:
                 break
 
@@ -442,7 +442,7 @@ if __name__ == "__main__":
 
     import importlib
     global tel
-    tel = importlib.import_module('params.DEIMOS')
+    tel = importlib.import_module('instruments.DEIMOS')
 
     solve_astrometry(file, tel, radius=0.5, replace=True, 
         shift_only=False, log=None)

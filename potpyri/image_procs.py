@@ -30,7 +30,7 @@ from photutils.segmentation import detect_threshold, detect_sources
 
 # Internal dependencies
 import solve_wcs
-from utilities import util
+import utilities
 
 # Edited on 2024-07-29
 __version__ = "1.3"
@@ -89,7 +89,7 @@ def generate_wcs(tel, binn, fieldcenter, out_size):
     w['CRPIX1']=float(out_size)/2 + 0.5
     w['CRPIX2']=float(out_size)/2 + 0.5
 
-    coord = util.parse_coord(fieldcenter[0], fieldcenter[1])
+    coord = utilities.parse_coord(fieldcenter[0], fieldcenter[1])
 
     w['CRVAL1']=coord.ra.degree
     w['CRVAL2']=coord.dec.degree
@@ -625,7 +625,7 @@ if __name__=="__main__":
     t.sort('File')
 
     global tel
-    tel = importlib.import_module('params.BINOSPEC')
+    tel = importlib.import_module('instruments.BINOSPEC')
 
     paths={}
     paths['red']='/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/Binospec/red'

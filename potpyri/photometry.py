@@ -34,8 +34,6 @@ import glob
 import copy
 import os
 
-from utilities import util
-
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -205,41 +203,6 @@ def get_star_catalog(img_data, img_mask, img_error, fwhm_init=5.0,
     stars = hstack([stars, stats])
     
     return(stars)
-
-def write_out_catalog(catalog, img_file, columns, sigfig, outfile, metadata):
-    # zfill the column numbers to 2 for standard format with 01, 02, 03, etc.
-    zfil = 2
-
-    # Get image header
-    header = fits.open(img_file)[0].header
-
-    # Add metadata from photometry
-    for key in metadata.keys():
-        header[key]=metadata[key]
-
-    header['NCOL']=len(columns)
-    for i,col in enumerate(columns):
-        header['COLUM{0}'.format(str(i+1).zfill(zfil))]=col
-
-    catdata = []
-    for row in catalog:
-        outdata=[]
-        outfmt=''
-        for i,col,sig in zip(np.arange(len(columns)),columns, sigfig):
-            fmt = '%7.{0}f'.format(sig)
-            data = fmt%row[col]
-            outdata.append(fmt%row[col])
-            outfmt+='{'+'{0}:>{1}'.format(i,7+int(sig))+'} '
-        outline = outfmt.format(*outdata)
-        outline = str(outline)
-        catdata.append(outline)
-
-    # Finally write out catalog
-    # Delete the outfile if it already exists:
-    if os.path.exists(outfile):
-        os.remove(outfile)
-        
-    util.write_catalog(outfile, header, catdata)
 
 def do_phot(img_file,
     fwhm_scale_psf=4.5, oversampling=1,
