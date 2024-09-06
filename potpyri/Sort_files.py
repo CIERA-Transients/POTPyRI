@@ -10,7 +10,6 @@ from astropy.table import Table
 import os
 import time
 import shutil
-import params
 import glob
 import numpy as np
 import gzip

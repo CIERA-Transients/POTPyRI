@@ -8,9 +8,7 @@ from astropy.coordinates import SkyCoord
 from astropy.table import Table
 from astropy.io import fits
 
-from utilities.Vizier_catalogs import find_catalog
-from utilities import util
-from utilities import catreg
+import utilities
 
 class absphot(object):
     def __init__(self, iterations=5, sigma=5):
@@ -22,15 +20,20 @@ class absphot(object):
 
     def get_zeropoint(self, flux, fluxerr, mag, magerr):
 
-        from scipy.odr import ODR, Model, Data, RealData
+        from scipy.odr import ODR
+        from scipy.odr import Model
+        from scipy.odr import Data
+        from scipy.odr import RealData
+        
         def magnitude(zpt, flux):
             return(zpt - 2.5*np.log10(flux))
 
         zpt_guess = np.nanmedian(mag + 2.5*np.log10(flux))
 
         data = RealData(np.array(flux, dtype=float),
-            np.array(mag, dtype=float), sx=np.array(fluxerr, dtype=float),
-            sy=np.array(magerr, dtype=float))
+                        np.array(mag, dtype=float), 
+                        sx=np.array(fluxerr, dtype=float),
+                        sy=np.array(magerr, dtype=float))
 
         model = Model(magnitude)
         odr = ODR(data, model, beta0=[zpt_guess], maxit=self.odr_iter)
@@ -88,21 +91,25 @@ class absphot(object):
 
         return(zpt, zpterr, master_mask)
 
-    def get_catalog(self, coords, catalog, filt, size=0.5, log=None):
+    def get_catalog(self, coords, catalog, filt, log=None):
 
-        if log:
-            log.info('Searching for catalog '+catalog)
-        if catalog=='2MASS' and filt=='Y':
-            cat_ID, cat_ra, cat_dec, cat_mag, cat_err = find_catalog(catalog, 'J')
-        else:
-            cat_ID, cat_ra, cat_dec, cat_mag, cat_err = find_catalog(catalog, filt)
+        if log: log.info(f'Searching for catalog {catalog}')
+        
+        cat_ID, cat_ra, cat_dec, cat_mag, cat_err = utilities.find_catalog(catalog, filt)
+        
         coord_ra = np.median([c.ra.degree for c in coords])
         coord_dec = np.median([c.dec.degree for c in coords])
+        
         med_coord = SkyCoord(coord_ra, coord_dec, unit='deg')
+
+        seps = med_coord.separation(coords)
+        max_sep = np.max(seps.to(u.deg).value)
         
         vizier = Vizier(columns=[cat_ra, cat_dec, cat_mag, cat_err])
         vizier.ROW_LIMIT = -1
-        cat = vizier.query_region(med_coord, width=size*u.degree, catalog=cat_ID)
+        cat = vizier.query_region(med_coord, width=1.2*max_sep*u.degree, 
+            catalog=cat_ID)
+
         if len(cat)>0:
             cat = cat[0]
             cat = cat[~np.isnan(cat[cat_mag])]
@@ -130,7 +137,7 @@ class absphot(object):
             return(None)
 
     def find_zeropoint(self, cmpfile, filt, catalog, match_radius=2.5*u.arcsec,
-        min_mag=17.0, phottable='APPPHOT', log=None):
+        phottable='APPPHOT', log=None):
 
         if log:
             log.info(f'Importing catalog file: {cmpfile}')
@@ -152,6 +159,8 @@ class absphot(object):
             print(f'Downloading {catalog} catalog in {filt}')
 
         cat = self.get_catalog(coords, catalog, filt, log=log)
+
+        min_mag = self.get_minmag(filt)
         cat = cat[cat['mag']>min_mag]
 
         if cat:
@@ -178,11 +187,11 @@ class absphot(object):
                 else:
                     match_table.add_row(table[i])
 
-
             # Sort by flux
             flux_idx = np.argsort(match_table['flux'])
             match_table = match_table[flux_idx]
             cat = cat[flux_idx]
+            
             # Do basic cuts on flux, fluxerr, catalog magnitude, cat magerr
             flux = match_table['flux'].data.astype('float32')
             fluxerr = match_table['flux_err'].data.astype('float32')
@@ -233,20 +242,6 @@ class absphot(object):
                 log.info('No zeropoint calculated.')
             return(None, None)
 
-    def AB_conversion(self, catalog, fil):
-        if catalog=='2MASS':
-            if fil == 'K' or 'Ks':
-                cor = 1.85
-            if fil == 'J':
-                cor = 0.91
-            if fil == 'H':
-                cor = 1.39
-            if fil == 'Y':
-                cor = 0.634
-        else:
-            cor = 0
-        return(cor)
-
     def Y_band(self, J, J_err, K, K_err):
         Y = J+0.46*(J-K)
         JK_err = np.sqrt(J_err**2+K_err**2)
@@ -256,10 +251,10 @@ class absphot(object):
 
     def convert_filter_name(self, filt):
         if filt=='uG0308' or filt=='uG0332' or filt=='U':
-            return 'u'        
-        if filt=='gG0301' or filt=='gG0325' or filt=='G':
+            return 'u'
+        if filt=='gG0301' or filt=='gG0325' or filt=='G' or filt=='V' or filt=='B':
             return 'g'
-        if filt=='rG0303' or filt=='rG0326' or filt=='R':
+        if filt=='rG0303' or filt=='rG0326' or filt=='R' or filt=='Rs':
             return 'r'
         if filt=='iG0302' or filt=='iG0327' or filt=='I':
             return 'i'
@@ -267,6 +262,8 @@ class absphot(object):
             return 'z'
         if filt=='RG850':
             return 'r'
+        if filt=='Y':
+            return 'J'
         else:
             return filt
     
@@ -280,10 +277,9 @@ class absphot(object):
         else:
             return 16.0
 
-
 if __name__=="__main__":
     zp_cal = absphot()
 
     zp, zp_err = zp_cal.find_zeropoint(
         '/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/MMIRS/red/GRB231117A_J.J.ut231204.32.11.stk.fits', 
-        'J', '2MASS', min_mag=14.0, log=None)
+        'J', '2MASS', log=None)
