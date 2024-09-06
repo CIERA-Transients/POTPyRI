@@ -58,7 +58,7 @@ def name():
 def static_mask(proc):
     return ''
 
-def pixscale():
+def pixscale(hdr):
     return 0.135 #arcsec/pixel
 
 # Minimum exposure time for science exposures
@@ -87,6 +87,12 @@ def bias():
 
 def flat():
     return True
+
+# Keywords for selecting files from Sort_files object
+# This allows a single file type to be used for multiple purposes (e.g., for
+# generating a flat-field image from science exposures)
+def filetype_keywords():
+    return {'SCIENCE':'SCIENCE', 'FLAT':'FLAT', 'DARK':'DARK','BIAS':'BIAS'}
 
 def science_keyword():
     return ['KOAIMTYP','SLITNAME','GRANAME','TRAPDOOR']
@@ -250,8 +256,9 @@ def create_bias(cal_list, amp, binn, red_path, log):
     
     return
 
-def load_flat(flat):
-    mflat = CCDData.read(flat,unit=u.electron)
+def load_flat(red_path, fil, amp, binn):
+    flat = get_mflat_name(red_path, fil, amp, binn)
+    mflat = CCDData.read(flat)
     return mflat
 
 def format_datasec(sec_string, binning=1):
@@ -271,7 +278,9 @@ def format_datasec(sec_string, binning=1):
 
     return(sec_string)
 
-def create_flat(flat_list, fil, amp, binn, red_path, mbias=None, log=None):
+def create_flat(flat_list, fil, amp, binn, red_path, mbias=None, mdark=None,
+    is_science=False, log=None, **kwargs):
+
     log.info(f'Processing files for filter: {fil}')
     log.info(f'{len(flat_list)} files found.')
     scale = []
@@ -380,7 +389,7 @@ def str_to_slice(sec_string):
     return(sl)
 
 def process_science(sci_list, fil, amp, binn, red_path, mbias=None,
-    mflat=None, proc=None, staticmask=None, skip_skysub=False, log=None):
+    mflat=None, mdark=None, proc=None, staticmask=None, skip_skysub=False, log=None):
     
     processed = []
     gains = gain(amp)
@@ -501,7 +510,7 @@ def process_science(sci_list, fil, amp, binn, red_path, mbias=None,
         final.header['CRVAL1'] = coords.ra.deg
         final.header['CRVAL2'] = coords.dec.deg
         
-        pixsc = pixscale()
+        pixsc = pixscale(header)
         if amp == '4B':
             final.header['CRPIX1'] = 2456
             final.header['CRPIX2'] = 1184
@@ -671,7 +680,7 @@ def trim_section(data):
 
 def edit_raw_headers(files, log=None):
 
-    for file in sorted(glob.glob(os.path.join(rawdir, '*.fits'))):
+    for file in files:
 
         hdu = fits.open(file)
         h = hdu[0].header
@@ -786,3 +795,6 @@ def edit_stack_headers(stack):
                 break
 
     return(stack)
+
+def out_size():
+    return 5000

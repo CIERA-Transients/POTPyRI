@@ -191,7 +191,7 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
             mdark = tel.load_dark(cal_path, amp, binn)
         except:
             if log: log.error(f'''No master dark found for this configuration, 
-                skipping reduction for: {cal_type}''')
+                skipping reduction for: {cal_type}.''')
             return(None)
     else:
         mdark = None
@@ -199,12 +199,12 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
     # Load flat frame
     if tel.flat():
         if log: log.info('Loading master flat.')
-        master_flat = tel.get_mflat_name(cal_path, fil, amp, binn)
-        if not os.path.exists(master_flat):
-            if log: log.error(f'''No master flat present for filter {fil}, skipping 
-                data reduction for {tar}. Check data before rerunning.''')
-            return(None)
-        mflat = tel.load_flat(master_flat)
+        if True:
+            mflat = tel.load_flat(cal_path, fil, amp, binn)
+        #except:
+        #    if log: log.error(f'''No master flat present for filter {fil}, 
+        #        skipping reduction for: {cal_type}.''')
+        #    return(None)
     else:
         mflat = None
         
@@ -454,6 +454,8 @@ def mask_satellites(images, filenames, log=None):
     out_data = []
     for i,science_data in enumerate(images):
 
+        if log: log.info(f'Checking for satellite trails in: {filenames[i]}')
+        
         data = np.ascontiguousarray(science_data.data.astype(np.float32))
 
         tmphdu = fits.PrimaryHDU()

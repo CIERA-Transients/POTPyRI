@@ -85,6 +85,7 @@ def do_flat(flat_table, tel, red_path, log=None):
         fil = flat_table[mask]['Filter'][0]
         amp = flat_table[mask]['Amp'][0]
         binn = flat_table[mask]['Binning'][0]
+        is_science = flat_table[mask]['Type'][0]=='SCIENCE'
 
         flat_name = tel.get_mflat_name(red_path, fil, amp, binn)
 
@@ -105,17 +106,18 @@ def do_flat(flat_table, tel, red_path, log=None):
 
             if tel.dark():
                 if log: log.info('Loading master dark.')
-                if True:
+                try:
                     mdark = tel.load_dark(red_path, amp, binn)
-                #except:
-                #    if log: log.error(f''''No master dark found for this 
-                #        configuration, skipping master flat creation for 
-                #        filter {fil}, {amp} amps and {binn} binning.''')
-                #    continue
+                except:
+                    if log: log.error(f''''No master dark found for this 
+                        configuration, skipping master flat creation for 
+                        filter {fil}, {amp} amps and {binn} binning.''')
+                    continue
 
             t1 = time.time()
             tel.create_flat(cal_table['File'], fil, amp, binn,
-                red_path, mbias=mbias, mdark=mdark, log=log)
+                red_path, mbias=mbias, mdark=mdark, is_science=is_science, 
+                log=log)
             t2 = time.time()            
             if log: log.info(f'Master flat creation completed in {t2-t1} sec')
 

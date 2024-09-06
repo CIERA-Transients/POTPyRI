@@ -147,7 +147,8 @@ def load_bias(red_path, amp, binn):
         for x in range(int(amp))]
     return mbias
 
-def load_flat(flat):
+def load_flat(red_path, fil, amp, binn):
+    flat = get_mflat_name(red_path, fil, amp, binn)
     mflat = CCDData.read(flat)
     return mflat
 

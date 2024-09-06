@@ -13,14 +13,14 @@ def download_index_files(outdir='/opt/homebrew/Cellar/astrometry-net/0.95_2/data
 
     import requests
 
-    baseurl = "http://broiler.astrometry.net/~dstn/4200/"
+    baseurl = "https://portal.nersc.gov/project/cosmo/temp/dstn/index-5200/LITE/"
     r  = requests.get(baseurl)
     data = r.text
     soup = BeautifulSoup(data, features="html5lib")
 
     for link in soup.find_all('a'):
         text = link.get('href')
-        if 'index' in text:
+        if 'index' in text and '.fits' in text:
             fileurl = os.path.join(baseurl, text)
             outfile = os.path.join(outdir, text)
             if os.path.exists(outfile):

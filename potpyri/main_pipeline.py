@@ -85,6 +85,12 @@ def main_pipeline(instrument:str,
     bias_files = file_table[file_table['Type']==kwds['BIAS']]
     flat_files = file_table[file_table['Type']==kwds['FLAT']]
     dark_files = file_table[file_table['Type']==kwds['DARK']]
+    science_data = file_table[file_table['Type']==kwds['SCIENCE']]
+
+    # Use science data as flat files if no flats and a lot of science data
+    if tel.flat() and len(flat_files)==0 and len(science_data)>11:
+        flat_files = science_data
+
     calibration.do_bias(bias_files, tel, paths['cal'], log=log)
     calibration.do_dark(dark_files, tel, paths['cal'], log=log)
     calibration.do_flat(flat_files, tel, paths['cal'], log=log)
@@ -93,7 +99,6 @@ def main_pipeline(instrument:str,
     ################
     # Basic processing
     # Does it even need to run?
-    science_data = file_table[file_table['Type']==kwds['SCIENCE']]
     if len(science_data)==0:
         if log: log.critical('No science files, check data before re-running.')
         logging.shutdown()
