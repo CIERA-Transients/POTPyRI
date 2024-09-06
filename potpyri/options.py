@@ -70,6 +70,12 @@ def add_options():
 
     args = params.parse_args()
 
+    # Handle/parse options
+    if 'bino' in args.instrument:
+        args.instrument = 'binospec'
+    if 'mmir' in args.instrument:
+        args.instrument = 'mmirs'
+
     return(args)
 
 def add_paths(data_path):

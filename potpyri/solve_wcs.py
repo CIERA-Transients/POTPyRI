@@ -166,7 +166,7 @@ def solve_astrometry(file, tel, radius=0.5, replace=True,
         if pair[0] in header.keys() and pair[1] in header.keys():
             ra = header[pair[0]]
             dec = header[pair[1]]
-            coord = util.parse_coord(ra, dec)
+            coord = utilities.parse_coord(ra, dec)
             if coord:
                 break
 
@@ -194,25 +194,25 @@ def solve_astrometry(file, tel, radius=0.5, replace=True,
     args += f'--ra {ra} --dec {dec} '
     args += f' --radius {radius} --no-plots -T '
     args += f'--overwrite -N {newfile} --dir {directory} '
-    args += '--use-sextractor '
 
     extra_opts = '--downsample 2 --no-verify --odds-to-tune-up 1e4 --objs 15'
 
     tries = 1
     good = False
-    while tries < 4 and not good:
+    while tries < 5 and not good:
         input_args = args + extra_opts
 
         if log: 
             log.info(f'Try #{tries} with astrometry.net...')
         else:
             print(f'Try #{tries} with astrometry.net...')
-        if log: 
-            log.info(input_args)
-        else:
-            print(input_args)
 
         process = [cmd,fullfile]+input_args.split()
+
+        if log: 
+            log.info(' '.join(process))
+        else:
+            print(' '.join(process))
 
         FNULL = open(os.devnull, 'w')
 
@@ -226,10 +226,13 @@ def solve_astrometry(file, tel, radius=0.5, replace=True,
             good = True
         else:
             tries += 1
-            if 'downsample' in extra_opts:
+            if tries==2:
                 extra_opts='--objs 15'
-            else:
-                extra_opts=''
+            elif tries==3:
+                extra_opts='--use-sextractor'
+            elif tries==4:
+                extra_opts='--use-source-extractor'
+
 
     file_exists=os.path.exists(newfile)
 
@@ -427,22 +430,29 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
 
     hdu[0].header.update(header)
 
+    ra_disp = std_ra*3600.0*np.cos(np.pi/180.0 * mean_de)
+    de_disp = std_de*3600.0
+
+    ra_disp = float('%.6f'%ra_disp)
+    de_disp = float('%.6f'%de_disp)
+
+    if log:
+        log.info(f'Dispersion in R.A.={ra_disp} arcsec, Dispersion in Decl.={de_disp} arcsec')
+
     # Add header variables for dispersion in WCS solution
-    hdu[0].header['RADISP']=(std_ra*3600.0*np.cos(np.pi/180.0 * mean_de),
-        'Dispersion in R.A. of WCS solution [Arcsec]')
-    hdu[0].header['DEDISP']=(std_de*3600.0,
-        'Dispersion in Decl. of WCS solution [Arcsec]')
+    hdu[0].header['RADISP']=(ra_disp, 'Dispersion in R.A. of WCS solution [Arcsec]')
+    hdu[0].header['DEDISP']=(de_disp, 'Dispersion in Decl. of WCS solution [Arcsec]')
 
     hdu.writeto(file, overwrite=True, output_verify='silentfix')
 
     return(True)
 
 if __name__ == "__main__":
-    file='/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/DEIMOS/red/workspace/FRB20230827.Z.ut231007.4.11.1381143942.fits'
+    file='/Users/ckilpatrick/Downloads/FRB20240619D/2024.0905/red/workspace/FRB20240619D.i.ut240905.2.11.155815337.fits'
 
     import importlib
     global tel
-    tel = importlib.import_module('instruments.DEIMOS')
+    tel = importlib.import_module('instruments.BINOSPEC')
 
     solve_astrometry(file, tel, radius=0.5, replace=True, 
         shift_only=False, log=None)

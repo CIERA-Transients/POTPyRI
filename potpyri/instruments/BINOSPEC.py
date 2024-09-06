@@ -29,23 +29,17 @@ def static_mask(paths):
     return [os.path.join(paths['code'], 'data', 'staticmasks', 
             'bino_proc.trim.staticmask.fits.fz')]
 
-def run_wcs():
-    return True
-
 def wcs_extension():
     return 0
 
-def pixscale():
+def pixscale(hdr):
     return 0.24
 
 def saturation(hdr):
-    return 65000 #defualt hdr['DATAMAX']*hdr['GAIN']
+    return 65000
 
 def min_exptime():
     return 1.0
-
-def cal_path():
-    return str(os.getenv("PIPELINE_HOME"))+'/Imaging_pipelines/BINOSPEC_calib/'
 
 def raw_format(proc):
     if proc:
@@ -63,7 +57,7 @@ def bias():
     return False
 
 def flat():
-    return True
+    return False
 
 def raw_header_ext():
     return 1
@@ -139,7 +133,8 @@ def load_bias(red_path, amp, binn):
     mbias = [CCDData.read(bias,hdu=x+1,unit=u.electron) for x in range(int(amp[0]))]
     return mbias
 
-def load_flat(flat):
+def load_flat(red_path, fil, amp, binn):
+    flat = get_mflat_name(red_path, fil, amp, binn)
     mflat = CCDData.read(flat, hdu=0)
     return mflat
 
@@ -152,7 +147,8 @@ def datasec():
 def biassec():
     return ['[1:1054,1:4112]','[3034:4096,1:4112]']
 
-def create_flat(flat_list, fil, amp, binn, red_path, mbias=None, log=None):
+def create_flat(flat_list, fil, amp, binn, red_path, mbias=None, mdark=None,
+    is_science=False, log=None):
 
     log.info(f'Processing files for filter: {fil}')
     log.info(f'{len(flat_list)} files found.')
@@ -178,6 +174,12 @@ def create_flat(flat_list, fil, amp, binn, red_path, mbias=None, log=None):
         flat_full = CCDData(np.concatenate((red[0], 
             np.empty((red[0].shape[0], 794)), red[1]), axis=1), 
             header=header,unit=u.electron)
+
+        # Mask flat_full if the image is a science frame
+        if is_science:
+            mean, median, stddev = sigma_clipped_stats(flat_full.data)
+            mask = flat_full.data > 5*stddev + median
+            flat_full.mask = mask.astype(np.uint8)
 
         exptime = flat_full.header['EXPTIME']
         log.info(f'Exposure time of image is {exptime}')
@@ -216,7 +218,7 @@ def get_base_science_name(image):
     return(filename)
 
 def process_science(sci_list, fil, amp, binn, red_path, mbias=None,
-    mflat=None, proc=None, staticmask=None, skip_skysub=False, log=None):
+    mflat=None, mdark=None, proc=None, staticmask=None, skip_skysub=False, log=None):
 
     processed = []
 
@@ -225,9 +227,6 @@ def process_science(sci_list, fil, amp, binn, red_path, mbias=None,
         imgmask = hdu[1].data.astype(bool)
     else:
         imgmask = None
-
-    flat_image = CCDData(np.copy(mflat),unit=u.electron,
-        meta=mflat.meta,mask=mflat.mask,uncertainty=mflat.uncertainty)
     
     for sci in sorted(sci_list):
             sci = os.path.abspath(sci)
@@ -250,7 +249,11 @@ def process_science(sci_list, fil, amp, binn, red_path, mbias=None,
                 header=header,unit=u.electron)
 
             sci_full.header['SATURATE'] = saturation(hdr)
-            processed_data = ccdproc.flat_correct(sci_full, flat_image)
+
+            if mflat is not None:
+                processed_data = ccdproc.flat_correct(sci_full, mflat)
+            else:
+                processed_data = sci_full
 
             if log: log.info('File proccessed.')
 
@@ -423,3 +426,6 @@ def edit_stack_headers(stack):
                 break
 
     return(stack)
+
+def out_size():
+    return 5000
