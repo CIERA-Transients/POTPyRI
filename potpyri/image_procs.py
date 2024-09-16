@@ -516,6 +516,9 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
 
     # Astroscrappy requires added sky background, so add this value back
     data = data + hdu[0].header['SKYBKG']
+
+    # Also need to adjust the saturation level by SKYBKG for saturated pixels
+    saturation += hdu[0].header['SKYBKG']
     
     if log: log.info('Masking saturated pixels.')
 
