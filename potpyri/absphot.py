@@ -140,9 +140,9 @@ class absphot(object):
         phottable='APPPHOT', log=None):
 
         if log:
-            log.info(f'Importing catalog file: {cmpfile}')
+            log.info(f'Importing catalog from file: {cmpfile}')
         else:
-            print(f'Importing catalog file: {cmpfile}')
+            print(f'Importing catalog from file: {cmpfile}')
 
         hdu = fits.open(cmpfile)
         header = hdu['PRIMARY'].header

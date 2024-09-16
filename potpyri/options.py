@@ -7,7 +7,9 @@ def add_options():
     params = argparse.ArgumentParser(description='Path of data.')
     params.add_argument('instrument', 
         default=None, 
-        choices=['Binospec','DEIMOS','GMOS','LRIS','MMIRS','MOSFIRE','TEST'],
+        type=str.upper,
+        choices=['BINOSPEC','DEIMOS','GMOS','LRIS','MMIRS','MOSFIRE','TEST',
+            'BINO','MMIR'],
         help='''Name of instrument (must be in params folder) of data to 
         reduce. Required to run pipeline. Use TEST for pipeline test.''')
     params.add_argument('data_path', 
@@ -71,10 +73,10 @@ def add_options():
     args = params.parse_args()
 
     # Handle/parse options
-    if 'bino' in args.instrument:
-        args.instrument = 'binospec'
-    if 'mmir' in args.instrument:
-        args.instrument = 'mmirs'
+    if 'BINO' in args.instrument:
+        args.instrument = 'BINOSPEC'
+    if 'MMIR' in args.instrument:
+        args.instrument = 'MMIRS'
 
     return(args)
 
