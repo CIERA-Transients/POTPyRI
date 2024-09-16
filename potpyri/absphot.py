@@ -107,6 +107,9 @@ class absphot(object):
         
         vizier = Vizier(columns=[cat_ra, cat_dec, cat_mag, cat_err])
         vizier.ROW_LIMIT = -1
+        if log: 
+            log.info(f'Getting {catalog} catalog with ID {cat_ID} in filt {filt}')
+            log.info(f'Querying around {coord_ra}, {coord_dec} deg')
         cat = vizier.query_region(med_coord, width=1.2*max_sep*u.degree, 
             catalog=cat_ID)
 
