@@ -467,6 +467,16 @@ class Instrument(object):
                 final = processed_data
                 final.header['SKYBKG'] = 0.0
 
+            # Convert data format to float32
+            final.data = final.data.astype(np.float32)
+            final.header['BITPIX']=-32
+
+            # Delete empty header keys
+            for key in list(final.header.keys()):
+                if not key.strip():
+                    if key in final.header.keys():
+                        del final.header[key]
+
             final_filename = self.get_sci_name(final.header, red_path)
             
             # Edit additional header values
@@ -475,6 +485,7 @@ class Instrument(object):
             final.header['AMPS']=amp 
             final.header['BINNING']=binn
             final.header['ORGFILE']=sci
+            final.header['EXTNAME']='SCI'
 
             if log: log.info(f'Writing final file: {final_filename}')
             final.write(final_filename, overwrite=True)
