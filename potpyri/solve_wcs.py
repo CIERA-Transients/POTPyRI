@@ -180,7 +180,7 @@ def solve_astrometry(file, tel, radius=0.5, replace=True,
         newfile = fullfile.replace(exten,'.solved.fits')
 
     # Handle pixel scale guess
-    scale = tel.pixscale(header)
+    scale = tel.pixscale
     scale_high = float('%.4f'%(scale * 1.2))
     scale_low = float('%.4f'%(scale * 0.8))
 

@@ -57,7 +57,8 @@ def main_pipeline(instrument:str,
     t1 = time.time()
     
     # import telescope parameter file
-    tel = importlib.import_module(f'instruments.{instrument.upper()}')
+    module = importlib.import_module(f'instruments.{instrument.upper()}')
+    tel = getattr(module, instrument.upper())()
 
     # Generate code and data paths based on input path
     paths = options.add_paths(data_path)
@@ -66,7 +67,7 @@ def main_pipeline(instrument:str,
     log = logger.get_log(paths['log'])
 
     if log: log.info(f'Running main pipeline version {__version__}')
-    if log: log.info(f'Running instrument paramater file version {tel.__version__}')
+    if log: log.info(f'Running instrument paramater file version {tel.version}')
 
     # This contains all of the file data
     file_list = os.path.join(paths['data'], file_list_name)
@@ -81,14 +82,14 @@ def main_pipeline(instrument:str,
     # Calibration images
     ####################
     # Master bias, dark, and flat creation (will skip if unnecessary)
-    kwds = tel.filetype_keywords()
+    kwds = tel.filetype_keywords
     bias_files = file_table[file_table['Type']==kwds['BIAS']]
     flat_files = file_table[file_table['Type']==kwds['FLAT']]
     dark_files = file_table[file_table['Type']==kwds['DARK']]
     science_data = file_table[file_table['Type']==kwds['SCIENCE']]
 
     # Use science data as flat files if no flats and a lot of science data
-    if tel.flat() and len(flat_files)==0 and len(science_data)>11:
+    if tel.flat and len(flat_files)==0 and len(science_data)>11:
         flat_files = science_data
 
     calibration.do_bias(bias_files, tel, paths['cal'], log=log)
@@ -132,7 +133,7 @@ def main_pipeline(instrument:str,
 
         if log: log.info('Calculating zeropint.')
         hdu = fits.open(stack)
-        cat = tel.catalog_zp(hdu[0].header)
+        cat = tel.catalog_zp
         cal = absphot.absphot()
         try:
             cal.find_zeropoint(stack, target_table['Filter'][0], cat, log=log)

@@ -7,7 +7,7 @@ import sys
 def do_bias(bias_table, tel, red_path, log=None):
 
     # Exit if telescope does not require bias
-    if not tel.bias():
+    if not tel.bias:
         return(None)
 
     bias_num = 0
@@ -39,7 +39,7 @@ def do_bias(bias_table, tel, red_path, log=None):
 def do_dark(dark_table, tel, red_path, log=None):
 
     # Exit if telescope does not require dark
-    if not tel.dark():
+    if not tel.dark:
         return(None)
 
     for cal_type in np.unique(dark_table['CalType']):
@@ -56,7 +56,7 @@ def do_dark(dark_table, tel, red_path, log=None):
             if log: log.info(f'Master dark {dark_name} exists.')
         else:
             mbias = None
-            if tel.bias():
+            if tel.bias:
                 if log: log.info('Loading master bias.')
                 try:
                     mbias = tel.load_bias(red_path, amp, binn)
@@ -75,7 +75,7 @@ def do_dark(dark_table, tel, red_path, log=None):
 def do_flat(flat_table, tel, red_path, log=None):
 
     # Exit if telescope does not require dark
-    if not tel.flat():
+    if not tel.flat:
         return(None)
 
     for cal_type in np.unique(flat_table['CalType']):
@@ -94,7 +94,7 @@ def do_flat(flat_table, tel, red_path, log=None):
         else:
             mbias = None
             mdark = None
-            if tel.bias():
+            if tel.bias:
                 if log: log.info('Loading master bias.')
                 try:
                     mbias = tel.load_bias(red_path, amp, binn)
@@ -104,7 +104,7 @@ def do_flat(flat_table, tel, red_path, log=None):
                         filter {fil}, {amp} amps, {binn} binning.''')
                     continue
 
-            if tel.dark():
+            if tel.dark:
                 if log: log.info('Loading master dark.')
                 try:
                     mdark = tel.load_dark(red_path, amp, binn)
