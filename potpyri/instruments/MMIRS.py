@@ -95,7 +95,7 @@ class MMIRS(instrument.Instrument):
 
     # Get a unique image number that can be derived only from the file header
     def get_number(self, header):
-        number = str(int(Time(header['DATE-OBS']).mjd*1e5)-5900000000)
+        number = str(int(np.abs(Time(header['DATE-OBS']).mjd*1e5-5900000000)))
         return(number)
 
     def raw_format(self, proc):
@@ -110,9 +110,7 @@ class MMIRS(instrument.Instrument):
     def get_time(self, hdr):
         return Time(hdr['DATE-OBS']).mjd
 
-    # Takes filename and outputs CCDData object with raw image in units of e-
-    def import_image(self, filename, amp, log=None):
-        hdu = fits.open(filename)
+    def measure_slope(self, hdu):
         header = hdu[self.raw_header_ext].header
 
         # Get header names to know how many up the ramp samples there are
@@ -143,9 +141,17 @@ class MMIRS(instrument.Instrument):
         slope = slope.astype(np.float32)
         slope = slope * np.max(all_times)
 
-        for key in hdu[f'IM{num_reads}'].header:
+        return(slope)
+
+
+    # Takes filename and outputs CCDData object with raw image in units of e-
+    def import_image(self, filename, amp, log=None):
+        hdu = fits.open(filename)
+        header = hdu[self.raw_header_ext].header
+        slope = hdu[1].data
+        for key in hdu[1].header:
             try:
-                header[key] = hdu[f'IM{num_reads}'].header[key]
+                header[key] = hdu[1].header[key]
             except ValueError:
                 continue
 
