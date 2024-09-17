@@ -128,7 +128,7 @@ class GMOS(instrument.Instrument):
 
     def import_image(self, filename, amp, log=None):
 
-        with fits.open(flat) as hdr:
+        with fits.open(filename) as hdr:
             header = hdr[0].header
 
         raw = [CCDData.read(filename, hdu=x+1, unit='adu') 
