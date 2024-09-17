@@ -133,16 +133,17 @@ def main_pipeline(instrument:str,
 
         if log: log.info('Calculating zeropint.')
         hdu = fits.open(stack)
-        cat = tel.catalog_zp
+        cat = tel.get_catalog(hdu[0].header)
         cal = absphot.absphot()
         try:
             cal.find_zeropoint(stack, target_table['Filter'][0], cat, log=log)
         except:
             if log: log.error(f'Could not calibrate photometry for {stack}')
         
-    t2 = time.time()
-    if log: log.info('Pipeline finshed.')
-    if log: log.info(f'Total runtime: {t2-t1} sec')
+    if log: 
+        t2 = time.time()
+        log.info('Pipeline finshed.')
+        log.info(f'Total runtime: {t2-t1} sec')
 
 def main():
     args = options.add_options()

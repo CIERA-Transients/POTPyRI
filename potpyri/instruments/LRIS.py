@@ -1,28 +1,16 @@
 #parameter file for LRIS/Keck
 import os
-import astropy
 import datetime
 import numpy as np
 import ccdproc
-import glob
 
 from astropy.coordinates import SkyCoord
-from astropy.stats import sigma_clipped_stats
-from astropy.stats import SigmaClip
 from astropy.modeling import models
-from astropy.stats import SigmaClip
 from astropy.io import fits
 from astropy.time import Time
 from astropy.nddata import CCDData
 from astropy.wcs import WCS
 import astropy.units as u
-
-from photutils import Background2D
-from photutils import MeanBackground
-from photutils.segmentation import SegmentationImage
-from photutils.segmentation import detect_sources
-from photutils.segmentation import detect_threshold
-from photutils.utils import circular_footprint
 
 __version__ = 1.9 #last edited 18/11/2022
 
@@ -391,17 +379,3 @@ class LRIS(instrument.Instrument):
                     break
 
         return(stack)
-
-
-def str_to_slice(sec_string):
-
-    sec_string = sec_string.replace('[','').replace(']','')
-    x,y = sec_string.split(',')
-    x1,x2 = x.split(':')
-    y1,y2 = y.split(':')
-
-    x1 = int(x1) ; x2 = int(x2) ; y1 = int(y1) ; y2 = int(y2)
-
-    sl = np.s_[x1:x2,y1:y2]
-
-    return(sl)
