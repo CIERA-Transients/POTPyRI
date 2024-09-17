@@ -97,41 +97,41 @@ class Instrument(object):
         self.out_size = 5000
 
     # Use these if a single value is needed for gain, rdnoise, etc.
-    def get_rdnoise(self):
+    def get_rdnoise(self, hdr):
         return(self.rdnoise)
 
-    def get_gain(self):
+    def get_gain(self, hdr):
         return(self.gain)
 
     # Get specific header keywords from file
-    def get_target(self, header):
-        return(header[self.target_keyword].replace(' ',''))
+    def get_target(self, hdr):
+        return(hdr[self.target_keyword].replace(' ',''))
 
-    def get_filter(self, header):
-        filt = header[self.filter_keyword]
+    def get_filter(self, hdr):
+        filt = hdr[self.filter_keyword]
         filt = filt.replace(' ','')
         filt = filt.split('_')[0]
         return(filt)
 
-    def get_exptime(self, header):
-        return(header[self.exptime_keyword])
+    def get_exptime(self, hdr):
+        return(hdr[self.exptime_keyword])
 
-    def get_ampl(self, header):
-        if self.amp_keyword in header.keys():
-            return(str(header[self.amp_keyword]))
+    def get_ampl(self, hdr):
+        if self.amp_keyword in hdr.keys():
+            return(str(hdr[self.amp_keyword]))
         else:
             return(str(self.amp_keyword))
 
-    def get_binning(self, header):
-        if self.bin_keyword in header.keys():
-            binn = str(header[self.bin_keyword]).replace(' ','')
+    def get_binning(self, hdr):
+        if self.bin_keyword in hdr.keys():
+            binn = str(hdr[self.bin_keyword]).replace(' ','')
             binn = binn.replace(',','')
             return(binn)
         else:
             return(self.bin_keyword)
 
-    def get_time(self, header):
-        return(header[self.mjd_keyword])
+    def get_time(self, hdr):
+        return(hdr[self.mjd_keyword])
 
     def get_static_mask(self, paths):
 
