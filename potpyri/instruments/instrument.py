@@ -423,6 +423,11 @@ class Instrument(object):
         for sci in sorted(sci_list):
             sci_full = self.import_image(sci, amp, log=log)
 
+            if staticmask is None:
+                staticmask = np.zeros(sci_full.data.shape).astype(bool)
+            else:
+                sci_full.mask = sci_full.mask | staticmask
+
             # Subtract bias
             if mbias is not None:
                 if log: log.info('Subtracting bias')
@@ -438,11 +443,13 @@ class Instrument(object):
             if mflat is not None:
                 if log: log.info('Flattening image')
                 sci_full = ccdproc.flat_correct(sci_full, mflat)
+                staticmask = staticmask | (mflat.data < 0.5)
 
             # Expand input mask
             processed_data = sci_full
             processed_data.mask = self.expand_mask(processed_data, 
                 input_mask=staticmask)
+            processed_data.data[processed_data.mask]=np.nan
 
             if not skip_skysub:
                 if log: log.info('Calculating 2D background.')
