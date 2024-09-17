@@ -4,7 +4,7 @@ import logging
 import numpy as np
 import sys
 
-def do_bias(bias_table, tel, red_path, log=None):
+def do_bias(bias_table, tel, red_path, staticmask=None, log=None):
 
     # Exit if telescope does not require bias
     if not tel.bias:
@@ -26,7 +26,8 @@ def do_bias(bias_table, tel, red_path, log=None):
         else:
             t1 = time.time()
             if log: log.info('Processing bias files.')
-            tel.create_bias(cal_table['File'], amp, binn, red_path, log=log)
+            tel.create_bias(cal_table['File'], amp, binn, red_path, 
+                staticmask=staticmask, log=log)
             t2 = time.time()
 
             if log: log.info(f'Master bias creation completed in {t2-t1} sec')
@@ -36,7 +37,7 @@ def do_bias(bias_table, tel, red_path, log=None):
         logging.shutdown()
         sys.exit(-1)
 
-def do_dark(dark_table, tel, red_path, log=None):
+def do_dark(dark_table, tel, red_path, staticmask=None, log=None):
 
     # Exit if telescope does not require dark
     if not tel.dark:
@@ -68,11 +69,11 @@ def do_dark(dark_table, tel, red_path, log=None):
 
             t1 = time.time()
             tel.create_dark(cal_table['File'], amp, binn,
-                red_path, mbias=mbias, log=log)
+                red_path, mbias=mbias, staticmask=staticmask, log=log)
             t2 = time.time()
             if log: log.info(f'Master dark creation completed in {t2-t1} sec.')
 
-def do_flat(flat_table, tel, red_path, log=None):
+def do_flat(flat_table, tel, red_path, staticmask=None, log=None):
 
     # Exit if telescope does not require dark
     if not tel.flat:
@@ -117,7 +118,7 @@ def do_flat(flat_table, tel, red_path, log=None):
             t1 = time.time()
             tel.create_flat(cal_table['File'], fil, amp, binn,
                 red_path, mbias=mbias, mdark=mdark, is_science=is_science, 
-                log=log)
+                staticmask=staticmask, log=log)
             t2 = time.time()            
             if log: log.info(f'Master flat creation completed in {t2-t1} sec')
 
