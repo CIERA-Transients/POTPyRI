@@ -99,7 +99,7 @@ class GMOS(instrument.Instrument):
     def get_rdnoise(self, hdr):
         return(hdr['RDNOISE'])
 
-    def get_rdnoise(self, hdr):
+    def get_gain(self, hdr):
         return(hdr['GAIN'])
 
     def raw_format(self, proc):
