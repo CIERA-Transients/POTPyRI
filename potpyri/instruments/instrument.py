@@ -394,6 +394,11 @@ class Instrument(object):
         mean, median, stddev = sigma_clipped_stats(mflat.data)
         mask = mflat.data > median + 10 * stddev
         mflat.data[mask]=np.nan
+
+        # Remove all nan values from flat
+        mask = np.isnan(mflat.data)
+        mflat.mask = mask
+        mflat.data[mask]=1.0
         
         if log: 
             log.info(f'Made flat for filter: {fil}, amp: {amp}, bin: {binn}.')
