@@ -425,8 +425,6 @@ class Instrument(object):
 
             if staticmask is None:
                 staticmask = np.zeros(sci_full.data.shape).astype(bool)
-            else:
-                sci_full.mask = sci_full.mask | staticmask
 
             # Subtract bias
             if mbias is not None:
