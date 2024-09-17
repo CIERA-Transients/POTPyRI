@@ -265,6 +265,7 @@ class Instrument(object):
             if log: log.info(f'Importing {bias}')
             bias_full = self.import_image(bias, amp, log=log)
             if staticmask is not None:
+                if log: log.info('Applying static mask')
                 bias_full.data[staticmask]=np.nan
             if self.cr_bias:
                 # Add a CR mask to the bias image
@@ -309,6 +310,7 @@ class Instrument(object):
             if log: log.info(f'Importing {dark}')
             dark_full = self.import_image(dark, amp, log=log)
             if staticmask is not None:
+                if log: log.info('Applying static mask')
                 dark_full.data[staticmask]=np.nan
             exptimes.append(self.get_exptime(dark_full.header))
 
@@ -356,6 +358,7 @@ class Instrument(object):
             if log: log.info(f'Importing {flat}')
             flat_full = self.import_image(flat, amp, log=log)
             if staticmask is not None:
+                if log: log.info('Applying static mask')
                 flat_full.data[staticmask]=np.nan
 
             if mbias is not None:
