@@ -369,6 +369,14 @@ class Instrument(object):
         
         mflat = ccdproc.combine(flats, method='median', scale=scale, 
             sigma_clip=True, clip_extrema=True)
+
+        # Mask flat
+        mflat.data[np.isinf(mflat.data)]=np.nan
+        mflat.data[mflat.data==0.0]=np.nan
+        mflat.data[mflat.data<0.0]=np.nan
+        mean, median, stddev = sigma_clipped_stats(mflat.data)
+        mask = mflat.data > median + 10 * stddev
+        mflat.data[mask]=np.nan
         
         if log: 
             log.info(f'Made flat for filter: {fil}, amp: {amp}, bin: {binn}.')
