@@ -25,7 +25,7 @@ __version__ = 1.2 #last edited 09/11/2021
 # Internal dependency
 from . import instrument
 
-class LRIS(instrument.Instrument):
+class GMOS(instrument.Instrument):
 
     def __init__(self, proc=None, ):
 
