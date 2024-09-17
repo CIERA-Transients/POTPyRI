@@ -251,7 +251,10 @@ class Instrument(object):
 
         return(frame_full)
 
-    def create_bias(self, bias_list, amp, binn, red_path, log=None, **kwargs):
+    def create_bias(self, bias_list, amp, binn, red_path, staticmask=None,
+        log=None, **kwargs):
+
+        staticmask = self.load_satmask(staticmask)
         
         if log:
             log.info(f'Processing bias files with {amp} amps and {binn} binning.')
@@ -261,6 +264,8 @@ class Instrument(object):
         for i, bias in enumerate(bias_list):
             if log: log.info(f'Importing {bias}')
             bias_full = self.import_image(bias, amp, log=log)
+            if staticmask is not None:
+                bias_full.data[staticmask]=np.nan
             if self.cr_bias:
                 # Add a CR mask to the bias image
                 mean, median, stddev = sigma_clipped_stats(bias_full.data)
@@ -289,7 +294,10 @@ class Instrument(object):
         
         return
 
-    def create_dark(self, dark_list, amp, binn, red_path, mbias=None, log=None):
+    def create_dark(self, dark_list, amp, binn, red_path, mbias=None, 
+        staticmask=None, log=None):
+
+        staticmask = self.load_satmask(staticmask)
 
         if log:
             log.info(f'Processing dark files with {amp} amps and {binn} binning.')
@@ -300,6 +308,8 @@ class Instrument(object):
         for dark in dark_list:
             if log: log.info(f'Importing {dark}')
             dark_full = self.import_image(dark, amp, log=log)
+            if staticmask is not None:
+                dark_full.data[staticmask]=np.nan
             exptimes.append(self.get_exptime(dark_full.header))
 
             if mbias is not None:
@@ -332,7 +342,9 @@ class Instrument(object):
         return
 
     def create_flat(self, flat_list, fil, amp, binn, red_path, mbias=None, 
-        mdark=None, is_science=False, log=None, **kwargs):
+        mdark=None, is_science=False, staticmask=None, log=None, **kwargs):
+
+        staticmask = self.load_satmask(staticmask)
 
         if log:
             log.info(f'Processing files for filter: {fil}')
@@ -343,6 +355,8 @@ class Instrument(object):
         for i, flat in enumerate(flat_list):
             if log: log.info(f'Importing {flat}')
             flat_full = self.import_image(flat, amp, log=log)
+            if staticmask is not None:
+                flat_full.data[staticmask]=np.nan
 
             if mbias is not None:
                 if log: log.info('Subtracting bias')
