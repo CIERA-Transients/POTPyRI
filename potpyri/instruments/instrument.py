@@ -125,6 +125,7 @@ class Instrument(object):
     def get_binning(self, header):
         if self.bin_keyword in header.keys():
             binn = str(header[self.bin_keyword]).replace(' ','')
+            binn = binn.replace(',','')
             return(binn)
         else:
             return(self.bin_keyword)
@@ -141,6 +142,9 @@ class Instrument(object):
             return [mask_file]
         else:
             return [None]
+
+    def get_catalog(self, hdr):
+        return(self.catalog_zp)
 
     def format_datasec(self, sec_string, binning=1):
         sec_string = sec_string.replace('[','').replace(']','')
