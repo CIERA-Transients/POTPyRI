@@ -153,22 +153,6 @@ class LRIS(instrument.Instrument):
             gains = [1]
         return gains
 
-    def get_datasec(self, hdr):
-        amp = self.get_ampl(hdr)
-        binn = int(self.get_binning(hdr)[0])
-
-        if amp=='1R':
-            if binn==1:
-                return(['[830:2064,284:2064]',
-                        '[830:2064,2170:3956]',
-                        '[2185:3450,284:2064]',
-                        '[2185:3450,2170:3956]'])
-            elif binn==2:
-                return(['[437:1032,146:1032]',
-                    '[437:1032,1177:2069]',
-                    '[1152:1784,146:1032]',
-                    '[1152:1784,1177:2069]'])
-
     def get_overscan(self, hdr):
         amp = self.get_ampl(hdr)
         binn = int(self.get_binning(hdr)[0])
@@ -224,12 +208,16 @@ class LRIS(instrument.Instrument):
 
         if amp=='1R':
             raw = [CCDData.read(filename, hdu=0, unit='adu')]
+            red = [ccdproc.ccd_process(x, oscan=oscan_reg, 
+                oscan_model=models.Chebyshev1D(3), 
+                gain=gains[j]*u.electron/u.adu, 
+                readnoise=readnoises[j]*u.electron) 
+                for j,x in enumerate(raw)]
         elif amp=='4B' or amp=='4R':
             raw = [CCDData.read(filename, hdu=x+1, unit='adu')
                 for x in range(int(amp[0]))]
-        
-        red = [ccdproc.ccd_process(x, oscan=oscan_reg, 
-                oscan_model=models.Chebyshev1D(3), 
+            red = [ccdproc.ccd_process(x, oscan=oscan_reg, 
+                oscan_model=models.Chebyshev1D(3), trim=x.header['DATASEC'], 
                 gain=gains[j]*u.electron/u.adu, 
                 readnoise=readnoises[j]*u.electron) 
                 for j,x in enumerate(raw)]
@@ -244,7 +232,7 @@ class LRIS(instrument.Instrument):
                     [red[0][self.get_1R_datasec(3, binning=bin2)],
                      red[0][self.get_1R_datasec(4, binning=bin2)]],axis=1)],
                     axis=0),header=header,unit=u.electron)
-        if amp=='4B':
+        elif amp=='4B':
             full = CCDData(np.concatenate([red[0],
                             np.fliplr(red[1]),
                             np.zeros([np.shape(red[1])[0],111]),
