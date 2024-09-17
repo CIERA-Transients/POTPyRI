@@ -474,6 +474,9 @@ class Instrument(object):
                 input_mask=staticmask)
             processed_data.data[processed_data.mask]=np.nan
 
+            print(os.path.join(red_path, 'test.fits'))
+            processed_data.write(os.path.join(red_path, 'test.fits'), overwrite=True)
+
             if not skip_skysub:
                 if log: log.info('Calculating 2D background.')
                 bkg = Background2D(processed_data, (64, 64), filter_size=(3, 3),
