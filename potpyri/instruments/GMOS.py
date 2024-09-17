@@ -57,8 +57,8 @@ class GMOS(instrument.Instrument):
 
         self.wavelength = 'OPT'
 
-        self.gain = None
-        self.rdnoise = None
+        self.gain = 1.63
+        self.rdnoise = 4.14
 
         self.datasec = None
         self.biassec = None
@@ -97,10 +97,16 @@ class GMOS(instrument.Instrument):
         self.out_size = 5000
 
     def get_rdnoise(self, hdr):
-        return(hdr['RDNOISE'])
+        try:
+            return(hdr['RDNOISE'])
+        except KeyError:
+            return(self.rdnoise)
 
     def get_gain(self, hdr):
-        return(hdr['GAIN'])
+        try:
+            return(hdr['GAIN'])
+        except KeyError:
+            return(self.gain)
 
     def raw_format(self, proc):
         return '*.fits.bz2'
