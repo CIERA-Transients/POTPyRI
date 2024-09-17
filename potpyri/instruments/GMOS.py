@@ -96,6 +96,12 @@ class GMOS(instrument.Instrument):
 
         self.out_size = 5000
 
+    def get_rdnoise(self, hdr):
+        return(hdr['RDNOISE'])
+
+    def get_rdnoise(self, hdr):
+        return(hdr['GAIN'])
+
     def raw_format(self, proc):
         return '*.fits.bz2'
 
@@ -136,8 +142,8 @@ class GMOS(instrument.Instrument):
         red = [ccdproc.ccd_process(x, oscan=x.header['BIASSEC'], 
             oscan_model=models.Chebyshev1D(3), 
             trim=x.header['DATASEC'], 
-            gain=x.header['GAIN']*u.electron/u.adu, 
-            readnoise=x.header['RDNOISE']*u.electron, 
+            gain=self.get_gain(x.header)*u.electron/u.adu, 
+            readnoise=self.get_rdnoise(x.header)*u.electron, 
             gain_corrected=True) 
             for k,x in enumerate(raw)]
 
