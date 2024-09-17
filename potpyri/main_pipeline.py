@@ -92,9 +92,10 @@ def main_pipeline(instrument:str,
     if tel.flat and len(flat_files)==0 and len(science_data)>11:
         flat_files = science_data
 
-    calibration.do_bias(bias_files, tel, paths['cal'], log=log)
-    calibration.do_dark(dark_files, tel, paths['cal'], log=log)
-    calibration.do_flat(flat_files, tel, paths['cal'], log=log)
+    staticmask = tel.get_static_mask(paths)
+    calibration.do_bias(bias_files, tel, paths['cal'], staticmask=staticmask, log=log)
+    calibration.do_dark(dark_files, tel, paths['cal'], staticmask=staticmask, log=log)
+    calibration.do_flat(flat_files, tel, paths['cal'], staticmask=staticmask, log=log)
 
     # Science images
     ################
