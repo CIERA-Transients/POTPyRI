@@ -16,69 +16,79 @@ import gzip
 import zlib
 import logging
 import sys
+import re
 
 def is_bad(hdr, tel):
-    bad_keyword = tel.bad_keywords
-    bad_files = tel.bad_values
+    keywords = tel.bad_keywords
+    values = tel.bad_values
 
-    bad = np.any([hdr[bad_keyword[j]] == bad_files[j] 
-        for j in range(len(bad_keyword))])
+    assert len(keywords)==len(values)
+    if len(keywords)==0: return(False)
+
+    bad = np.any([bool(re.match(v, hdr[k])) for k,v in zip(keywords,values)])
 
     return(bad)
 
 def is_spec(hdr, tel):
-    spec_keyword = tel.spec_keywords
-    spec_files = tel.spec_values
+    keywords = tel.spec_keywords
+    values = tel.spec_values
 
-    spec = np.all([hdr[spec_keyword[j]] == spec_files[j] 
-        for j in range(len(spec_keyword))])
+    assert len(keywords)==len(values)
+    if len(keywords)==0: return(False)
+
+    spec = np.all([bool(re.match(v, hdr[k])) for k,v in zip(keywords,values)])
 
     return(spec)
 
 def is_flat(hdr, tel):
-    flat_keyword = tel.flat_keywords
-    flat_files = tel.flat_values
+    keywords = tel.flat_keywords
+    values = tel.flat_values
 
-    telescope = tel.name.upper()
+    assert len(keywords)==len(values)
+    if len(keywords)==0: return(False)
 
-    flat = ((len(flat_keyword) != 0) & (np.all([flat_files[j] in hdr[flat_keyword[j]] 
-        for j in range(len(flat_keyword))])) & (telescope!='DEIMOS')) | ((len(flat_keyword) != 0) & (np.any([flat_files[j] in hdr[flat_keyword[j]] 
-        for j in range(len(flat_keyword))])) & (telescope=='DEIMOS'))
+    flat = np.all([bool(re.match(v, hdr[k])) for k,v in zip(keywords,values)])
 
     return(flat)
 
+def is_dark(hdr, tel):
+    keywords = tel.dark_keywords
+    values = tel.dark_values
+
+    assert len(keywords)==len(values)
+    if len(keywords)==0: return(False)
+
+    dark = np.all([bool(re.match(v, hdr[k])) for k,v in zip(keywords,values)])
+
+    return(dark)
+
 def is_bias(hdr, tel):
-    bias_keyword = tel.bias_keywords
-    bias_files = tel.bias_values
+    keywords = tel.bias_keywords
+    values = tel.bias_values
 
-    bias = len(bias_keyword) != 0 and np.all([hdr[bias_keyword[j]] == bias_files[j] for j in range(len(bias_keyword))])
+    assert len(keywords)==len(values)
+    if len(keywords)==0: return(False)
 
+    bias = np.all([bool(re.match(v, hdr[k])) for k,v in zip(keywords,values)])
+    
     return(bias)
 
 def is_science(hdr, tel):
-    science_keyword = tel.science_keywords
-    science_files = tel.science_values
+    keywords = tel.science_keywords
+    values = tel.science_values
 
-    science = np.all([hdr[science_keyword[j]] == science_files[j] 
-        for j in range(len(science_keyword))])
+    assert len(keywords)==len(values)
+    if len(keywords)==0: return(False)
+
+    science = np.all([bool(re.match(v, hdr[k])) for k,v in zip(keywords,values)])
 
     # Check minimum exposure time
     if tel.min_exptime:
         exptime = tel.get_exptime(hdr)
         if exptime < tel.min_exptime:
-            science = False
+            return(False)
 
     return(science)
-
-def is_dark(hdr, tel):
-    dark_keyword = tel.dark_keywords
-    dark_files = tel.dark_values
-
-    dark = len(dark_keyword) != 0 and np.all([dark_files[j] in hdr[dark_keyword[j]] 
-        for j in range(len(dark_keyword))])
-
-    return(dark)
-
 
 # Overall method to handle files:
 def handle_files(file_list, tel, paths, incl_bad=False, proc=None, 
