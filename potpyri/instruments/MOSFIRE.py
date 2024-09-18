@@ -87,16 +87,16 @@ class MOSFIRE(instrument.Instrument):
         self.out_size = 5000
 
     def get_saturation(self, hdr):
-        return hdr['SATURATE']*hdr['SYSGAIN']
+        return(hdr['SATURATE']*hdr['SYSGAIN'])
 
     def raw_format(self, proc):
-        return 'MF.*.fits.gz'
+        return('MF.*.fits.gz')
 
     def get_filter(self, hdr):
         filt = hdr['FILTER'].replace(' ','').split('_')[0]
         if filt == 'Ks':
             filt = 'K'
-        return filt
+        return(filt)
 
     def get_rdnoise(self, hdr):
         readnoise = {1:21,4:10.8,8:7.7,16:5.8,32:4.2,64:3.5,128:3.0}
@@ -106,7 +106,10 @@ class MOSFIRE(instrument.Instrument):
         return(hdr['SYSGAIN'])
 
     def get_exptime(self, hdr):
-        return hdr['TRUITIME']*hdr['COADDONE']
+        return(hdr['TRUITIME']*hdr['COADDONE'])
+
+    def get_number(self, hdr):
+        return(hdr['FRAMENUM'])
 
     def import_image(self, filename, amp, log=None):
 
