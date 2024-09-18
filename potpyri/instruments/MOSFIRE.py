@@ -84,7 +84,7 @@ class MOSFIRE(instrument.Instrument):
         self.detrend = True
         self.catalog_zp = '2MASS'
 
-        self.out_size = 5000
+        self.out_size = 2500
 
     def get_saturation(self, hdr):
         return(hdr['SATURATE']*hdr['SYSGAIN'])
