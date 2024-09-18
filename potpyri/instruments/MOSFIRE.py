@@ -2,17 +2,13 @@
 import os
 import astropy
 import datetime
+import ccdproc
 import numpy as np
-from photutils import make_source_mask, Background2D, MeanBackground
-from astropy.stats import SigmaClip
+
+import astropy.units as u
 from astropy.io import fits
 from astropy.time import Time
 from astropy.nddata import CCDData
-import astropy.units.astrophys as u
-import astropy.units as u
-import ccdproc
-from astropy.modeling import models
-import create_mask
 
 __version__ = 1.6 #last edited 09/11/2021
 
