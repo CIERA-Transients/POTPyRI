@@ -141,7 +141,7 @@ class DEIMOS(instrument.Instrument):
         else:
             trim_sec = '[13:2060,1:2601]'
         
-        raw = [CCDData.read(flat, hdu=x+1, unit='adu') 
+        raw = [CCDData.read(filename, hdu=x+1, unit='adu') 
             for x in range(int(amp))]
         red = [ccdproc.ccd_process(x, oscan=x[:,0:13], 
             oscan_model=models.Chebyshev1D(3), trim=trim_sec, 
