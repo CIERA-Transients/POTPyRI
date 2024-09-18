@@ -112,6 +112,7 @@ class DEIMOS(instrument.Instrument):
         return(str(hdr['NVIDINP']))
 
     def get_gain(self, hdr):
+        amp = self.get_ampl(hdr)
         if amp=='4':
             gains = [1.206, 1.722, 1.211, 1.231]
         if amp=='8':
@@ -119,6 +120,7 @@ class DEIMOS(instrument.Instrument):
         return gains
 
     def get_rdnoise(self, hdr):
+        amp = self.get_ampl(hdr)
         if amp=='4':
             readnoise = [2.528, 2.128, 2.5395, 3.2335]
         if amp=='8':
@@ -132,6 +134,7 @@ class DEIMOS(instrument.Instrument):
 
         gains = self.get_gain(header)
         readnoises = self.get_rdnoise(header)
+        amp = self.get_ampl(header)
 
         if header['DETSEC01'] == '[1:2048,1:4096]':
             trim_sec = '[13:2060,1321:3921]'
