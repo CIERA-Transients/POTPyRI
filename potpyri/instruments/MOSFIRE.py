@@ -15,7 +15,7 @@ __version__ = 1.6 #last edited 09/11/2021
 # Internal dependency
 from . import instrument
 
-class DEIMOS(instrument.Instrument):
+class MOSFIRE(instrument.Instrument):
 
     def __init__(self, proc=None, ):
 
