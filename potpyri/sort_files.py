@@ -25,7 +25,7 @@ def is_bad(hdr, tel):
     assert len(keywords)==len(values)
     if len(keywords)==0: return(False)
 
-    bad = np.any([bool(re.match(v, hdr[k])) for k,v in zip(keywords,values)])
+    bad = np.any([bool(re.search(v, hdr[k])) for k,v in zip(keywords,values)])
 
     return(bad)
 
@@ -36,7 +36,7 @@ def is_spec(hdr, tel):
     assert len(keywords)==len(values)
     if len(keywords)==0: return(False)
 
-    spec = np.all([bool(re.match(v, hdr[k])) for k,v in zip(keywords,values)])
+    spec = np.all([bool(re.search(v, hdr[k])) for k,v in zip(keywords,values)])
 
     return(spec)
 
@@ -47,7 +47,7 @@ def is_flat(hdr, tel):
     assert len(keywords)==len(values)
     if len(keywords)==0: return(False)
 
-    flat = np.all([bool(re.match(v, hdr[k])) for k,v in zip(keywords,values)])
+    flat = np.all([bool(re.search(v, hdr[k])) for k,v in zip(keywords,values)])
 
     return(flat)
 
@@ -58,7 +58,7 @@ def is_dark(hdr, tel):
     assert len(keywords)==len(values)
     if len(keywords)==0: return(False)
 
-    dark = np.all([bool(re.match(v, hdr[k])) for k,v in zip(keywords,values)])
+    dark = np.all([bool(re.search(v, hdr[k])) for k,v in zip(keywords,values)])
 
     return(dark)
 
@@ -69,7 +69,7 @@ def is_bias(hdr, tel):
     assert len(keywords)==len(values)
     if len(keywords)==0: return(False)
 
-    bias = np.all([bool(re.match(v, hdr[k])) for k,v in zip(keywords,values)])
+    bias = np.all([bool(re.search(v, hdr[k])) for k,v in zip(keywords,values)])
     
     return(bias)
 
@@ -80,7 +80,7 @@ def is_science(hdr, tel):
     assert len(keywords)==len(values)
     if len(keywords)==0: return(False)
 
-    science = np.all([bool(re.match(v, hdr[k])) for k,v in zip(keywords,values)])
+    science = np.all([bool(re.search(v, hdr[k])) for k,v in zip(keywords,values)])
 
     # Check minimum exposure time
     if tel.min_exptime:

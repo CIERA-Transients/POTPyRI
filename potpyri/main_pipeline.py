@@ -84,10 +84,10 @@ def main_pipeline(instrument:str,
     ####################
     # Master bias, dark, and flat creation (will skip if unnecessary)
     kwds = tel.filetype_keywords
-    bias_match = np.array([bool(re.match(kwds['BIAS'], r)) for r in file_table['Type']])
-    flat_match = np.array([bool(re.match(kwds['FLAT'], r)) for r in file_table['Type']])
-    dark_match = np.array([bool(re.match(kwds['DARK'], r)) for r in file_table['Type']])
-    science_match = np.array([bool(re.match(kwds['SCIENCE'], r)) for r in file_table['Type']])
+    bias_match = np.array([bool(re.search(kwds['BIAS'], r)) for r in file_table['Type']])
+    flat_match = np.array([bool(re.search(kwds['FLAT'], r)) for r in file_table['Type']])
+    dark_match = np.array([bool(re.search(kwds['DARK'], r)) for r in file_table['Type']])
+    science_match = np.array([bool(re.search(kwds['SCIENCE'], r)) for r in file_table['Type']])
     bias_files = file_table[bias_match]
     flat_files = file_table[flat_match]
     dark_files = file_table[dark_match]
