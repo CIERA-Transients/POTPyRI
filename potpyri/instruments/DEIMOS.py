@@ -81,7 +81,7 @@ class DEIMOS(instrument.Instrument):
         self.science_keywords = ['MOSMODE','OBSMODE','SLMSKNAM','HATCHPOS']
         self.science_values = ['Direct','imaging','None','open']
         self.flat_keywords = ['OBSTYPE','OBJECT']
-        self.flat_values = ['DmFlat','lat']
+        self.flat_values = ['Flat','Flat']
         self.bias_keywords = ['OBSTYPE']
         self.bias_values = ['Bias']
         self.dark_keywords = []
