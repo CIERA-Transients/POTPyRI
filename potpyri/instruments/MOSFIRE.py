@@ -102,6 +102,9 @@ class MOSFIRE(instrument.Instrument):
         readnoise = {1:21,4:10.8,8:7.7,16:5.8,32:4.2,64:3.5,128:3.0}
         return readnoise[hdr['NUMREADS']]
 
+    def get_gain(self, hdr):
+        return(hdr['SYSGAIN'])
+
     def get_exptime(self, hdr):
         return hdr['TRUITIME']*hdr['COADDONE']
 
@@ -109,8 +112,8 @@ class MOSFIRE(instrument.Instrument):
 
         raw = CCDData.read(filename, unit=u.adu)
         red = ccdproc.ccd_process(raw, 
-            gain=raw.header['SYSGAIN']*u.electron/u.adu, 
-            readnoise=rdnoise(raw.header)*u.electron)
+            gain=self.get_gain(raw.header)*u.electron/u.adu, 
+            readnoise=self.get_rdnoise(raw.header)*u.electron)
 
         red.header['SATURATE'] = self.get_saturation(red.header)
 
@@ -118,7 +121,6 @@ class MOSFIRE(instrument.Instrument):
 
     def edit_raw_headers(self, files, log=None):
         pass
-
 
     def edit_stack_headers(self, stack):
         return(stack)
