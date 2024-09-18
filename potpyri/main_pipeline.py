@@ -112,8 +112,8 @@ def main_pipeline(instrument:str,
         sys.exit(-1)
 
     # Begin processing
-    for tar in np.unique(science_data['CalType']):
-        mask = science_data['CalType']==tar
+    for tar in np.unique(science_data['TargType']):
+        mask = science_data['TargType']==tar
         target_table = science_data[mask]
 
         if target is not None:
