@@ -115,3 +115,10 @@ class MOSFIRE(instrument.Instrument):
         red.header['SATURATE'] = self.get_saturation(red.header)
 
         return(red)
+
+    def edit_raw_headers(self, files, log=None):
+        pass
+
+
+    def edit_stack_headers(self, stack):
+        return(stack)
