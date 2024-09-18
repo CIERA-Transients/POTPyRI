@@ -167,9 +167,9 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
     dark_num = 0
     flat_num = 0
 
-    params = ('File','Target','Filter','Amp','Binning','Exp','Type',
+    params = ('File','Target','TargType','Filter','Amp','Binning','Exp','Type',
         'CalType','Time')
-    dtypes = ('S','S','S','S','S','S','S','S','float64')
+    dtypes = ('S','S','S','S','S','S','S','S','S','float64')
     file_table = Table(names=params, dtype=dtypes)
 
     for i, f in enumerate(sorted(files)):
@@ -245,19 +245,24 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
             # Bias only depends on amplifier and bin mode
             cal_type = f'{amp}_{binn}'
             target = 'BIAS'
+            targ_type = cal_type
         elif file_type=='DARK':
             # Dark depends on exposure, amplifier, and bin
             cal_type = f'{exp}_{amp}_{binn}'
             target = 'DARK'
+            targ_type = cal_type
         elif file_type=='FLAT':
             # Flat depends on filter, amplifier, and bin
             cal_type = f'{fil}_{amp}_{binn}'
             target = 'FLAT'
+            targ_type = cal_type
         elif file_type=='SCIENCE':
             # Science is grouped by target, filter, amplifier, bin
-            cal_type = f'{target}_{fil}_{amp}_{binn}'
+            cal_type = f'{fil}_{amp}_{binn}'
+            targ_type = f'{target}_{fil}_{amp}_{binn}'
         else:
             cal_type = ''
+            targ_type = ''
 
         currfile = os.path.join(moved_path, os.path.basename(f))
         if not os.path.exists(currfile):
@@ -268,8 +273,8 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
         if log: log.info(f'File {currfile} is {file_type}')
 
         if (file_type!='BAD' and file_type!='SPEC') or incl_bad:
-            file_table.add_row((currfile,target,fil,amp,binn,exp,file_type,
-                cal_type,file_time))
+            file_table.add_row((currfile,target,targ_type,fil,amp,binn,exp,
+                file_type,cal_type,file_time))
 
     file_table.sort(['Type','Target','CalType','File'])
 
