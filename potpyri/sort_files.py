@@ -163,26 +163,22 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
     file_table = Table(names=params, dtype=dtypes)
 
     for i, f in enumerate(sorted(files)):
-        with fits.open(f, mode='readonly') as file_open:
-            # Grab header for classifying file
-            try:
-                ext = tel.raw_header_ext
-                hdr = file_open[ext].header
-            except IndexError:
-                if log: log.error(f'Moving file {f} to bad due to error opening file.')
-                moved_path = paths['bad']
-                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
-                continue
-            # Validate that the data are OK
-            try:
-                ext = tel.raw_header_ext
-                check_data = file_open[ext].data
-                file_open._verify()
-            except (TypeError, gzip.BadGzipFile, zlib.error):
-                if log: log.error(f'Moving file {f} to bad due to corrupted data.')
-                moved_path = paths['bad']
-                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
-                continue
+        try:
+            file_open = fits.open(f, mode='readonly')
+            ext = tel.raw_header_ext
+            hdr = file_open[ext].header
+            check_data = file_open[ext].data
+            file_open._verify()
+        except IndexError:
+            if log: log.error(f'Moving file {f} to bad due to error opening file.')
+            moved_path = paths['bad']
+            if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
+            continue
+        except (TypeError, gzip.BadGzipFile, zlib.error):
+            if log: log.error(f'Moving file {f} to bad due to corrupted data.')
+            moved_path = paths['bad']
+            if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
+            continue
 
         try:
             target = tel.get_target(hdr)
