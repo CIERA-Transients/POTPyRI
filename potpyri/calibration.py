@@ -86,7 +86,7 @@ def do_flat(flat_table, tel, red_path, staticmask=None, log=None):
         fil = flat_table[mask]['Filter'][0]
         amp = flat_table[mask]['Amp'][0]
         binn = flat_table[mask]['Binning'][0]
-        is_science = flat_table[mask]['Type'][0]=='SCIENCE'
+        is_science = np.any([f=='SCIENCE' for f in flat_table[mask]['Type']])
 
         flat_name = tel.get_mflat_name(red_path, fil, amp, binn)
 
