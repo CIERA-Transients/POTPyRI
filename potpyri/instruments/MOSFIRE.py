@@ -71,7 +71,7 @@ class MOSFIRE(instrument.Instrument):
         self.science_keywords = ['GRATMODE','MASKNAME']
         self.science_values = ['imaging','OPEN']
         self.flat_keywords = ['OBJECT']
-        self.flat_values = ['Flat']
+        self.flat_values = ['[F,f]lat*']
         self.bias_keywords = []
         self.bias_values = []
         self.dark_keywords = ['FILTER']
