@@ -22,6 +22,7 @@ import time
 import shutil
 import logging
 import importlib
+import re
 import numpy as np
 
 from astropy.io import fits
@@ -83,10 +84,14 @@ def main_pipeline(instrument:str,
     ####################
     # Master bias, dark, and flat creation (will skip if unnecessary)
     kwds = tel.filetype_keywords
-    bias_files = file_table[file_table['Type']==kwds['BIAS']]
-    flat_files = file_table[file_table['Type']==kwds['FLAT']]
-    dark_files = file_table[file_table['Type']==kwds['DARK']]
-    science_data = file_table[file_table['Type']==kwds['SCIENCE']]
+    bias_match = np.array([bool(re.match(kwds['BIAS'], r)) for r in file_table['Type']])
+    flat_match = np.array([bool(re.match(kwds['FLAT'], r)) for r in file_table['Type']])
+    dark_match = np.array([bool(re.match(kwds['DARK'], r)) for r in file_table['Type']])
+    science_match = np.array([bool(re.match(kwds['SCIENCE'], r)) for r in file_table['Type']])
+    bias_files = file_table[bias_match]
+    flat_files = file_table[flat_match]
+    dark_files = file_table[dark_match]
+    science_data = file_table[science_match]
 
     # Use science data as flat files if no flats and a lot of science data
     if tel.flat and len(flat_files)==0 and len(science_data)>11:
