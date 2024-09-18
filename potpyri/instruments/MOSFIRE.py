@@ -108,8 +108,10 @@ class MOSFIRE(instrument.Instrument):
     def get_exptime(self, hdr):
         return(hdr['TRUITIME']*hdr['COADDONE'])
 
-    def get_number(self, hdr):
-        return(hdr['FRAMENUM'])
+    # Get a unique image number that can be derived only from the file header
+    def get_number(self, header):
+        number = str(header['FRAMENO']).zfill(5)
+        return(number)
 
     def import_image(self, filename, amp, log=None):
 

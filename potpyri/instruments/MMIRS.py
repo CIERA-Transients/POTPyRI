@@ -94,9 +94,12 @@ class MMIRS(instrument.Instrument):
         self.out_size = 2500
 
     # Get a unique image number that can be derived only from the file header
-    def get_number(self, header):
-        number = str(int(np.abs(Time(header['DATE-OBS']).mjd*1e5-5900000000)))
-        return(number)
+    def get_number(self, hdr):
+        datestr = hdr['DATE-OBS']
+        elap = Time(datestr)-Time('1980-01-01')
+        elap = int(np.round(elap.to(u.second).value))
+
+        return elap
 
     def raw_format(self, proc):
         return('*.fits')

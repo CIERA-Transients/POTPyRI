@@ -109,6 +109,7 @@ class DEIMOS(instrument.Instrument):
         return elap
 
     def get_ampl(self, hdr):
+        return(str(hdr['NVIDINP']))
 
     def get_gain(self, hdr):
         if amp=='4':
