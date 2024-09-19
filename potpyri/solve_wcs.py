@@ -195,11 +195,20 @@ def solve_astrometry(file, tel, radius=0.5, replace=True,
     args += f' --radius {radius} --no-plots -T '
     args += f'--overwrite -N {newfile} --dir {directory} '
 
+    # Test for --use-source-extractor flag
+    p = subprocess.run(['solve-field','-h'],capture_output=True)
+    data = p.stdout.decode().lower()
+
+    if '--use-source-extractor' in data:
+        args += '--use-source-extractor '
+    elif '--use-sextractor' in data:
+        args += '--use-sextractor '
+
     extra_opts = '--downsample 2 --no-verify --odds-to-tune-up 1e4 --objs 15'
 
     tries = 1
     good = False
-    while tries < 5 and not good:
+    while tries < 3 and not good:
         input_args = args + extra_opts
 
         if log: 
@@ -228,10 +237,6 @@ def solve_astrometry(file, tel, radius=0.5, replace=True,
             tries += 1
             if tries==2:
                 extra_opts='--objs 15'
-            elif tries==3:
-                extra_opts='--use-sextractor'
-            elif tries==4:
-                extra_opts='--use-source-extractor'
 
 
     file_exists=os.path.exists(newfile)

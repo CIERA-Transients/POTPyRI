@@ -1,6 +1,7 @@
 import os
 import shutil
 import sys
+import subprocess
 
 def add_options():
     import argparse
@@ -78,6 +79,25 @@ def add_options():
         args.instrument = 'MMIRS'
 
     return(args)
+
+def test_for_dependencies():
+
+    p = subprocess.run(['solve-field','-h'], capture_output=True)
+    data = p.stdout.decode().lower()
+
+    # Check for astrometry.net in output
+    if 'astrometry.net' not in data:
+        raise Exception(f'''Astrometry.net is a dependency of POTPyRI.  Download
+            and install the binaries and required index files from:
+            https://astrometry.net/use.html''')
+
+    p = subprocess.run(['sex','-h'], capture_output=True)
+    data = p.stderr.decode().lower()
+    if 'syntax: sex' not in data:
+        raise Exception(f'''source extractor is a dependency of POTPyRI.  
+            Install via Homebrew (https://formulae.brew.sh/formula/sextractor), 
+            apt-get, or directly from the source code:
+            https://github.com/astromatic/sextractor.''')
 
 def add_paths(data_path):
 
