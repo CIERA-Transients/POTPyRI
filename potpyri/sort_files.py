@@ -277,7 +277,7 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
             logging.shutdown()
             sys.exit(-1)
 
-        if log: log.info(f'File {currfile} is {file_type}')
+        if log: log.info(f'File {i+1}/{len(files)}: {currfile} is {file_type},{target},{fil}')
 
         if (file_type!='BAD' and file_type!='SPEC') or incl_bad:
             file_table.add_row((currfile,target,targ_type,fil,amp,binn,exp,

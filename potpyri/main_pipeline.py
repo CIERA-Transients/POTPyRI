@@ -152,6 +152,7 @@ def main_pipeline(instrument:str,
         log.info(f'Total runtime: {t2-t1} sec')
 
 def main():
+    options.test_for_dependencies()
     args = options.add_options()
     main_pipeline(**vars(args))
 
