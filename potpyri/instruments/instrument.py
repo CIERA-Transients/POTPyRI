@@ -131,7 +131,7 @@ class Instrument(object):
             return(self.bin_keyword)
 
     def get_time(self, hdr):
-        return(hdr[self.mjd_keyword])
+        return(float(hdr[self.mjd_keyword]))
 
     def get_static_mask(self, paths):
 

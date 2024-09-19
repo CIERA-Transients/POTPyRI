@@ -25,8 +25,7 @@ def add_options():
     params.add_argument('--proc', 
         type=str, 
         default=True, 
-        help='''Option to use the _proc data from MMT. Optional parameter. 
-        Default is False.''')
+        help='''Option to specify file processing for data ingestion.''')
     params.add_argument('--include-bad','--incl-bad', 
         default=False,
         action='store_true', 

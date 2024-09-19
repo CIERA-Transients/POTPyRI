@@ -72,6 +72,8 @@ def main_pipeline(instrument:str,
 
     # This contains all of the file data
     file_list = os.path.join(paths['data'], file_list_name)
+    print(proc)
+    print(tel.raw_format(proc))
     file_table = sort_files.handle_files(file_list, tel, paths, 
         incl_bad=incl_bad, proc=proc, no_redo=no_redo_sort, log=log)
 

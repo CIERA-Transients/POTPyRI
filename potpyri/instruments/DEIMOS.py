@@ -73,7 +73,7 @@ class DEIMOS(instrument.Instrument):
         self.target_keyword = 'OBJECT'
         self.exptime_keyword = 'ELAPTIME'
         self.filter_keyword = 'DWFILNAM'
-        self.mjd_keyword = 'MJD-OBS'
+        self.mjd_keyword = 'MJD'
         self.bin_keyword = 'BINNING'
         self.amp_keyword = 'NVIDINP'
 
