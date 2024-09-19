@@ -163,9 +163,6 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
     
     if log: log.info(f'Running sort_files version: {__version__}')
 
-    # Edit raw data headers if necessary
-    tel.edit_raw_headers(files, log=log)
-
     bad_num = 0
     spec_num = 0
     sci_num = 0
@@ -195,6 +192,10 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
             moved_path = paths['bad']
             if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
             continue
+
+        # Edit raw data headers if necessary
+        # TODO - adjust method to work only on individual files
+        tel.edit_raw_headers([f], log=log)
 
         try:
             target = tel.get_target(hdr)
