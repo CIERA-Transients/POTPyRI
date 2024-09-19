@@ -97,7 +97,7 @@ class LRIS(instrument.Instrument):
 
     def raw_format(self, proc):
 
-        if str(proc)=='True':
+        if str(proc)=='archive':
             return('*.fits')
         elif str(proc)=='raw':
             return('*[b,r]*.fits')
