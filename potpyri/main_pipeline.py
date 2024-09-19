@@ -126,6 +126,10 @@ def main_pipeline(instrument:str,
             skip_skysub=skip_skysub, fieldcenter=fieldcenter, out_size=out_size,
             log=log)
 
+        if stack is None:
+            if log: log.error(f'Could not generate a stack for {tar}')
+            continue
+
         # Auto-WCS solution - only run if we have not already pre-aligned to
         # a specific input coordinate
         if fieldcenter is None and out_size is None:
