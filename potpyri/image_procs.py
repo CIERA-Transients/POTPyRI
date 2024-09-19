@@ -116,6 +116,9 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
 
         solved_images.append(file)
 
+    if len(solved_images)==0:
+        return(None, None)
+
     # Determine what the value of use_wcs should be
     if use_wcs is None:
         if fieldcenter is None:
@@ -247,6 +250,9 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
 
     aligned_images, aligned_data = align_images(reduced_files, paths, tel, binn,
         use_wcs=use_wcs, fieldcenter=fieldcenter, out_size=out_size, log=log)
+
+    if aligned_images is None or aligned_data is None:
+        return(None)
 
     if log: log.info('Creating mask and error arrays.')
     masks = []
