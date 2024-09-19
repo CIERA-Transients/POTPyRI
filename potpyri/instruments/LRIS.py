@@ -83,7 +83,7 @@ class LRIS(instrument.Instrument):
         self.spec_keywords = ['GRISTRAN']
         self.spec_values = ['deployed']
         self.bad_keywords = ['SLITNAME','KOAIMTYP']
-        self.bad_values = ['GOH_LRIS','focus']
+        self.bad_values = ['goh_lris','focus']
 
         self.detrend = True
         self.catalog_zp = 'PS1'

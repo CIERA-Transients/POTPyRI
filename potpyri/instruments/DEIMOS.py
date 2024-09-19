@@ -79,17 +79,17 @@ class DEIMOS(instrument.Instrument):
 
         # File sorting keywords
         self.science_keywords = ['MOSMODE','OBSMODE','SLMSKNAM','HATCHPOS']
-        self.science_values = ['Direct','imaging','None','open']
+        self.science_values = ['direct','imaging','none','open']
         self.flat_keywords = ['OBSTYPE','OBJECT']
-        self.flat_values = ['Flat','Flat']
+        self.flat_values = ['flat','flat']
         self.bias_keywords = ['OBSTYPE']
-        self.bias_values = ['Bias']
+        self.bias_values = ['bias']
         self.dark_keywords = []
         self.dark_values = []
         self.spec_keywords = ['MOSMODE','OBSMODE','SLMSKNAM']
-        self.spec_values = ['Spectral','longslit','LVMslitC']
+        self.spec_values = ['spectral','longslit','lvmslitc']
         self.bad_keywords = ['SLMSKNAM','PONAME']
-        self.bad_values = ['GOH_X','Mira']
+        self.bad_values = ['goh_x','mira']
 
         self.detrend = True
         self.catalog_zp = 'PS1'

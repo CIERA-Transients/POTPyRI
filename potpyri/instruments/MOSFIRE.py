@@ -69,17 +69,17 @@ class MOSFIRE(instrument.Instrument):
 
         # File sorting keywords
         self.science_keywords = ['GRATMODE','MASKNAME']
-        self.science_values = ['imaging','OPEN']
+        self.science_values = ['imaging','open']
         self.flat_keywords = ['OBJECT']
-        self.flat_values = ['[F,f]lat*']
+        self.flat_values = ['flat']
         self.bias_keywords = []
         self.bias_values = []
         self.dark_keywords = ['FILTER']
-        self.dark_values = ['Dark']
+        self.dark_values = ['dark']
         self.spec_keywords = ['GRATMODE']
         self.spec_values = ['spectroscopy']
         self.bad_keywords = ['MASKNAME','PONAME']
-        self.bad_values = ['CLOSED','MIRA']
+        self.bad_values = ['closed','mira']
 
         self.detrend = True
         self.catalog_zp = '2MASS'
