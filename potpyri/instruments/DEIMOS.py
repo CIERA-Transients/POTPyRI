@@ -141,7 +141,7 @@ class DEIMOS(instrument.Instrument):
         else:
             trim_sec = '[13:2060,1:2601]'
         
-        raw = [CCDData.read(filename, hdu=x+1, unit='adu') 
+        raw = [CCDData.read(filename, hdu=x+1, unit=u.adu) 
             for x in range(int(amp))]
         red = [ccdproc.ccd_process(x, oscan=x[:,0:13], 
             oscan_model=models.Chebyshev1D(3), trim=trim_sec, 
@@ -154,14 +154,12 @@ class DEIMOS(instrument.Instrument):
             full = CCDData(np.concatenate([red[0],np.zeros([2601,113]),
                 red[1],np.zeros([2601,81]),red[2],np.zeros([2601,113]),
                 red[3]],axis=1),
-                header=header,
-                unit=u.electron/u.second)
+                header=header, unit=u.electron)
         if amp == '8':
             full = CCDData(np.concatenate([red[1],np.fliplr(red[0]),
                 red[3],np.fliplr(red[2]),red[5],np.fliplr(red[4]),red[7],
                 np.fliplr(red[6])],axis=1),
-                header=header,
-                unit=u.electron/u.second)
+                header=header, unit=u.electron)
 
         full.header['SATURATE'] = self.saturation
 
