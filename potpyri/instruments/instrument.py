@@ -506,6 +506,12 @@ class Instrument(object):
                 final = processed_data
                 final.header['SKYBKG'] = 0.0
 
+            # Apply final masking based on excessively negative values
+            mean, median, stddev = sigma_clipped_stats(final.data)
+            mask = final.data < median - 10 * stddev
+            final.data[mask] = np.nan
+            final.mask = final.mask | mask
+
             # Convert data format to float32
             final.data = final.data.astype(np.float32)
             final.header['BITPIX']=-32
