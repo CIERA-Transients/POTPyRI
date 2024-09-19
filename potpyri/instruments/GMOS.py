@@ -79,17 +79,17 @@ class GMOS(instrument.Instrument):
 
         # File sorting keywords
         self.science_keywords = ['SHUTTER','GRATING','OBSCLASS','OBSTYPE']
-        self.science_values = ['OPEN','MIRROR','science','OBJECT']
+        self.science_values = ['open','mirror','science','object']
         self.flat_keywords = ['SHUTTER','GRATING','OBSCLASS','OBSTYPE']
-        self.flat_values = ['OPEN','MIRROR','dayCal','OBJECT']
+        self.flat_values = ['open','mirror','daycal','object']
         self.bias_keywords = ['SHUTTER','GRATING','OBSCLASS','OBSTYPE']
-        self.bias_values = ['CLOSED','MIRROR','dayCal','BIAS']
+        self.bias_values = ['closed','mirror','daycal','bias']
         self.dark_keywords = []
         self.dark_values = []
         self.spec_keywords = ['SHUTTER','FILTER2']
-        self.spec_values = ['OPEN','open2-8']
+        self.spec_values = ['open','open2-8']
         self.bad_keywords = ['RAWGEMQA']
-        self.bad_values = ['FAIL']
+        self.bad_values = ['fail']
 
         self.detrend = True
         self.catalog_zp = 'PS1'
