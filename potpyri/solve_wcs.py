@@ -208,7 +208,7 @@ def solve_astrometry(file, tel, radius=0.5, replace=True,
 
     tries = 1
     good = False
-    while tries < 3 and not good:
+    while tries < 4 and not good:
         input_args = args + extra_opts
 
         if log: 
@@ -237,6 +237,8 @@ def solve_astrometry(file, tel, radius=0.5, replace=True,
             tries += 1
             if tries==2:
                 extra_opts='--objs 15'
+            elif tries==3:
+                extra_opts=''
 
 
     file_exists=os.path.exists(newfile)
