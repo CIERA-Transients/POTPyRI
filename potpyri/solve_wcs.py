@@ -1,16 +1,10 @@
-#!/usr/bin/env python
-
 "Python script for WCS solution."
-"Author: Kerry Paterson"
-"This project was funded by AST "
-"If you use this code for your work, please consider citing ."
+"Authors: Kerry Paterson, Charlie Kilpatrick"
 
-__version__ = "3.12" #last updated 01/10/2021
+# Last updated 09/21/2024
+__version__ = "2.0"
 
 import numpy as np
-import time
-import astropy
-import argparse
 import subprocess
 import os
 
@@ -32,7 +26,7 @@ from astropy.wcs import WCS
 from astropy.wcs.utils import fit_wcs_from_points
 
 # Internal dependency
-import utilities
+from potpyri import utilities
 
 #turn Astropy warnings off
 import warnings
@@ -180,7 +174,7 @@ def solve_astrometry(file, tel, radius=0.5, replace=True,
         newfile = fullfile.replace(exten,'.solved.fits')
 
     # Handle pixel scale guess
-    scale = tel.pixscale(header)
+    scale = tel.pixscale
     scale_high = float('%.4f'%(scale * 1.2))
     scale_low = float('%.4f'%(scale * 0.8))
 
@@ -195,11 +189,20 @@ def solve_astrometry(file, tel, radius=0.5, replace=True,
     args += f' --radius {radius} --no-plots -T '
     args += f'--overwrite -N {newfile} --dir {directory} '
 
+    # Test for --use-source-extractor flag
+    p = subprocess.run(['solve-field','-h'],capture_output=True)
+    data = p.stdout.decode().lower()
+
+    if '--use-source-extractor' in data:
+        args += '--use-source-extractor '
+    elif '--use-sextractor' in data:
+        args += '--use-sextractor '
+
     extra_opts = '--downsample 2 --no-verify --odds-to-tune-up 1e4 --objs 15'
 
     tries = 1
     good = False
-    while tries < 5 and not good:
+    while tries < 4 and not good:
         input_args = args + extra_opts
 
         if log: 
@@ -229,9 +232,7 @@ def solve_astrometry(file, tel, radius=0.5, replace=True,
             if tries==2:
                 extra_opts='--objs 15'
             elif tries==3:
-                extra_opts='--use-sextractor'
-            elif tries==4:
-                extra_opts='--use-source-extractor'
+                extra_opts=''
 
 
     file_exists=os.path.exists(newfile)

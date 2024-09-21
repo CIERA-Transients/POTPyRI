@@ -1,13 +1,19 @@
+"Wrapper methods for creating bias, dark, and flat images from pipeline data."
+"Authors: Charlie Kilpatrick"
+
+# Initial version tracking on 09/21/2024
+__version__ = "1.0"
+
 import os
 import time
 import logging
 import numpy as np
 import sys
 
-def do_bias(bias_table, tel, red_path, log=None):
+def do_bias(bias_table, tel, red_path, staticmask=None, log=None):
 
     # Exit if telescope does not require bias
-    if not tel.bias():
+    if not tel.bias:
         return(None)
 
     bias_num = 0
@@ -26,7 +32,8 @@ def do_bias(bias_table, tel, red_path, log=None):
         else:
             t1 = time.time()
             if log: log.info('Processing bias files.')
-            tel.create_bias(cal_table['File'], amp, binn, red_path, log=log)
+            tel.create_bias(cal_table['File'], amp, binn, red_path, 
+                staticmask=staticmask, log=log)
             t2 = time.time()
 
             if log: log.info(f'Master bias creation completed in {t2-t1} sec')
@@ -36,10 +43,10 @@ def do_bias(bias_table, tel, red_path, log=None):
         logging.shutdown()
         sys.exit(-1)
 
-def do_dark(dark_table, tel, red_path, log=None):
+def do_dark(dark_table, tel, red_path, staticmask=None, log=None):
 
     # Exit if telescope does not require dark
-    if not tel.dark():
+    if not tel.dark:
         return(None)
 
     for cal_type in np.unique(dark_table['CalType']):
@@ -56,7 +63,7 @@ def do_dark(dark_table, tel, red_path, log=None):
             if log: log.info(f'Master dark {dark_name} exists.')
         else:
             mbias = None
-            if tel.bias():
+            if tel.bias:
                 if log: log.info('Loading master bias.')
                 try:
                     mbias = tel.load_bias(red_path, amp, binn)
@@ -68,14 +75,14 @@ def do_dark(dark_table, tel, red_path, log=None):
 
             t1 = time.time()
             tel.create_dark(cal_table['File'], amp, binn,
-                red_path, mbias=mbias, log=log)
+                red_path, mbias=mbias, staticmask=staticmask, log=log)
             t2 = time.time()
             if log: log.info(f'Master dark creation completed in {t2-t1} sec.')
 
-def do_flat(flat_table, tel, red_path, log=None):
+def do_flat(flat_table, tel, red_path, staticmask=None, log=None):
 
     # Exit if telescope does not require dark
-    if not tel.flat():
+    if not tel.flat:
         return(None)
 
     for cal_type in np.unique(flat_table['CalType']):
@@ -85,7 +92,7 @@ def do_flat(flat_table, tel, red_path, log=None):
         fil = flat_table[mask]['Filter'][0]
         amp = flat_table[mask]['Amp'][0]
         binn = flat_table[mask]['Binning'][0]
-        is_science = flat_table[mask]['Type'][0]=='SCIENCE'
+        is_science = np.any([f=='SCIENCE' for f in flat_table[mask]['Type']])
 
         flat_name = tel.get_mflat_name(red_path, fil, amp, binn)
 
@@ -94,7 +101,7 @@ def do_flat(flat_table, tel, red_path, log=None):
         else:
             mbias = None
             mdark = None
-            if tel.bias():
+            if tel.bias:
                 if log: log.info('Loading master bias.')
                 try:
                     mbias = tel.load_bias(red_path, amp, binn)
@@ -104,7 +111,7 @@ def do_flat(flat_table, tel, red_path, log=None):
                         filter {fil}, {amp} amps, {binn} binning.''')
                     continue
 
-            if tel.dark():
+            if tel.dark:
                 if log: log.info('Loading master dark.')
                 try:
                     mdark = tel.load_dark(red_path, amp, binn)
@@ -117,7 +124,7 @@ def do_flat(flat_table, tel, red_path, log=None):
             t1 = time.time()
             tel.create_flat(cal_table['File'], fil, amp, binn,
                 red_path, mbias=mbias, mdark=mdark, is_science=is_science, 
-                log=log)
+                staticmask=staticmask, log=log)
             t2 = time.time()            
             if log: log.info(f'Master flat creation completed in {t2-t1} sec')
 

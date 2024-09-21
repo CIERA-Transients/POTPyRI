@@ -8,33 +8,33 @@ WCS alignment is performed with astrometry.net and astropy/photutils,
 photometry is performed with photutils, and flux calibration with astroquery
 and numpy.
 
-Author: Kerry Paterson
+Authors: Kerry Paterson, Charlie Kilpatrick
 This project was funded by AST 
 If you use this code for your work, please consider citing the package release.
 """
 
-# Refactor on 2024-07-19
-__version__ = "1.22"
+# Last updated 09/21/2024
+__version__ = "2.0"
 
 import sys
 import os
 import time
-import shutil
 import logging
 import importlib
+import re
 import numpy as np
 
 from astropy.io import fits
 
 # Internal dependencies
-import logger
-import sort_files
-import solve_wcs
-import photometry
-import absphot
-import calibration
-import image_procs
-import options
+from potpyri import logger
+from potpyri import sort_files
+from potpyri import solve_wcs
+from potpyri import photometry
+from potpyri import absphot
+from potpyri import calibration
+from potpyri import image_procs
+from potpyri import options
 
 # Check options.py - all named parameters need to correspond to options that are
 # provided via argparse.
@@ -57,7 +57,8 @@ def main_pipeline(instrument:str,
     t1 = time.time()
     
     # import telescope parameter file
-    tel = importlib.import_module(f'instruments.{instrument.upper()}')
+    module = importlib.import_module(f'potpyri.instruments.{instrument.upper()}')
+    tel = getattr(module, instrument.upper())()
 
     # Generate code and data paths based on input path
     paths = options.add_paths(data_path)
@@ -66,7 +67,7 @@ def main_pipeline(instrument:str,
     log = logger.get_log(paths['log'])
 
     if log: log.info(f'Running main pipeline version {__version__}')
-    if log: log.info(f'Running instrument paramater file version {tel.__version__}')
+    if log: log.info(f'Running instrument paramater file version {tel.version}')
 
     # This contains all of the file data
     file_list = os.path.join(paths['data'], file_list_name)
@@ -81,19 +82,24 @@ def main_pipeline(instrument:str,
     # Calibration images
     ####################
     # Master bias, dark, and flat creation (will skip if unnecessary)
-    kwds = tel.filetype_keywords()
-    bias_files = file_table[file_table['Type']==kwds['BIAS']]
-    flat_files = file_table[file_table['Type']==kwds['FLAT']]
-    dark_files = file_table[file_table['Type']==kwds['DARK']]
-    science_data = file_table[file_table['Type']==kwds['SCIENCE']]
+    kwds = tel.filetype_keywords
+    bias_match = np.array([bool(re.search(kwds['BIAS'], r)) for r in file_table['Type']])
+    flat_match = np.array([bool(re.search(kwds['FLAT'], r)) for r in file_table['Type']])
+    dark_match = np.array([bool(re.search(kwds['DARK'], r)) for r in file_table['Type']])
+    science_match = np.array([bool(re.search(kwds['SCIENCE'], r)) for r in file_table['Type']])
+    bias_files = file_table[bias_match]
+    flat_files = file_table[flat_match]
+    dark_files = file_table[dark_match]
+    science_data = file_table[science_match]
 
     # Use science data as flat files if no flats and a lot of science data
-    if tel.flat() and len(flat_files)==0 and len(science_data)>11:
+    if tel.flat and len(flat_files)==0 and len(science_data)>11:
         flat_files = science_data
 
-    calibration.do_bias(bias_files, tel, paths['cal'], log=log)
-    calibration.do_dark(dark_files, tel, paths['cal'], log=log)
-    calibration.do_flat(flat_files, tel, paths['cal'], log=log)
+    staticmask = tel.get_static_mask(paths)
+    calibration.do_bias(bias_files, tel, paths['cal'], staticmask=staticmask, log=log)
+    calibration.do_dark(dark_files, tel, paths['cal'], staticmask=staticmask, log=log)
+    calibration.do_flat(flat_files, tel, paths['cal'], staticmask=staticmask, log=log)
 
     # Science images
     ################
@@ -105,8 +111,8 @@ def main_pipeline(instrument:str,
         sys.exit(-1)
 
     # Begin processing
-    for tar in np.unique(science_data['CalType']):
-        mask = science_data['CalType']==tar
+    for tar in np.unique(science_data['TargType']):
+        mask = science_data['TargType']==tar
         target_table = science_data[mask]
 
         if target is not None:
@@ -118,6 +124,10 @@ def main_pipeline(instrument:str,
         stack = image_procs.image_proc(target_table, tel, paths, proc=proc, 
             skip_skysub=skip_skysub, fieldcenter=fieldcenter, out_size=out_size,
             log=log)
+
+        if stack is None:
+            if log: log.error(f'Could not generate a stack for {tar}')
+            continue
 
         # Auto-WCS solution - only run if we have not already pre-aligned to
         # a specific input coordinate
@@ -132,18 +142,20 @@ def main_pipeline(instrument:str,
 
         if log: log.info('Calculating zeropint.')
         hdu = fits.open(stack)
-        cat = tel.catalog_zp(hdu[0].header)
+        cat = tel.get_catalog(hdu[0].header)
         cal = absphot.absphot()
         try:
             cal.find_zeropoint(stack, target_table['Filter'][0], cat, log=log)
         except:
             if log: log.error(f'Could not calibrate photometry for {stack}')
         
-    t2 = time.time()
-    if log: log.info('Pipeline finshed.')
-    if log: log.info(f'Total runtime: {t2-t1} sec')
+    if log: 
+        t2 = time.time()
+        log.info('Pipeline finshed.')
+        log.info(f'Total runtime: {t2-t1} sec')
 
 def main():
+    options.test_for_dependencies()
     args = options.add_options()
     main_pipeline(**vars(args))
 

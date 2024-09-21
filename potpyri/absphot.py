@@ -1,6 +1,10 @@
+"Function for calculating zero points during flux calibration."
+"Authors: Kerry Paterson, Charlie Kilpatrick"
+
+# Initial version tracking on 09/21/2024
+__version__ = "1.0"
+
 import numpy as np
-import os
-import sys
 
 from astroquery.vizier import Vizier
 from astropy import units as u
@@ -8,7 +12,8 @@ from astropy.coordinates import SkyCoord
 from astropy.table import Table
 from astropy.io import fits
 
-import utilities
+# Internal dependency
+from potpyri import utilities
 
 class absphot(object):
     def __init__(self, iterations=5, sigma=5):
@@ -22,7 +27,6 @@ class absphot(object):
 
         from scipy.odr import ODR
         from scipy.odr import Model
-        from scipy.odr import Data
         from scipy.odr import RealData
         
         def magnitude(zpt, flux):
@@ -107,6 +111,9 @@ class absphot(object):
         
         vizier = Vizier(columns=[cat_ra, cat_dec, cat_mag, cat_err])
         vizier.ROW_LIMIT = -1
+        if log: 
+            log.info(f'Getting {catalog} catalog with ID {cat_ID} in filt {filt}')
+            log.info(f'Querying around {coord_ra}, {coord_dec} deg')
         cat = vizier.query_region(med_coord, width=1.2*max_sep*u.degree, 
             catalog=cat_ID)
 
@@ -140,9 +147,9 @@ class absphot(object):
         phottable='APPPHOT', log=None):
 
         if log:
-            log.info(f'Importing catalog file: {cmpfile}')
+            log.info(f'Importing catalog from file: {cmpfile}')
         else:
-            print(f'Importing catalog file: {cmpfile}')
+            print(f'Importing catalog from file: {cmpfile}')
 
         hdu = fits.open(cmpfile)
         header = hdu['PRIMARY'].header
