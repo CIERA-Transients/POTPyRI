@@ -1,9 +1,13 @@
+"Functions for processing, masking, creating error images, and stacking images."
+"Authors: Charlie Kilpatrick"
+
+# Last updated on 09/21/2024
+__version__ = "2.0"
+
 import os 
-import ccdproc
 import time
 import importlib
 import numpy as np
-import astroscrappy
 import logging
 import sys
 
@@ -13,10 +17,7 @@ import acstools
 
 import astropy.units as u
 from astropy.io import fits, ascii
-from astropy.table import Table
-from astropy.stats import SigmaClip
 from astropy.stats import sigma_clipped_stats
-from astropy.nddata import CCDData
 from astropy.wcs import WCS
 
 from ccdproc import wcs_project
@@ -24,16 +25,9 @@ from ccdproc import CCDData
 from ccdproc import combine
 from ccdproc import cosmicray_lacosmic
 
-from photutils.background import Background2D
-from photutils.background import MeanBackground
-from photutils.segmentation import detect_threshold, detect_sources
-
 # Internal dependencies
-import solve_wcs
-import utilities
-
-# Edited on 2024-07-29
-__version__ = "1.3"
+from potpyri import solve_wcs
+from potpyri import utilities
 
 def remove_pv_distortion(header):
 
@@ -167,9 +161,9 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
 
     # All data in the table should be for one target
     assert np.all([image_data['Target']==image_data['Target'][0]])
-    assert np.all([image_data['CalType']==image_data['CalType'][0]])
+    assert np.all([image_data['TargType']==image_data['TargType'][0]])
     
-    cal_type = image_data['CalType'][0]
+    cal_type = image_data['TargType'][0]
     target = image_data['Target'][0]
     fil = image_data['Filter'][0]
     amp = image_data['Amp'][0]
@@ -220,9 +214,10 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
     processed = tel.process_science(files, fil, amp, binn, work_path,
         mbias=mbias, mflat=mflat, mdark=mdark, proc=proc, 
         staticmask=staticmask, skip_skysub=skip_skysub, log=log)
+    
     # Get filenames for output processed data
     reduced_files = [p.header['FILENAME'] for p in processed]
-        
+
     t2 = time.time()
     if log: log.info(f'Data processed in {t2-t1} sec')
     if log: log.info('Aligning images.')
@@ -241,7 +236,7 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
     reduced_files = np.array(reduced_files)[idx]
 
     if out_size is None:
-        out_size = tel.out_size
+        out_size = tel.get_out_size(processed[0].header)
 
     if fieldcenter is not None:
         use_wcs = generate_wcs(tel, binn, fieldcenter, out_size)
@@ -354,8 +349,6 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
     
     # Generate stack name and write out
     stackname = tel.get_stk_name(sci_med[0].header, red_path)
-
-    #sci_med = tel.edit_stack_headers(sci_med)
     sci_med.writeto(stackname, overwrite=True, output_verify='silentfix')
     
     if log: 
@@ -603,7 +596,7 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
     else:
         print(f'Mask creation completed in {t_end-t_start} sec')
 
-    return newdata, mask_hdu
+    return(newdata, mask_hdu)
 
 
 def create_error(science_data, mask_data, rdnoise):

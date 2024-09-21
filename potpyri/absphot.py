@@ -1,6 +1,10 @@
+"Function for calculating zero points during flux calibration."
+"Authors: Kerry Paterson, Charlie Kilpatrick"
+
+# Initial version tracking on 09/21/2024
+__version__ = "1.0"
+
 import numpy as np
-import os
-import sys
 
 from astroquery.vizier import Vizier
 from astropy import units as u
@@ -8,7 +12,8 @@ from astropy.coordinates import SkyCoord
 from astropy.table import Table
 from astropy.io import fits
 
-import utilities
+# Internal dependency
+from potpyri import utilities
 
 class absphot(object):
     def __init__(self, iterations=5, sigma=5):
@@ -22,7 +27,6 @@ class absphot(object):
 
         from scipy.odr import ODR
         from scipy.odr import Model
-        from scipy.odr import Data
         from scipy.odr import RealData
         
         def magnitude(zpt, flux):

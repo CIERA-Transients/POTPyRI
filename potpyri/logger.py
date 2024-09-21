@@ -1,3 +1,9 @@
+"Function for logging throughout the pipeline."
+"Authors: Kerry Paterson, Charlie Kilpatrick"
+
+# Initial version tracking on 09/21/2024
+__version__ = "1.0"
+
 import logging
 import time
 import datetime

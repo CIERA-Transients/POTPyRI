@@ -8,18 +8,17 @@ WCS alignment is performed with astrometry.net and astropy/photutils,
 photometry is performed with photutils, and flux calibration with astroquery
 and numpy.
 
-Author: Kerry Paterson
+Authors: Kerry Paterson, Charlie Kilpatrick
 This project was funded by AST 
 If you use this code for your work, please consider citing the package release.
 """
 
-# Refactor on 2024-07-19
-__version__ = "1.22"
+# Last updated 09/21/2024
+__version__ = "2.0"
 
 import sys
 import os
 import time
-import shutil
 import logging
 import importlib
 import re
@@ -28,14 +27,14 @@ import numpy as np
 from astropy.io import fits
 
 # Internal dependencies
-import logger
-import sort_files
-import solve_wcs
-import photometry
-import absphot
-import calibration
-import image_procs
-import options
+from potpyri import logger
+from potpyri import sort_files
+from potpyri import solve_wcs
+from potpyri import photometry
+from potpyri import absphot
+from potpyri import calibration
+from potpyri import image_procs
+from potpyri import options
 
 # Check options.py - all named parameters need to correspond to options that are
 # provided via argparse.
@@ -58,7 +57,7 @@ def main_pipeline(instrument:str,
     t1 = time.time()
     
     # import telescope parameter file
-    module = importlib.import_module(f'instruments.{instrument.upper()}')
+    module = importlib.import_module(f'potpyri.instruments.{instrument.upper()}')
     tel = getattr(module, instrument.upper())()
 
     # Generate code and data paths based on input path

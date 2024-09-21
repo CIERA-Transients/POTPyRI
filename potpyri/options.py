@@ -1,3 +1,9 @@
+"Functions for initializing pipeline options and data paths."
+"Authors: Charlie Kilpatrick"
+
+# Initial version tracking on 09/21/2024
+__version__ = "1.0"
+
 import os
 import shutil
 import sys

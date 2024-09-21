@@ -1,25 +1,24 @@
-#parameter file for LRIS/Keck
-import os
-import datetime
-import numpy as np
-import ccdproc
+# Parameter file for LRIS/Keck
 
+__version__ = "2.0" # Last edited 09/21/2024
+
+import os
+import ccdproc
+import numpy as np
+
+import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astropy.modeling import models
 from astropy.io import fits
 from astropy.time import Time
 from astropy.nddata import CCDData
-from astropy.wcs import WCS
-import astropy.units as u
-
-__version__ = 1.9 #last edited 18/11/2022
 
 # Internal dependency
 from . import instrument
 
 class LRIS(instrument.Instrument):
 
-    def __init__(self, proc=None, ):
+    def __init__(self):
 
         self.version = __version__
 
@@ -111,7 +110,7 @@ class LRIS(instrument.Instrument):
             filt = hdr['BLUFILT']
         if instrument == 'LRIS':
             filt = hdr['REDFILT']
-        return filt
+        return(filt)
 
     def get_ampl(self, hdr):
         try:
@@ -123,7 +122,7 @@ class LRIS(instrument.Instrument):
             side = 'B'
         if instrument == 'LRIS':
             side = 'R'
-        return amp+side
+        return(amp+side)
 
     def get_binning(self, header):
         if self.bin_keyword in header.keys():
@@ -141,7 +140,7 @@ class LRIS(instrument.Instrument):
             readnoise = [3.565,3.565,3.565,3.565]
         if amp=='1R':
             readnoise = [4]
-        return readnoise
+        return(readnoise)
 
     def get_gain(self, hdr):
         amp = self.get_ampl(hdr)
@@ -151,7 +150,7 @@ class LRIS(instrument.Instrument):
             gains = [1.71,1.64,1.61,1.67]
         if amp=='1R':
             gains = [1]
-        return gains
+        return(gains)
 
     def get_overscan(self, hdr):
         amp = self.get_ampl(hdr)
@@ -168,14 +167,23 @@ class LRIS(instrument.Instrument):
             b4=int(4248./binn)
             oscan_reg = f'[{b1}:{b2},{b3}:{b4}]'
         
-        return oscan_reg
+        return(oscan_reg)
 
     def get_time(self, hdr):
         try:
             mid_time = float(hdr['MJD-OBS'])
         except:
             mid_time = hdr['MJD']
-        return mid_time
+        return(mid_time)
+
+    def get_exptime(self, hdr):
+        if self.exptime_keyword in hdr.keys():
+            return(float(hdr[self.mjd_keyword]))
+        else:
+            t1 = Time(h['DATE-BEG'])
+            t2 = Time(h['DATE-END'])
+            dt = t2 - t1
+            return(dt.to_value('sec'))
 
     def get_1R_datasec(self, amp, binning=1):
         if binning==1:
@@ -249,121 +257,3 @@ class LRIS(instrument.Instrument):
         full.header['SATURATE'] = self.saturation
 
         return(full)
-
-    def edit_raw_headers(self, files, log=None):
-
-        for file in files:
-
-            hdu = fits.open(file)
-            h = hdu[0].header
-
-            if ('ELAPTIME' not in h.keys() and 'DATE-BEG' in h.keys() and
-                'DATE-END' in h.keys()):
-
-                t1 = Time(h['DATE-BEG'])
-                t2 = Time(h['DATE-END'])
-                dt = t2 - t1
-
-                hdu[0].header['ELAPTIME']=dt.to_value('sec')
-
-            if ('ELAPTIME' in h.keys() and float(h['ELAPTIME'])==0):
-                hdu[0].header['SLITNAME']=''
-                hdu[0].header['OBJECT']='bias'
-                hdu[0].header['KOAIMTYP']='bias'
-
-            if (('twi' in h['OBJECT'].lower() and 'flat' in h['OBJECT'].lower()) or
-                ('blank' in h['OBJECT'].lower()) or
-                ('t_flat' in h['OBJECT'].lower()) or
-                ('dome' in h['OBJECT'].lower() and 'flat' in h['OBJECT'].lower())):
-                hdu[0].header['KOAIMTYP']='flatlamp'
-
-            if ('KOAIMTYP' not in h.keys()):
-
-                if ('twi' in h['OBJECT'] and 'flat' in h['OBJECT']):
-                    hdu[0].header['KOAIMTYP']='flatlamp'
-                elif ('bias' in h['OBJECT'].lower()):
-                    hdu[0].header['KOAIMTYP']='bias'
-                else:
-                    hdu[0].header['KOAIMTYP']='object'
-
-            if 'NPIXSAT' not in h.keys():
-                npixsat = 0
-                for nh in hdu:
-                    if (('VidInp' in nh.name) or
-                        (nh.name=='PRIMARY' and nh.data is not None)):
-                        npixsat += len(nh.data[np.where(nh.data>60000)])
-                hdu[0].header['NPIXSAT']=npixsat
-
-            if 'INSTREV' in h.keys() and h['INSTREV']=='REDMARK4':
-                coord = SkyCoord(h['RABASE'],h['DECBASE'],unit=(u.hour, u.deg))
-
-                hdu[0].header['CRPIX1']=2000.0
-                hdu[0].header['CRPIX2']=2000.0
-
-                hdu[0].header['CRVAL1']=coord.ra.degree
-                hdu[0].header['CRVAL2']=coord.dec.degree
-
-                # TODO: Check that this is the correct dependence on PA
-                pa = h['PA']
-                bin1,bin2 = h['BINNING'].split(',')
-
-                hdu[0].header['CD1_2']=-np.sin(pa * np.pi/180.0)*3.75E-05*int(bin1)
-                hdu[0].header['CD2_1']=np.sin(pa * np.pi/180.0)*3.75E-05*int(bin1)
-                hdu[0].header['CD1_1']=np.cos(pa * np.pi/180.0)*3.75E-05*int(bin2)
-                hdu[0].header['CD2_2']=-np.cos(pa * np.pi/180.0)*3.75E-05*int(bin2)
-
-            if ('INSTRUME' in h.keys() and h['INSTRUME']=='LRISBLUE' and
-                'RA' in h.keys() and 'DEC' in h.keys()):
-
-                coord = SkyCoord(h['RA'], h['DEC'], unit=(u.hour, u.deg))
-
-                hdu[0].header['CRPIX1']=1500.0
-                hdu[0].header['CRPIX2']=1300.0
-
-                hdu[0].header['CRVAL1']=coord.ra.degree
-                hdu[0].header['CRVAL2']=coord.dec.degree
-
-                if 'ROTPOSN' in list(h.keys()):
-                    pa = h['ROTPOSN']
-                    hdu[0].header['CD1_2']=np.sin(pa * np.pi/180.0)*3.75E-05
-                    hdu[0].header['CD2_1']=-np.sin(pa * np.pi/180.0)*3.75E-05
-                    hdu[0].header['CD1_1']=np.cos(pa * np.pi/180.0)*3.75E-05
-                    hdu[0].header['CD2_2']=-np.cos(pa * np.pi/180.0)*3.75E-05
-
-                for i in np.arange(len(hdu)):
-                    if i==0: continue
-
-                    hdu[i].header['CUNIT1'] = 'deg'
-                    hdu[i].header['CUNIT2'] = 'deg'
-
-            hdu.writeto(file, overwrite=True, output_verify='silentfix')
-
-    def edit_stack_headers(self, stack):
-
-        good_keys = ['SIMPLE','BITPIX','NAXIS','NAXIS1','NAXIS2','EXTEND',
-            'DATE-OBS','RA','DEC','TARGRA','TARGDEC','EQUINOX','HA','AIRMASS',
-            'PARANG','EL','AZ','LST','TELESCOP','PA','DICHNAME','OBSMODE',
-            'CTYPE1','CTYPE2','CUNIT1','CUNIT2','RADECSYS','CD1_1','CD1_2',
-            'CD2_1','CD2_2','CRPIX1','CRPIX2','CRVAL1','CRVAL2','SEMESTER',
-            'PROGID','PROGPI','PROGINST','OA','SATURATE','SKYBKG','BUNIT',
-            'MJD-OBS','EXPTOT','EXPTIME','GAIN','RDNOISE','NFILES','FILTER',
-            'OBSTYPE','XTENSION','EXTNAME']
-
-        if 'TARGNAME' in stack[0].header.keys() and 'OBJECT' in stack[0].header.keys():
-            stack[0].header['OBJECT'] = stack[0].header['TARGNAME']
-
-        if 'EXPTOT' in stack[0].header.keys() and 'EXPTIME' in stack[0].header.keys():
-            stack[0].header['OBJECT'] = stack[0].header['TARGNAME']
-
-        # This deletes all keys in the header that are not in good_keys
-        for i,h in enumerate(stack):
-            while True:
-                cont = True
-                for key in stack[i].header.keys():
-                    if key in stack[i].header.keys() and key not in good_keys:
-                        del stack[i].header[key]
-                        cont = False
-                if cont:
-                    break
-
-        return(stack)

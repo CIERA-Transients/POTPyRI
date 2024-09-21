@@ -1,38 +1,33 @@
+"Functions for performing aperture and PSF photometry on pipeline images."
+"Authors: Kerry Paterson, Charlie Kilpatrick"
+
+# Initial version tracking on 09/21/2024
+__version__ = "1.0"
+
 from photutils.aperture import ApertureStats
 from photutils.aperture import CircularAperture
-from photutils.background import LocalBackground
-from photutils.background import MMMBackground
 from photutils.detection import DAOStarFinder
-from photutils.psf import EPSFModel
 from photutils.psf import EPSFBuilder
 from photutils.psf import extract_stars
 from photutils.psf import PSFPhotometry
-from photutils.psf import SourceGrouper
 
 from astropy.io import fits
 from astropy.stats import sigma_clipped_stats
 from astropy.stats import SigmaClip
 from astropy.nddata import NDData
 from astropy.table import Table
-from astropy.table import unique
 from astropy.table import Column
 from astropy.table import hstack
-from astropy.table import vstack
 from astropy.visualization import simple_norm
 from astropy.wcs import WCS
-from astropy.modeling import models
 from astropy.modeling import fitting
 from astropy.modeling import functional_models
 
 import matplotlib.pyplot as plt
 
-from scipy.ndimage import rotate
 from scipy.stats import sigmaclip
 import numpy as np
-import sys
-import glob
 import copy
-import os
 
 import warnings
 warnings.filterwarnings('ignore')

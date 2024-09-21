@@ -1,3 +1,7 @@
+# Basic instrument class
+
+__version__ = "1.1" # Last edited 09/21/2024
+
 import os
 import astropy
 import datetime
@@ -8,18 +12,13 @@ import numpy as np
 from photutils import Background2D
 from photutils import MeanBackground
 
-from astropy.coordinates import SkyCoord
+import astropy.units as u
 from astropy.io import fits
 from astropy.modeling import models
 from astropy.nddata import CCDData
 from astropy.stats import sigma_clipped_stats
 from astropy.stats import SigmaClip
 from astropy.time import Time
-
-import astropy.units as u
-import astropy.wcs as wcs
-
-__version__ = 1.0 # last edited 09-05-2024
 
 # Generic instrument class for POTPyRI
 
@@ -94,6 +93,7 @@ class Instrument(object):
         self.detrend = True
         self.catalog_zp = 'PS1'
 
+        # Default final image size for binning of 1x1
         self.out_size = 5000
 
     # Use these if a single value is needed for gain, rdnoise, etc.
@@ -130,6 +130,11 @@ class Instrument(object):
         else:
             return(self.bin_keyword)
 
+    def get_out_size(self, hdr):
+        binn = int(str(self.get_binning(hdr))[0])
+        out_size = int(self.out_size/binn)
+        return(out_size)
+
     def get_time(self, hdr):
         return(float(hdr[self.mjd_keyword]))
 
@@ -139,9 +144,9 @@ class Instrument(object):
             f'{self.name.lower()}.staticmask.fits.fz')
 
         if os.path.exists(mask_file):
-            return [mask_file]
+            return([mask_file])
         else:
-            return [None]
+            return([None])
 
     def get_catalog(self, hdr):
         return(self.catalog_zp)
@@ -165,9 +170,9 @@ class Instrument(object):
 
     def raw_format(self, proc):
         if proc:
-            return 'sci_img_*.fits'
+            return('sci_img_*.fits')
         else:
-            return 'sci_img*[!proc].fits'
+            return('sci_img*[!proc].fits')
 
     def get_stk_name(self, hdr, red_path):
         
@@ -217,17 +222,17 @@ class Instrument(object):
     def load_bias(self, red_path, amp, binn):
         bias = self.get_mbias_name(red_path, amp, binn)
         mbias = CCDData.read(bias)
-        return mbias
+        return(mbias)
 
     def load_dark(self, red_path, amp, binn):
         dark = self.get_mdark_name(red_path, amp, binn)
         mdark = CCDData.read(dark)
-        return mdark
+        return(mdark)
 
     def load_flat(self, red_path, fil, amp, binn):
         flat = self.get_mflat_name(red_path, fil, amp, binn)
         mflat = CCDData.read(flat)
-        return mflat
+        return(mflat)
 
     def import_image(self, filename, amp, log=None):
         filename = os.path.abspath(filename)
@@ -536,63 +541,4 @@ class Instrument(object):
             final.write(final_filename, overwrite=True)
             processed.append(final)
 
-        return processed
-
-    def edit_raw_headers(self, files, log=None):
-
-        bad_keys = ['WCSNAMEA','CUNIT1A','CUNIT2A','CTYPE1A','CTYPE2A',
-            'CRPIX1A','CRPIX2A','CRVAL1A','CRVAL2A','CD1_1A','CD1_2A',
-            'CD2_1A','CD2_2A','SOFTWARE','VER','DATASEC']
-
-        for file in files:
-            hdu = fits.open(file)
-            for i,h in enumerate(hdu):
-                hdr = copy.copy(h.header)
-                for key in hdr.keys():
-                    if key in bad_keys:
-                        del hdu[i].header[key]
-
-                # Check values of CRVAL1 and CRVAL2, which can be weird for some
-                # files
-                if ('CTYPE1' in hdr.keys() and 
-                    hdr['CTYPE1']=='RA---TAN' and 
-                    (hdr['CRVAL1']<0.0 or hdr['CRVAL1']>360.0)):
-                    coord = SkyCoord(hdr['LST'], '31:41:20.04', 
-                        unit=(u.hour, u.deg))
-                    hdu[i].header['CRVAL1']=coord.ra.degree
-
-                if ('CTYPE2' in hdr.keys() and 
-                    hdr['CTYPE2']=='DEC--TAN' and 
-                    (hdr['CRVAL2']<-90.0 or hdr['CRVAL2']>90.0)):
-                    hdu[i].header['CRVAL2']=31.6889
-
-
-            hdu.writeto(file, overwrite=True, output_verify='silentfix')
-
-
-    def edit_stack_headers(self, stack):
-
-        good_keys = ['SIMPLE','BITPIX','NAXIS','NAXIS1','NAXIS2','EXTEND',
-            'OBSERVAT','TELESCOP','ORIGIN','INSTRUME','EXTNAME','FILTER',
-            'DATE-OBS','RA','DEC','POSANG','AZ','EL','ROT','PA','MJD',
-            'LST','UT','AIRMASS','HA','GSEEING','WSEEING','IMAGETYP',
-            'OBJECT','PI','PROPID','GAIN','RADECSYS','SATURATE','SKYBKG',
-            'BUNIT','FILENAME','RADISP','DEDISP','MJD-OBS','RADESYS','EXPTOT',
-            'RDNOISE','NFILES','OBSTYPE','WCSAXES','CTYPE1','CTYPE2','EQUINOX',
-            'LONPOLE','LATPOLE','CRVAL1','CRVAL2','CRPIX1','CRPIX2','CUNIT1',
-            'CUNIT2','CD1_1','CD1_2','CD2_1','CD2_2','FWHM','DATE','SKYADU',
-            'SKYSIG','NPSFSTAR','NOBJECT','ZPTNSTAR','ZPTMAG','ZPTMUCER',
-            'M3SIGMA','M5SIGMA','M10SIGMA','CDELT1','CDELT2']
-
-        # This deletes all keys in the header that are not in good_keys
-        for i,h in enumerate(stack):
-            while True:
-                cont = True
-                for key in stack[i].header.keys():
-                    if key in stack[i].header.keys() and key not in good_keys:
-                        del stack[i].header[key]
-                        cont = False
-                if cont:
-                    break
-
-        return(stack)
+        return(processed)

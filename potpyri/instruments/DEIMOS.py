@@ -1,33 +1,23 @@
-#parameter file for DEIMOS/Keck
+# Parameter file for DEIMOS/Keck
+
+__version__ = "2.0" # Last edited 09/21/2024
+
 import os
-import astropy
-import datetime
-import copy
 import ccdproc
 import numpy as np
 
-from photutils import Background2D
-from photutils import MeanBackground
-
-from astropy.coordinates import SkyCoord
+import astropy.units as u
 from astropy.io import fits
 from astropy.modeling import models
 from astropy.nddata import CCDData
-from astropy.stats import sigma_clipped_stats
-from astropy.stats import SigmaClip
 from astropy.time import Time
-
-import astropy.units as u
-import astropy.wcs as wcs
-
-__version__ = 1.5 #last edited 23/11/2021
 
 # Internal dependency
 from . import instrument
 
 class DEIMOS(instrument.Instrument):
 
-    def __init__(self, proc=None, ):
+    def __init__(self):
 
         self.version = __version__
 
@@ -98,15 +88,14 @@ class DEIMOS(instrument.Instrument):
 
     def raw_format(self, proc):
         if proc and str(proc)=='raw':
-            return 'd*.fits'
+            return('d*.fits')
         else:
-            return 'DE*.fits.gz'
+            return('DE*.fits.gz')
 
     def get_number(self, hdr):
         elap = Time(hdr['MJD'], format='mjd')-Time('1980-01-01')
         elap = int(np.round(elap.to(u.second).value))
-
-        return elap
+        return(elap)
 
     def get_ampl(self, hdr):
         return(str(hdr['NVIDINP']))
@@ -117,7 +106,7 @@ class DEIMOS(instrument.Instrument):
             gains = [1.206, 1.722, 1.211, 1.231]
         if amp=='8':
             gains = [1.232, 1.180, 1.714, 1.173, 1.161, 1.261, 1.246, 1.216]
-        return gains
+        return(gains)
 
     def get_rdnoise(self, hdr):
         amp = self.get_ampl(hdr)
@@ -125,8 +114,16 @@ class DEIMOS(instrument.Instrument):
             readnoise = [2.528, 2.128, 2.5395, 3.2335]
         if amp=='8':
             readnoise = [2.583, 2.473, 1.797, 2.459, 2.434, 2.645, 3.918, 2.549]
-        
-        return readnoise
+        return(readnoise)
+
+    def get_exptime(self, hdr):
+        if self.exptime_keyword in hdr.keys():
+            return(float(hdr[self.mjd_keyword]))
+        else:
+            t1 = Time(h['DATE-BEG'])
+            t2 = Time(h['DATE-END'])
+            dt = t2 - t1
+            return(dt.to_value('sec'))
 
     def import_image(self, filename, amp, log=None):
         with fits.open(filename) as hdr:
@@ -164,67 +161,3 @@ class DEIMOS(instrument.Instrument):
         full.header['SATURATE'] = self.saturation
 
         return(full)
-
-    def edit_raw_headers(self, files, log=None):
-
-        for file in files:
-
-            basefile = os.path.basename(file)
-            if basefile.startswith('DE') and basefile.endswith('.gz'): continue
-
-            if log: log.info(f'Editing headers for: {file}')
-
-            hdu = fits.open(file)
-            h = hdu[0].header
-
-            if ('ELAPTIME' not in h.keys() and 'DATE-BEG' in h.keys() and
-                'DATE-END' in h.keys()):
-
-                t1 = Time(h['DATE-BEG'])
-                t2 = Time(h['DATE-END'])
-                dt = t2 - t1
-
-                hdu[0].header['ELAPTIME']=dt.to_value('sec')
-
-            if (('twi' in h['OBJECT'].lower() and 'flat' in h['OBJECT'].lower()) or
-                ('blank' in h['OBJECT'].lower()) or
-                ('t_flat' in h['OBJECT'].lower()) or
-                ('sky' in h['OBJECT'].lower() and 'flat' in h['OBJECT'].lower())):
-                hdu[0].header['OBSTYPE']='DmFlat'
-
-            if 'bias' in h['OBJECT'].lower():
-                hdu[0].header['OBSTYPE']='Bias'
-
-            if 'PONAME3' in h.keys() and h['PONAME3'].lower().strip()=='image':
-                hdu[0].header['OBSMODE']='imaging'
-            else:
-                hdu[0].header['OBSMODE']='spectroscopy'
-
-            hdu.writeto(file, overwrite=True, output_verify='silentfix')
-
-    def edit_stack_headers(self, stack, log=None):
-
-        good_keys = ['SIMPLE','BITPIX','NAXIS','NAXIS1','NAXIS2','EXTEND',
-            'OBSERVAT','TELESCOP','ORIGIN','INSTRUME','EXTNAME','FILTER',
-            'DATE-OBS','RA','DEC','POSANG','AZ','EL','ROT','PA',
-            'LST','UT','AIRMASS','HA','GSEEING','WSEEING','IMAGETYP',
-            'OBJECT','PI','PROPID','GAIN','RADECSYS','SATURATE','SKYBKG',
-            'BUNIT','FILENAME','RADISP','DEDISP','MJD-OBS','RADESYS','EXPTOT',
-            'RDNOISE','NFILES','OBSTYPE','WCSAXES','CTYPE1','CTYPE2','EQUINOX',
-            'LONPOLE','LATPOLE','CRVAL1','CRVAL2','CRPIX1','CRPIX2','CUNIT1',
-            'CUNIT2','CD1_1','CD1_2','CD2_1','CD2_2','FWHM','DATE','SKYADU',
-            'SKYSIG','NPSFSTAR','NOBJECT','ZPTNSTAR','ZPTMAG','ZPTMUCER',
-            'M3SIGMA','M5SIGMA','M10SIGMA','CDELT1','CDELT2']
-
-        # This deletes all keys in the header that are not in good_keys
-        for i,h in enumerate(stack):
-            while True:
-                cont = True
-                for key in stack[i].header.keys():
-                    if key in stack[i].header.keys() and key not in good_keys:
-                        del stack[i].header[key]
-                        cont = False
-                if cont:
-                    break
-
-        return(stack)

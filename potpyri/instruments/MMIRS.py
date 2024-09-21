@@ -1,30 +1,22 @@
-#parameter file for MMIRS/MMT
+# Parameter file for MMIRS/MMT
+
+__version__ = "2.0" # Last edited 09/21/2024
+
 import os
-import astropy
-import datetime
+import ccdproc
 import numpy as np
 
-from photutils.background import Background2D
-from photutils.background import MeanBackground
-
-from astropy.stats import SigmaClip
+import astropy.units as u
 from astropy.io import fits
 from astropy.time import Time
 from astropy.nddata import CCDData
-from astropy.stats import sigma_clipped_stats
-import astropy.units.astrophys as u
-import astropy.units as u
-import ccdproc
-from astropy.modeling import models
-
-__version__ = 1.8 #last edited 09/11/2021
 
 # Internal dependency
 from . import instrument
 
 class MMIRS(instrument.Instrument):
 
-    def __init__(self, proc=None, ):
+    def __init__(self):
 
         self.version = __version__
 
@@ -98,8 +90,7 @@ class MMIRS(instrument.Instrument):
         datestr = hdr['DATE-OBS']
         elap = Time(datestr)-Time('1980-01-01')
         elap = int(np.round(elap.to(u.second).value))
-
-        return elap
+        return(elap)
 
     def raw_format(self, proc):
         return('*.fits')
@@ -113,6 +104,8 @@ class MMIRS(instrument.Instrument):
     def get_time(self, hdr):
         return Time(hdr['DATE-OBS']).mjd
 
+    # Not currently used - need better implementation of slope measurement to
+    # account for jump detection, bias, etc.
     def measure_slope(self, hdu):
         header = hdu[self.raw_header_ext].header
 
@@ -145,7 +138,6 @@ class MMIRS(instrument.Instrument):
         slope = slope * np.max(all_times)
 
         return(slope)
-
 
     # Takes filename and outputs CCDData object with raw image in units of e-
     def import_image(self, filename, amp, log=None):
@@ -188,26 +180,3 @@ class MMIRS(instrument.Instrument):
         red.mask = red.data > saturate
 
         return(red)
-
-    def edit_raw_headers(self, files, log=None):
-
-
-        bad_keys = ['PV2_1','PV2_2','PV2_3','PV2_4','PV2_5','CD1_1','CD1_2',
-            'CD2_1','CD2_2','DTV1','DTV2','DTM1_1','DTM2_2','LTM1_1','LTM1_2',
-            'LTM2_1','LTM2_2','LTV1','LTV2','CTYPE1','CTYPE2','RADECSYS',
-            'CRPIX1','CRPIX2','SECPIX1','SECPIX2','DATAMAX','DATAMIN']
-
-        for file in files:
-            hdu = fits.open(file)
-
-            for i,h in enumerate(hdu):
-                while any([k in bad_keys for k in h.header.keys()]):
-                    for key in h.header.keys():
-                        if key in bad_keys:
-                            if key in h.header.keys():
-                                del h.header[key]
-
-            hdu.writeto(file, overwrite=True, output_verify='silentfix')
-
-    def edit_stack_headers(self, stack):
-        return(stack)

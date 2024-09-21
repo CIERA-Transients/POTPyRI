@@ -1,33 +1,25 @@
-#parameter file for GMOS/Gemini
+# Parameter file for GMOS/Gemini
+
+__version__ = "2.0" # Last edited 09/21/2024
+
 import os
-import astropy
-import datetime
-import copy
 import ccdproc
 import numpy as np
 
-from photutils import Background2D
-from photutils import MeanBackground
-
+import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.modeling import models
 from astropy.nddata import CCDData
-from astropy.stats import sigma_clipped_stats
 from astropy.stats import SigmaClip
 from astropy.time import Time
-
-import astropy.units as u
-import astropy.wcs as wcs
-
-__version__ = 1.2 #last edited 09/11/2021
 
 # Internal dependency
 from . import instrument
 
 class GMOS(instrument.Instrument):
 
-    def __init__(self, proc=None, ):
+    def __init__(self):
 
         self.version = __version__
 
@@ -94,7 +86,7 @@ class GMOS(instrument.Instrument):
         self.detrend = True
         self.catalog_zp = 'PS1'
 
-        self.out_size = 5000
+        self.out_size = 3200
 
     def get_rdnoise(self, hdr):
         try:
@@ -109,7 +101,7 @@ class GMOS(instrument.Instrument):
             return(self.gain)
 
     def raw_format(self, proc):
-        return '*.fits.bz2'
+        return('*.fits.bz2')
 
     def get_ampl(self, hdr):
         nccd = hdr['NCCDS']
@@ -117,17 +109,16 @@ class GMOS(instrument.Instrument):
             amp = '4'
         else:
             amp = '12'
-        return amp
+        return(amp)
 
     def get_time(self, hdr):
-        return Time(hdr['DATE-OBS']+'T'+hdr['TIME-OBS']).mjd
+        return(Time(hdr['DATE-OBS']+'T'+hdr['TIME-OBS']).mjd)
 
     def get_number(self, hdr):
         datestr = hdr['DATE-OBS']+'T'+hdr['TIME-OBS']
         elap = Time(datestr)-Time('1980-01-01')
         elap = int(np.round(elap.to(u.second).value))
-
-        return elap
+        return(elap)
 
     def get_catalog(self, hdr):
         coord = SkyCoord(hdr['RA'], hdr['DEC'], unit=(u.deg, u.deg))
@@ -177,30 +168,3 @@ class GMOS(instrument.Instrument):
         full.header['SATURATE'] = self.saturation
 
         return(full)
-
-    def edit_stack_headers(self, stack, log=None):
-
-        good_keys = ['SIMPLE','BITPIX','NAXIS','NAXIS1','NAXIS2','EXTEND',
-            'INSTRUME','OBJECT','OBSTYPE','GEMPRGID','OBSERVER','TELESCOP',
-            'EPOCH','SSA','RA','DEC','UT','DATE','DETECTOR','DATE-OBS',
-            'AIRMASS','MJD-OBS','GAIN','RDNOISE','SATURATE','SKYBKG','BUNIT',
-            'CTYPE1','CTYPE2','CUNIT1','CUNIT2','RADECSYS','CD1_1','CD1_2',
-            'CD2_1','CD2_2','CRPIX1','CRPIX2','CRVAL1','CRVAL2','NFILES','FILTER',
-            'AMPS','BINNING','XTENSION','EXTNAME','TIMESYS','EXPTOT','WCSAXES']
-
-        # This deletes all keys in the header that are not in good_keys
-        for i,h in enumerate(stack):
-            while True:
-                cont = True
-                for key in stack[i].header.keys():
-                    if key in stack[i].header.keys() and key not in good_keys:
-                        del stack[i].header[key]
-                        cont = False
-                if cont:
-                    break
-
-
-        return(stack)
-
-    def edit_raw_headers(self, files, log=None):
-        pass
