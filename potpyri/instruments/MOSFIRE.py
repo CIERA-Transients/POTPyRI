@@ -1,7 +1,8 @@
-#parameter file for MOSFIRE/Keck
+# Parameter file for MOSFIRE/Keck
+
+__version__ = "2.0" # Last edited 09/21/2024
+
 import os
-import astropy
-import datetime
 import ccdproc
 import numpy as np
 
@@ -10,14 +11,12 @@ from astropy.io import fits
 from astropy.time import Time
 from astropy.nddata import CCDData
 
-__version__ = 1.6 #last edited 09/11/2021
-
 # Internal dependency
 from . import instrument
 
 class MOSFIRE(instrument.Instrument):
 
-    def __init__(self, proc=None, ):
+    def __init__(self):
 
         self.version = __version__
 
@@ -123,9 +122,3 @@ class MOSFIRE(instrument.Instrument):
         red.header['SATURATE'] = self.get_saturation(red.header)
 
         return(red)
-
-    def edit_raw_headers(self, files, log=None):
-        pass
-
-    def edit_stack_headers(self, stack):
-        return(stack)

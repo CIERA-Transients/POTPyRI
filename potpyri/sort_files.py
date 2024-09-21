@@ -1,11 +1,11 @@
-#!/usr/bin/env python
-
 "Function to sort files for main_pipeline."
-"Authors: Owen Eskandari, Kerry Paterson"
+"Authors: Owen Eskandari, Kerry Paterson, Charlie Kilpatrick"
 
-__version__ = "2.7" #last updated 18/08/2021
+# Last updated 09/21/2024
+__version__ = "3.0"
 
-from astropy.io import fits, ascii
+from astropy.io import fits
+from astropy.io import ascii
 from astropy.table import Table
 import os
 import time
@@ -193,10 +193,6 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
             if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
             continue
 
-        # Edit raw data headers if necessary
-        # TODO - adjust method to work only on individual files
-        tel.edit_raw_headers([f], log=log)
-
         try:
             target = tel.get_target(hdr)
             fil = tel.get_filter(hdr)
@@ -298,4 +294,4 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
     t_end = time.time()
     log.info(f'Sort_files ran in {t_end-t_start} sec')
 
-    return file_table
+    return(file_table)

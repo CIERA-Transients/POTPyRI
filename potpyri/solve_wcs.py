@@ -1,16 +1,10 @@
-#!/usr/bin/env python
-
 "Python script for WCS solution."
-"Author: Kerry Paterson"
-"This project was funded by AST "
-"If you use this code for your work, please consider citing ."
+"Authors: Kerry Paterson, Charlie Kilpatrick"
 
-__version__ = "3.12" #last updated 01/10/2021
+# Last updated 09/21/2024
+__version__ = "2.0"
 
 import numpy as np
-import time
-import astropy
-import argparse
 import subprocess
 import os
 
@@ -32,7 +26,7 @@ from astropy.wcs import WCS
 from astropy.wcs.utils import fit_wcs_from_points
 
 # Internal dependency
-import utilities
+from potpyri import utilities
 
 #turn Astropy warnings off
 import warnings

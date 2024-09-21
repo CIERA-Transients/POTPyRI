@@ -1,29 +1,19 @@
-#parameter file for BINOSPEC/MMT
+# Parameter file for BINOSPEC/MMT
+
+__version__ = "2.0" # Last edited 09/21/2024
+
 import os
-import astropy
-import datetime
-import copy
 import ccdproc
 import numpy as np
 
-from photutils import Background2D
-from photutils import MeanBackground
-
-from astropy.coordinates import SkyCoord
+import astropy.units as u
 from astropy.io import fits
 from astropy.modeling import models
 from astropy.nddata import CCDData
-from astropy.stats import sigma_clipped_stats
-from astropy.stats import SigmaClip
 from astropy.time import Time
-
-import astropy.units as u
-import astropy.wcs as wcs
 
 # Internal dependency
 from . import instrument
-
-__version__ = 1.4 #last edited 24/08/2021
 
 class BINOSPEC(instrument.Instrument):
 
@@ -99,8 +89,7 @@ class BINOSPEC(instrument.Instrument):
         datestr = hdr['DATE-OBS']
         elap = Time(datestr)-Time('1980-01-01')
         elap = int(np.round(elap.to(u.second).value))
-
-        return elap
+        return(elap)
 
     def import_image(self, filename, amp, log=None):
         filename = os.path.abspath(filename)
@@ -109,7 +98,8 @@ class BINOSPEC(instrument.Instrument):
         with fits.open(filename) as hdr:
             header = hdr[self.raw_header_ext].header
 
-        raw = [CCDData.read(filename, hdu=x+1, unit='adu') for x in range(int(amp))]
+        raw = [CCDData.read(filename, hdu=x+1, unit='adu') 
+            for x in range(int(amp))]
         red = [ccdproc.ccd_process(x, oscan=self.biassec[k], 
                oscan_model=models.Chebyshev1D(3), 
                trim=self.datasec[k], gain=self.gain[k]*u.electron/u.adu, 
