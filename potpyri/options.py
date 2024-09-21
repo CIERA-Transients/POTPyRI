@@ -1,13 +1,22 @@
+"Functions for initializing pipeline options and data paths."
+"Authors: Charlie Kilpatrick"
+
+# Initial version tracking on 09/21/2024
+__version__ = "1.0"
+
 import os
 import shutil
 import sys
+import subprocess
 
 def add_options():
     import argparse
     params = argparse.ArgumentParser(description='Path of data.')
     params.add_argument('instrument', 
         default=None, 
-        choices=['Binospec','DEIMOS','GMOS','LRIS','MMIRS','MOSFIRE','TEST'],
+        type=str.upper,
+        choices=['BINOSPEC','DEIMOS','GMOS','LRIS','MMIRS','MOSFIRE','TEST',
+            'BINO','MMIR'],
         help='''Name of instrument (must be in params folder) of data to 
         reduce. Required to run pipeline. Use TEST for pipeline test.''')
     params.add_argument('data_path', 
@@ -23,8 +32,7 @@ def add_options():
     params.add_argument('--proc', 
         type=str, 
         default=True, 
-        help='''Option to use the _proc data from MMT. Optional parameter. 
-        Default is False.''')
+        help='''Option to specify file processing for data ingestion.''')
     params.add_argument('--include-bad','--incl-bad', 
         default=False,
         action='store_true', 
@@ -71,12 +79,31 @@ def add_options():
     args = params.parse_args()
 
     # Handle/parse options
-    if 'bino' in args.instrument:
-        args.instrument = 'binospec'
-    if 'mmir' in args.instrument:
-        args.instrument = 'mmirs'
+    if 'BINO' in args.instrument:
+        args.instrument = 'BINOSPEC'
+    if 'MMIR' in args.instrument:
+        args.instrument = 'MMIRS'
 
     return(args)
+
+def test_for_dependencies():
+
+    p = subprocess.run(['solve-field','-h'], capture_output=True)
+    data = p.stdout.decode().lower()
+
+    # Check for astrometry.net in output
+    if 'astrometry.net' not in data:
+        raise Exception(f'''Astrometry.net is a dependency of POTPyRI.  Download
+            and install the binaries and required index files from:
+            https://astrometry.net/use.html''')
+
+    p = subprocess.run(['sex','-h'], capture_output=True)
+    data = p.stderr.decode().lower()
+    if 'syntax: sex' not in data:
+        raise Exception(f'''source extractor is a dependency of POTPyRI.  
+            Install via Homebrew (https://formulae.brew.sh/formula/sextractor), 
+            apt-get, or directly from the source code:
+            https://github.com/astromatic/sextractor.''')
 
 def add_paths(data_path):
 

@@ -1,11 +1,11 @@
-#!/usr/bin/env python
-
 "Function to sort files for main_pipeline."
-"Authors: Owen Eskandari, Kerry Paterson"
+"Authors: Owen Eskandari, Kerry Paterson, Charlie Kilpatrick"
 
-__version__ = "2.7" #last updated 18/08/2021
+# Last updated 09/21/2024
+__version__ = "3.0"
 
-from astropy.io import fits, ascii
+from astropy.io import fits
+from astropy.io import ascii
 from astropy.table import Table
 import os
 import time
@@ -16,69 +16,85 @@ import gzip
 import zlib
 import logging
 import sys
+import re
 
 def is_bad(hdr, tel):
-    bad_keyword = tel.bad_keyword()
-    bad_files = tel.bad_files()
+    keywords = tel.bad_keywords
+    values = tel.bad_values
 
-    bad = np.any([hdr[bad_keyword[j]] == bad_files[j] 
-        for j in range(len(bad_keyword))])
+    assert len(keywords)==len(values)
+    if len(keywords)==0: return(False)
+
+    bad = np.any([bool(re.search(v, str(hdr[k]).lower())) 
+        for k,v in zip(keywords,values)])
 
     return(bad)
 
 def is_spec(hdr, tel):
-    spec_keyword = tel.spec_keyword()
-    spec_files = tel.spec_files()
+    keywords = tel.spec_keywords
+    values = tel.spec_values
 
-    spec = np.all([hdr[spec_keyword[j]] == spec_files[j] 
-        for j in range(len(spec_keyword))])
+    assert len(keywords)==len(values)
+    if len(keywords)==0: return(False)
+
+    spec = np.all([bool(re.search(v, str(hdr[k]).lower())) 
+        for k,v in zip(keywords,values)])
 
     return(spec)
 
 def is_flat(hdr, tel):
-    flat_keyword = tel.flat_keyword()
-    flat_files = tel.flat_files()
+    keywords = tel.flat_keywords
+    values = tel.flat_values
 
-    telescope = tel.name()
+    assert len(keywords)==len(values)
+    if len(keywords)==0: return(False)
 
-    flat = ((len(flat_keyword) != 0) & (np.all([flat_files[j] in hdr[flat_keyword[j]] 
-        for j in range(len(flat_keyword))])) & (telescope!='DEIMOS')) | ((len(flat_keyword) != 0) & (np.any([flat_files[j] in hdr[flat_keyword[j]] 
-        for j in range(len(flat_keyword))])) & (telescope=='DEIMOS'))
+    flat = np.all([bool(re.search(v, str(hdr[k]).lower())) 
+        for k,v in zip(keywords,values)])
 
     return(flat)
 
-def is_bias(hdr, tel):
-    bias_keyword = tel.bias_keyword()
-    bias_files = tel.bias_files()
-
-    bias = len(bias_keyword) != 0 and np.all([hdr[bias_keyword[j]] == bias_files[j] for j in range(len(bias_keyword))])
-
-    return(bias)
-
-def is_science(hdr, tel):
-    science_keyword = tel.science_keyword()
-    science_files = tel.science_files()
-
-    science = np.all([hdr[science_keyword[j]] == science_files[j] 
-        for j in range(len(science_keyword))])
-
-    # Check minimum exposure time
-    if tel.min_exptime():
-        exptime = tel.exptime(hdr)
-        if exptime < tel.min_exptime():
-            science = False
-
-    return(science)
-
 def is_dark(hdr, tel):
-    dark_keyword = tel.dark_keyword()
-    dark_files = tel.dark_files()
+    keywords = tel.dark_keywords
+    values = tel.dark_values
 
-    dark = len(dark_keyword) != 0 and np.all([dark_files[j] in hdr[dark_keyword[j]] 
-        for j in range(len(dark_keyword))])
+    assert len(keywords)==len(values)
+    if len(keywords)==0: return(False)
+
+    dark = np.all([bool(re.search(v, str(hdr[k]).lower())) 
+        for k,v in zip(keywords,values)])
 
     return(dark)
 
+def is_bias(hdr, tel):
+    keywords = tel.bias_keywords
+    values = tel.bias_values
+
+    assert len(keywords)==len(values)
+    if len(keywords)==0: return(False)
+
+    bias = np.all([bool(re.search(v, str(hdr[k]).lower())) 
+        for k,v in zip(keywords,values)])
+    
+    return(bias)
+
+def is_science(hdr, tel):
+    keywords = tel.science_keywords
+    values = tel.science_values
+
+    assert len(keywords)==len(values)
+    if len(keywords)==0: return(False)
+
+    science = np.all([bool(re.search(v, str(hdr[k]).lower())) 
+        for k,v in zip(keywords,values)])
+
+    # Check minimum exposure time
+    if tel.min_exptime:
+        exptime = tel.get_exptime(hdr)
+        if exptime < tel.min_exptime:
+            return(False)
+
+    return(science)
 
 # Overall method to handle files:
 def handle_files(file_list, tel, paths, incl_bad=False, proc=None, 
@@ -147,12 +163,6 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
     
     if log: log.info(f'Running sort_files version: {__version__}')
 
-    # Edit raw data headers if necessary
-    tel.edit_raw_headers(files, log=log)
-
-    ext = tel.raw_header_ext()
-    target_keyword = tel.target_keyword()
-
     bad_num = 0
     spec_num = 0
     sci_num = 0
@@ -160,35 +170,36 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
     dark_num = 0
     flat_num = 0
 
-    params = ('File','Target','Filter','Amp','Binning','Exp','Type',
+    params = ('File','Target','TargType','Filter','Amp','Binning','Exp','Type',
         'CalType','Time')
-    dtypes = ('S','S','S','S','S','S','S','S','float64')
+    dtypes = ('S','S','S','S','S','S','S','S','S','float64')
     file_table = Table(names=params, dtype=dtypes)
 
-    for i, f in enumerate(files):
-        with fits.open(f, mode='readonly') as file_open:
-            try:
-                hdr = file_open[ext].header
-            except IndexError:
-                if log: log.error(f'Moving file {f} to bad due to error opening file.')
-                moved_path = paths['bad']
-                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
-                continue
-            try:
-                check_data = file_open[ext].data
-                file_open._verify()
-            except (TypeError, gzip.BadGzipFile, zlib.error):
-                if log: log.error(f'Moving file {f} to bad due to corrupted data.')
-                moved_path = paths['bad']
-                if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
-                continue
+    for i, f in enumerate(sorted(files)):
         try:
-            target = hdr[target_keyword].replace(' ','')
-            fil = tel.filter_keyword(hdr)
-            amp = tel.amp_keyword(hdr)
-            binn = tel.bin_keyword(hdr)
-            exp = str(tel.exptime(hdr))
-            file_time = tel.time_format(hdr)
+            file_open = fits.open(f, mode='readonly')
+            ext = tel.raw_header_ext
+            hdr = file_open[ext].header
+            check_data = file_open[ext].data
+            file_open._verify()
+        except IndexError:
+            if log: log.error(f'Moving file {f} to bad due to error opening file.')
+            moved_path = paths['bad']
+            if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
+            continue
+        except (TypeError, gzip.BadGzipFile, zlib.error):
+            if log: log.error(f'Moving file {f} to bad due to corrupted data.')
+            moved_path = paths['bad']
+            if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
+            continue
+
+        try:
+            target = tel.get_target(hdr)
+            fil = tel.get_filter(hdr)
+            amp = tel.get_ampl(hdr)
+            binn = tel.get_binning(hdr)
+            exp = str(tel.get_exptime(hdr))
+            file_time = tel.get_time(hdr)
 
             if (is_bad(hdr, tel) and not is_bias(hdr, tel) and 
                 not is_dark(hdr, tel) and not is_flat(hdr, tel)):
@@ -237,19 +248,24 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
             # Bias only depends on amplifier and bin mode
             cal_type = f'{amp}_{binn}'
             target = 'BIAS'
+            targ_type = cal_type
         elif file_type=='DARK':
             # Dark depends on exposure, amplifier, and bin
             cal_type = f'{exp}_{amp}_{binn}'
             target = 'DARK'
+            targ_type = cal_type
         elif file_type=='FLAT':
             # Flat depends on filter, amplifier, and bin
             cal_type = f'{fil}_{amp}_{binn}'
             target = 'FLAT'
+            targ_type = cal_type
         elif file_type=='SCIENCE':
             # Science is grouped by target, filter, amplifier, bin
-            cal_type = f'{target}_{fil}_{amp}_{binn}'
+            cal_type = f'{fil}_{amp}_{binn}'
+            targ_type = f'{target}_{fil}_{amp}_{binn}'
         else:
             cal_type = ''
+            targ_type = ''
 
         currfile = os.path.join(moved_path, os.path.basename(f))
         if not os.path.exists(currfile):
@@ -257,11 +273,14 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
             logging.shutdown()
             sys.exit(-1)
 
+        if log: log.info(f'File {i+1}/{len(files)}: {currfile} is {file_type},{target},{fil}')
+
         if (file_type!='BAD' and file_type!='SPEC') or incl_bad:
-            file_table.add_row((currfile,target,fil,amp,binn,exp,file_type,
-                cal_type,file_time))
+            file_table.add_row((currfile,target,targ_type,fil,amp,binn,exp,
+                file_type,cal_type,file_time))
 
     file_table.sort(['Type','Target','CalType','File'])
+
     ascii.write(file_table, file_list, format='fixed_width',
         formats={'Time':'%5.6f'})
 
@@ -275,4 +294,4 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
     t_end = time.time()
     log.info(f'Sort_files ran in {t_end-t_start} sec')
 
-    return file_table
+    return(file_table)

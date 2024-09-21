@@ -1,9 +1,13 @@
+"Functions for processing, masking, creating error images, and stacking images."
+"Authors: Charlie Kilpatrick"
+
+# Last updated on 09/21/2024
+__version__ = "2.0"
+
 import os 
-import ccdproc
 import time
 import importlib
 import numpy as np
-import astroscrappy
 import logging
 import sys
 
@@ -13,10 +17,7 @@ import acstools
 
 import astropy.units as u
 from astropy.io import fits, ascii
-from astropy.table import Table
-from astropy.stats import SigmaClip
 from astropy.stats import sigma_clipped_stats
-from astropy.nddata import CCDData
 from astropy.wcs import WCS
 
 from ccdproc import wcs_project
@@ -24,16 +25,9 @@ from ccdproc import CCDData
 from ccdproc import combine
 from ccdproc import cosmicray_lacosmic
 
-from photutils.background import Background2D
-from photutils.background import MeanBackground
-from photutils.segmentation import detect_threshold, detect_sources
-
 # Internal dependencies
-import solve_wcs
-import utilities
-
-# Edited on 2024-07-29
-__version__ = "1.3"
+from potpyri import solve_wcs
+from potpyri import utilities
 
 def remove_pv_distortion(header):
 
@@ -58,7 +52,7 @@ def get_fieldcenter(images):
         w = WCS(hdu[0].header)
 
         data_shape = hdu[0].data.shape
-        center_pix = (data_shape[0]/2., data_shape[1]/2.)
+        center_pix = (data_shape[1]/2., data_shape[0]/2.)
 
         coord = w.pixel_to_world(*center_pix)
 
@@ -75,7 +69,7 @@ def generate_wcs(tel, binn, fieldcenter, out_size):
     w = {'NAXES':2, 'NAXIS1': out_size, 'NAXIS2': out_size,
         'EQUINOX': 2000.0, 'LONPOLE': 180.0, 'LATPOLE': 0.0}
 
-    pixscale = tel.pixscale(None)
+    pixscale = tel.pixscale
     cdelt = pixscale * int(str(binn)[0])/3600.0
 
     w['CDELT1'] = -1.0 * cdelt
@@ -115,6 +109,9 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
         if not success: continue
 
         solved_images.append(file)
+
+    if len(solved_images)==0:
+        return(None, None)
 
     # Determine what the value of use_wcs should be
     if use_wcs is None:
@@ -156,7 +153,7 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
 def image_proc(image_data, tel, paths, proc=None, skip_skysub=False, 
     fieldcenter=None, out_size=None, satellites=True, log=None):
 
-    wavelength = tel.wavelength()
+    wavelength = tel.wavelength
 
     red_path = paths['red']
     cal_path = paths['cal']
@@ -164,16 +161,16 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
 
     # All data in the table should be for one target
     assert np.all([image_data['Target']==image_data['Target'][0]])
-    assert np.all([image_data['CalType']==image_data['CalType'][0]])
+    assert np.all([image_data['TargType']==image_data['TargType'][0]])
     
-    cal_type = image_data['CalType'][0]
+    cal_type = image_data['TargType'][0]
     target = image_data['Target'][0]
     fil = image_data['Filter'][0]
     amp = image_data['Amp'][0]
     binn = image_data['Binning'][0]
 
     # Load bias frame
-    if tel.bias():
+    if tel.bias:
         if log: log.info('Loading master bias.')
         try:
             mbias = tel.load_bias(cal_path, amp, binn)
@@ -185,7 +182,7 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
         mbias = None
 
     # Load bias frame
-    if tel.dark():
+    if tel.dark:
         if log: log.info('Loading master dark.')
         try:
             mdark = tel.load_dark(cal_path, amp, binn)
@@ -197,14 +194,14 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
         mdark = None
 
     # Load flat frame
-    if tel.flat():
+    if tel.flat:
         if log: log.info('Loading master flat.')
-        if True:
+        try:
             mflat = tel.load_flat(cal_path, fil, amp, binn)
-        #except:
-        #    if log: log.error(f'''No master flat present for filter {fil}, 
-        #        skipping reduction for: {cal_type}.''')
-        #    return(None)
+        except:
+            if log: log.error(f'''No master flat present for filter {fil}, 
+                skipping reduction for: {cal_type}.''')
+            return(None)
     else:
         mflat = None
         
@@ -213,41 +210,33 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
 
     # Bias subtraction, gain correction, flat correction, and flat fielding
     files = image_data['File']
-    staticmask = tel.static_mask(paths)
+    staticmask = tel.get_static_mask(paths)
     processed = tel.process_science(files, fil, amp, binn, work_path,
         mbias=mbias, mflat=mflat, mdark=mdark, proc=proc, 
         staticmask=staticmask, skip_skysub=skip_skysub, log=log)
+    
+    # Get filenames for output processed data
+    reduced_files = [p.header['FILENAME'] for p in processed]
+
+    t2 = time.time()
+    if log: log.info(f'Data processed in {t2-t1} sec')
+    if log: log.info('Aligning images.')
 
     # If masking satellite trails, this needs to be done before reprojection so
     # that the acstools algorithm accurately models the edges of the detector
     if satellites:
-        mask_satellites(processed, files, log=log)
-        
-    t2 = time.time()
-    if log: log.info(f'Data processed in {t2-t1} sec')
-
-    # Write reduced data to file and stack images with the same pointing
-    if log: log.info('Writing out reduced data.')
-    
-    reduced_files = [os.path.join(work_path, tel.get_base_science_name(sci))
-        for sci in image_data['File']]
-    
-    for j,process_data in enumerate(processed):
-        process_data.header['FILENAME'] = os.path.basename(reduced_files[j])
-        process_data.write(reduced_files[j], overwrite=True)
-
-    if log: log.info('Aligning images.')
+        mask_satellites(processed, reduced_files, log=log)
 
     # Sort files so deepest exposure is first
     exptimes = []
     for file in reduced_files:
         hdu = fits.open(file)
-        exptimes.append(tel.exptime(hdu[0].header))
+        exptimes.append(tel.get_exptime(hdu[0].header))
     idx = np.flip(np.argsort(exptimes))
     reduced_files = np.array(reduced_files)[idx]
 
     if out_size is None:
-        out_size = tel.out_size()
+        out_size = tel.get_out_size(processed[0].header)
 
     if fieldcenter is not None:
         use_wcs = generate_wcs(tel, binn, fieldcenter, out_size)
@@ -257,15 +246,19 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
     aligned_images, aligned_data = align_images(reduced_files, paths, tel, binn,
         use_wcs=use_wcs, fieldcenter=fieldcenter, out_size=out_size, log=log)
 
+    if aligned_images is None or aligned_data is None:
+        return(None)
+
     if log: log.info('Creating mask and error arrays.')
     masks = []
     errors = []
     for stack_img in aligned_images:
         hdu = fits.open(stack_img, mode='readonly')
+        hdr = hdu[0].header
         clean, mask = create_mask(stack_img,
-            hdu[0].header['SATURATE'], tel.rdnoise(hdu[0].header),
+            hdr['SATURATE'], np.mean(tel.get_rdnoise(hdr)),
             log=log, outpath=work_path)
-        error = create_error(stack_img, mask, tel.rdnoise(hdu[0].header))
+        error = create_error(stack_img, mask, np.mean(tel.get_rdnoise(hdr)))
 
         masks.append(mask)
         errors.append(error)
@@ -294,6 +287,10 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
         hdulist[1].name='MASK'
         hdulist[2].name='ERROR'
 
+        hdulist[0].header['EXTNAME']='SCI'
+        hdulist[1].header['EXTNAME']='MASK'
+        hdulist[2].header['EXTNAME']='ERROR'
+
         filename = hdulist[0].header['FILENAME'].replace('.fits',
             '_data.fits')
         fullfilename = os.path.join(work_path, filename)
@@ -306,27 +303,31 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
     
     if log: log.info('Creating median stack.') 
     sci_med = stack_data(aligned_data, tel, masks, errors, log=log)
-    sci_med = sci_med.to_hdu()
-
     sci_med = add_stack_mask(sci_med, aligned_data)
 
-    if tel.detrend(sci_med[0].header):
+    if tel.detrend:
         sci_med = detrend_stack(sci_med)
 
     sci_med[0].data = sci_med[0].data.astype(np.float32)
     sci_med[1].data = sci_med[1].data.astype(np.uint8)
     sci_med[2].data = sci_med[2].data.astype(np.float32)
+    sci_med[0].header['EXTNAME']='SCI'
+    sci_med[1].header['EXTNAME']='MASK'
+    sci_med[2].header['EXTNAME']='ERROR'
     sci_med[0].header['BITPIX'] = -32
     sci_med[1].header['BITPIX'] = 8
     sci_med[2].header['BITPIX'] = -32
 
     # Get time parameters from aligned data
-    mid_time = np.average([tel.time_format(d.header) for d in aligned_data])
-    exptimes = np.array([tel.exptime(d.header) for d in aligned_data])
+    mid_time = np.average([tel.get_time(d.header) for d in aligned_data])
+    exptimes = np.array([tel.get_exptime(d.header) for d in aligned_data])
     eff_time = np.sum(exptimes**2)/np.sum(exptimes)
     total_time = np.sum(exptimes)
 
+    # Add both formats for code that requires either
     sci_med[0].header['MJD-OBS'] = (mid_time, 
+        'Mid-MJD of the observation sequence.')
+    sci_med[0].header['MJD'] = (mid_time, 
         'Mid-MJD of the observation sequence.')
     # Since we generated stack with median, effective exposure should be a 
     # weighted average of the input exposure times
@@ -338,18 +339,16 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
         'Effecetive gain for stack.')
 
     # Calculate read noise
-    rdnoise = tel.rdnoise(sci_med[0].header)/np.sqrt(len(aligned_data))
+    rdnoise = np.mean(tel.get_rdnoise(sci_med[0].header))/np.sqrt(len(aligned_data))
     sci_med[0].header['RDNOISE'] = (rdnoise, 'Readnoise of stack.')
     
     sci_med[0].header['NFILES'] = (len(aligned_data), 
         'Number of images in stack')
     sci_med[0].header['FILTER'] = fil
     sci_med[0].header['OBSTYPE'] = 'OBJECT'
-
-    sci_med = tel.edit_stack_headers(sci_med)
     
     # Generate stack name and write out
-    stackname = tel.stacked_image(image_data[0], red_path)
+    stackname = tel.get_stk_name(sci_med[0].header, red_path)
     sci_med.writeto(stackname, overwrite=True, output_verify='silentfix')
     
     if log: 
@@ -384,7 +383,7 @@ def detrend_stack(stack):
 
 def stack_data(stacking_data, tel, masks, errors, log=None):
 
-    stack_method = tel.stack_method(stacking_data[0].header)
+    stack_method = tel.stack_method
     if not stack_method:
         if log:
             log.critical('Could not get stacking method for these images')
@@ -406,7 +405,7 @@ def stack_data(stacking_data, tel, masks, errors, log=None):
     for i,stk in enumerate(stacking_data):
         mask = masks[i].data.astype(bool)
         stacking_data[i].data[mask] = np.nan
-        exptimes.append(float(tel.exptime(stk.header)))
+        exptimes.append(float(tel.get_exptime(stk.header)))
 
     exptimes = np.array(exptimes)
     scale = 1./exptimes
@@ -415,6 +414,8 @@ def stack_data(stacking_data, tel, masks, errors, log=None):
 
     sci_med = combine(stacking_data, weights=weights, scale=scale,
         method=stack_method, mem_limit=64e9)
+
+    sci_med = sci_med.to_hdu()
 
     return(sci_med)
 
@@ -426,13 +427,13 @@ def add_stack_mask(stack, stacking_data):
 
     # Keep track of original masked values
     bp_mask = (mask > 0) | (data==0.0) | np.isnan(data) | np.isnan(mask) |\
-        np.isnan(error) | (error==0.0)
+        np.isnan(error) | (error==0.0) | np.isinf(data)
 
     # Reset mask
     mask = np.zeros(mask.shape).astype(np.uint8)
 
     # Add bad pixels back to mask
-    mask[(data==0.0) | bp_mask] = 1
+    mask[bp_mask] = 1
 
     # Add saturation to mask
     sat = np.min([d.header['SATURATE'] for d in stacking_data])
@@ -440,8 +441,13 @@ def add_stack_mask(stack, stacking_data):
     sat_mask = data >= sat
     mask[sat_mask] = 4
 
+    # Set masked values to 0
     data[mask>0] = 0.0
     error[mask>0] = 0.0
+
+    # Make sure that nan and inf values are removed from data
+    data[np.isnan(data)]=0.0
+    data[np.isinf(data)]=0.0
 
     stack[0].data = data
     stack[1].data = mask
@@ -509,6 +515,9 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
 
     # Astroscrappy requires added sky background, so add this value back
     data = data + hdu[0].header['SKYBKG']
+
+    # Also need to adjust the saturation level by SKYBKG for saturated pixels
+    saturation += hdu[0].header['SKYBKG']
     
     if log: log.info('Masking saturated pixels.')
 
@@ -587,7 +596,7 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
     else:
         print(f'Mask creation completed in {t_end-t_start} sec')
 
-    return newdata, mask_hdu
+    return(newdata, mask_hdu)
 
 
 def create_error(science_data, mask_data, rdnoise):

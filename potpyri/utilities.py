@@ -1,24 +1,6 @@
+from astropy import units as u
 from astropy.coordinates import SkyCoord
-from astropy import utils, units as u
-from astropy.coordinates import SkyCoord, Angle, match_coordinates_sky
-from astropy.table import Table, Column
-from astropy.io.votable import parse as votable_parse
-from astropy.io import ascii, fits
-from astroquery.mast import Observations, Catalogs
-from astroquery.vizier import Vizier
-import os
-import pandas
-import requests
-import numpy as np
-import shutil
-import casjobs
-import math
-import copy
-import pickle
-import requests
 import warnings
-import re
-from contextlib import contextmanager
 import csv
 import sys
 csv.field_size_limit(sys.maxsize)
