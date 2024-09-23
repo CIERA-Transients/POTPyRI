@@ -385,7 +385,14 @@ class Instrument(object):
             log.info(f'Exposure time of image is {exptime}')
             
             norm = 1./np.nanmedian(flat_full) #check for binning
-            log.info(f'Flat normalization: {norm}')
+            # Vet the flat normalization - it should not be negative
+            if norm > 0.:
+                log.info(f'Flat normalization: {norm}')
+            else:
+                # Skip this file
+                log.error(f'Flat normalization: {norm}')
+                continue
+                
             scale.append(norm)
             flats.append(flat_full)
         
