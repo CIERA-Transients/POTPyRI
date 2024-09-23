@@ -14,13 +14,22 @@ The recommended installation is via conda and pip.  First create a conda environ
 
 To install POTPyRI, run:
 
-```pip install git+https://github.com/CIERA-Transients/POTPyRI.git```
+```pip install git+https://github.com/CIERA-Transients/POTPyRI.git@dev```
 
 which will install the remaining dependencies from the requirements.txt file.
 
 ### External Dependencies
 
-POTPyRI has two external dependencies: `astrometry.net` and `source extractor`.  It is recommended that you install them via Homebrew on Mac OS systems or via `apt-get` on Ubuntu/Linux systems.  Note that for `astrometry.net`, index files are required, which can be installed in your `astrometry.net` data directory with the POTPyRI-provided script `potpyri/archives/download_anet_index.py`.
+POTPyRI has two external dependencies: `astrometry.net` and `source extractor`.  It is recommended that you install them via Homebrew on Mac OS systems or via `apt-get` on Ubuntu/Linux systems.  They are also available via the following Github repositories:
+
+https://github.com/dstndstn/astrometry.net
+https://github.com/astromatic/sextractor
+
+Note that for `astrometry.net`, index files are required, which can be installed in your `astrometry.net` data directory with the POTPyRI-provided script `potpyri/archives/download_anet_index.py`.  There is a utility script in POTPyRI that will attempt to install the latest index files.  Once you have successfully installed `astrometry.net`, run:
+
+```
+download_anet_index
+```
 
 ## Supported Instruments
 
