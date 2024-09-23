@@ -12,9 +12,12 @@ The recommended installation is via conda and pip.  First create a conda environ
 
 ```conda create -n potpyri python=3.11 cython numpy```
 
-To install POTPyRI, run:
+Then to install POTPyRI, run:
 
-```pip install git+https://github.com/CIERA-Transients/POTPyRI.git@dev```
+```
+conda activate potpyri
+pip install git+https://github.com/CIERA-Transients/POTPyRI.git@dev
+```
 
 which will install the remaining dependencies from the requirements.txt file.
 
@@ -22,10 +25,10 @@ which will install the remaining dependencies from the requirements.txt file.
 
 POTPyRI has two external dependencies: `astrometry.net` and `source extractor`.  It is recommended that you install them via Homebrew on Mac OS systems or via `apt-get` on Ubuntu/Linux systems.  They are also available via the following Github repositories:
 
-https://github.com/dstndstn/astrometry.net
+https://github.com/dstndstn/astrometry.net \\
 https://github.com/astromatic/sextractor
 
-Note that for `astrometry.net`, index files are required, which can be installed in your `astrometry.net` data directory with the POTPyRI-provided script `potpyri/archives/download_anet_index.py`.  There is a utility script in POTPyRI that will attempt to install the latest index files.  Once you have successfully installed `astrometry.net`, run:
+Note that for `astrometry.net`, index files are required.  There is a utility script in POTPyRI that will attempt to install the latest index files.  Once you have successfully installed `astrometry.net` in your path, run:
 
 ```
 download_anet_index
@@ -51,10 +54,6 @@ where `instrument` is the name of the instrument you wish to reduce data from (s
 The pipeline is designed to run with no user input, including file ingestion, pixel calibration with provided calibration files, astrometry, image stacking, photometry, and flux calibration. The pipeline will display prompts or instructions on the terminal in green or red to provide user feedback and indicate when an error is encountered. For more details on each of these sections, including how the pipeline performs each task, see below. 
 
 All processed data will be written out in the `data_path` under the `red` subdirectory.  Raw data are stored in `raw` and unused files are stored in `bad`.  Processed calibration files will be stored in `red/cals`, logs in `red/log`, and interstitial image files before stacking are stored in `log/workspace`. A description of each type of output file can be found in **Outputs**.
-
-## Flow diagram
-
-![plot](./images/Pipeline_flow_diagram.pdf)
 
 ## Pipeline parameters
 
