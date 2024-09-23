@@ -32,7 +32,7 @@ def download_index_files(outdir=None):
             raise Exception('ERROR: cannot find astrometry.net in path.  Install first.')
 
         path = os.path.dirname(path)
-        config_file = os.path.join(path, '..', 'astrometry.cfg')
+        config_file = os.path.join(path, '..', 'etc', 'astrometry.cfg')
 
         if not os.path.exists(config_file):
             raise Exception('ERROR: cannot find astrometry.cfg file.  Specify data path instead.')
