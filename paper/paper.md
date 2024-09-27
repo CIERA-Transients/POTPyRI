@@ -30,11 +30,11 @@ bibliography: paper.bib
 
 # Summary
 
-This pipeline was developed for the reduction and stacking of imaging data for a number of telescopes and instruments in the optical and near-infrared (NIR) bands. The purpose of the pipeline is to provide a semi-automated way to reduce imaging data, create a median stack with reliable astrometry and photometric calibration, and allow the user to perform manual aperture photometry in Python.
+The Pipeline for Optical/infrared Telescopes in Python for Reducing Images (POTPyRI) was developed for flexible, open-source processing of imaging data from several optical/infrared (OIR) on large-aperture telescopes.  The goals of this project were to provide: 1) an open-source code base with generic methods that can be adapted to data from any OIR telescope and instrument, 2) a fully automated pipeline with minimal user input that can be used as a "black box" and handle the most common failure modes in reduction of each instrument, and 3) consistent outputs that can be easily interpreted by the user and applied to a wide range of astronomical science cases requiring deep limiting magnitudes (23--27 AB mag), especially in time-domain astronomy.  
 
 # Statement of need
 
-The pipeline is written in Python (currently deployed and tested on Python 3.8) and uses packages from Astropy [@astropy:2013], [@astropy:2018], ccdproc, astroquery [@Ginsburg2019] and photutils; with the additional use of SExtractor [@Bertin1996]. The code is available on GitHub at https://github.com/CIERA-Transients/POTPyRI, where instructions on the installation and detailed use can be found.
+The pipeline is written in Python (currently deployed and tested on Python 3.11) and uses packages from Astropy [@astropy:2013], [@astropy:2018], ccdproc, astroquery [@Ginsburg2019] and photutils; with the additional use of SExtractor [@Bertin1996] and Astrometry.net [@Lang2010]. The code is available on GitHub at https://github.com/CIERA-Transients/POTPyRI, where instructions on the installation and detailed use can be found.
 
 Currently available instruments (as of Feb 2022 - see the GitHub for the most recent list) include:
 
