@@ -70,8 +70,13 @@ def is_bias(hdr, tel):
     keywords = tel.bias_keywords
     values = tel.bias_values
 
+    print(len(values))
+
     assert len(keywords)==len(values)
     if len(keywords)==0: return(False)
+
+    for k,v in zip(keywords, values):
+        print(v, k, str(hdr[k]).lower(), bool(re.search(v, str(hdr[k]).lower())))
 
     bias = np.all([bool(re.search(v, str(hdr[k]).lower())) 
         for k,v in zip(keywords,values)])
