@@ -122,6 +122,9 @@ class LRIS(instrument.Instrument):
         return(filt)
 
     def get_time(self, hdr):
+        print('TEST LRIS METHOD')
+        print('MJD' in hdr.keys())
+        print('MJD-OBS' in hdr.keys())
         if 'MJD' in hdr.keys():
             return(float(hdr['MJD']))
         elif 'MJD-OBS' in hdr.keys():
