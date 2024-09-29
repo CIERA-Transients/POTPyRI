@@ -129,6 +129,12 @@ class GMOS(instrument.Instrument):
         
         return('PS1')
 
+    def get_instrument_name(self, hdr):
+        if 'INSTRUME' in hdr.keys():
+            return(str(hdr['INSTRUME']).lower())
+        else:
+            return(self.name.lower())
+
     def import_image(self, filename, amp, log=None):
 
         with fits.open(filename) as hdr:

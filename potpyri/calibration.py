@@ -10,7 +10,7 @@ import logging
 import numpy as np
 import sys
 
-def do_bias(bias_table, tel, red_path, staticmask=None, log=None):
+def do_bias(bias_table, tel, paths, log=None):
 
     # Exit if telescope does not require bias
     if not tel.bias:
@@ -25,15 +25,15 @@ def do_bias(bias_table, tel, red_path, staticmask=None, log=None):
         amp = cal_type.split('_')[0]
         binn = cal_type.split('_')[1]
 
-        bias_name = tel.get_mbias_name(red_path, amp, binn)
+        bias_name = tel.get_mbias_name(paths, amp, binn)
         
         if os.path.exists(bias_name):
             if log: log.info(f'Master bias {bias_name} exists.')
         else:
             t1 = time.time()
             if log: log.info('Processing bias files.')
-            tel.create_bias(cal_table['File'], amp, binn, red_path, 
-                staticmask=staticmask, log=log)
+            tel.create_bias(cal_table['File'], amp, binn, paths, 
+                log=log)
             t2 = time.time()
 
             if log: log.info(f'Master bias creation completed in {t2-t1} sec')
@@ -43,7 +43,7 @@ def do_bias(bias_table, tel, red_path, staticmask=None, log=None):
         logging.shutdown()
         sys.exit(-1)
 
-def do_dark(dark_table, tel, red_path, staticmask=None, log=None):
+def do_dark(dark_table, tel, paths, log=None):
 
     # Exit if telescope does not require dark
     if not tel.dark:
@@ -57,7 +57,7 @@ def do_dark(dark_table, tel, red_path, staticmask=None, log=None):
         amp = cal_type.split('_')[1]
         binn = cal_type.split('_')[2]
 
-        dark_name = tel.get_mdark_name(red_path, amp, binn)
+        dark_name = tel.get_mdark_name(paths, amp, binn)
 
         if os.path.exists(dark_name):
             if log: log.info(f'Master dark {dark_name} exists.')
@@ -66,7 +66,7 @@ def do_dark(dark_table, tel, red_path, staticmask=None, log=None):
             if tel.bias:
                 if log: log.info('Loading master bias.')
                 try:
-                    mbias = tel.load_bias(red_path, amp, binn)
+                    mbias = tel.load_bias(paths, amp, binn)
                 except:
                     if log: log.error(f''''No master bias found for this 
                         configuration, skipping master dark creation for 
@@ -75,11 +75,11 @@ def do_dark(dark_table, tel, red_path, staticmask=None, log=None):
 
             t1 = time.time()
             tel.create_dark(cal_table['File'], amp, binn,
-                red_path, mbias=mbias, staticmask=staticmask, log=log)
+                paths, mbias=mbias, log=log)
             t2 = time.time()
             if log: log.info(f'Master dark creation completed in {t2-t1} sec.')
 
-def do_flat(flat_table, tel, red_path, staticmask=None, log=None):
+def do_flat(flat_table, tel, paths, log=None):
 
     # Exit if telescope does not require dark
     if not tel.flat:
@@ -94,7 +94,7 @@ def do_flat(flat_table, tel, red_path, staticmask=None, log=None):
         binn = flat_table[mask]['Binning'][0]
         is_science = np.any([f=='SCIENCE' for f in flat_table[mask]['Type']])
 
-        flat_name = tel.get_mflat_name(red_path, fil, amp, binn)
+        flat_name = tel.get_mflat_name(paths, fil, amp, binn)
 
         if os.path.exists(flat_name):
             if log: log.info(f'Master flat {flat_name} exists.')
@@ -104,7 +104,7 @@ def do_flat(flat_table, tel, red_path, staticmask=None, log=None):
             if tel.bias:
                 if log: log.info('Loading master bias.')
                 try:
-                    mbias = tel.load_bias(red_path, amp, binn)
+                    mbias = tel.load_bias(paths, amp, binn)
                 except:
                     if log: log.error(f'''No master bias found for this 
                         configuration, skipping master flat creation for 
@@ -114,7 +114,7 @@ def do_flat(flat_table, tel, red_path, staticmask=None, log=None):
             if tel.dark:
                 if log: log.info('Loading master dark.')
                 try:
-                    mdark = tel.load_dark(red_path, amp, binn)
+                    mdark = tel.load_dark(paths, amp, binn)
                 except:
                     if log: log.error(f''''No master dark found for this 
                         configuration, skipping master flat creation for 
@@ -123,8 +123,8 @@ def do_flat(flat_table, tel, red_path, staticmask=None, log=None):
 
             t1 = time.time()
             tel.create_flat(cal_table['File'], fil, amp, binn,
-                red_path, mbias=mbias, mdark=mdark, is_science=is_science, 
-                staticmask=staticmask, log=log)
+                paths, mbias=mbias, mdark=mdark, is_science=is_science, 
+                log=log)
             t2 = time.time()            
             if log: log.info(f'Master flat creation completed in {t2-t1} sec')
 
