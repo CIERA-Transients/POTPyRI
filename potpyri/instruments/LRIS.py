@@ -186,13 +186,6 @@ class LRIS(instrument.Instrument):
         
         return(oscan_reg)
 
-    def get_time(self, hdr):
-        try:
-            mid_time = float(hdr['MJD-OBS'])
-        except:
-            mid_time = hdr['MJD']
-        return(mid_time)
-
     def get_exptime(self, hdr):
         if self.exptime_keyword in hdr.keys():
             return(float(hdr[self.mjd_keyword]))
