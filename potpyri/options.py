@@ -15,10 +15,10 @@ def add_options():
     params.add_argument('instrument', 
         default=None, 
         type=str.upper,
-        choices=['BINOSPEC','DEIMOS','GMOS','LRIS','MMIRS','MOSFIRE','TEST',
+        choices=['BINOSPEC','DEIMOS','GMOS','LRIS','MMIRS','MOSFIRE',
             'BINO','MMIR'],
-        help='''Name of instrument (must be in params folder) of data to 
-        reduce. Required to run pipeline. Use TEST for pipeline test.''')
+        help='''Name of instrument (must be in instruments dir) of data to 
+        reduce. Required to run pipeline.''')
     params.add_argument('data_path', 
         default=None, 
         help='''Path of data to reduce. See manual for specific details. 

@@ -8,11 +8,12 @@ tags:
   - data reduction
 
 authors:
-  - name: K. Paterson^[corresponding author]
+  - name: K. Paterson[^corresponding author]
     orcid: 0000-0001-8340-3486
-    affiliation: "1" #
+    affiliation: 1
   - name: C. D. Kilpatrick
     affiliation: 1
+    orcid: 0000-0002-5740-7747
   - name: O. Eskandar
     affiliation: 1
   - name: D. Velsaco
@@ -45,7 +46,7 @@ Currently available instruments (as of Feb 2022 - see the GitHub for the most re
  - LRIS (Keck) [@Oke1995]
  - GMOS (Gemini-N and Gemini-S) [@Davies1997]
 
-Since the pipeline is meant to provide the community with a way to reduce imaging data from these instruments, one science application has been the rapid reduction and identification of Gamma-Ray Burst (GRB) afterglows, as well as the reduction and stacking of follow-up observations to identify potential host galaxies for associated and in depth study (see [@Paterson2020], [@Rastinejad2021], [@Fong2021]).
+Since the pipeline is meant to provide the community with a way to reduce imaging data from these instruments, one science application has been the rapid reduction and identification of gamma-ray burst (GRB) afterglows, as well as the reduction and stacking of follow-up observations to identify potential host galaxies for associated and in depth study (see [@Paterson2020], [@Rastinejad2021], [@Fong2021]).
 
 # Method
 
@@ -53,7 +54,7 @@ The pipeline requires two parameters to run. The first is the name of the instru
 
 ![Flow diagram of the steps taken by the pipeline. Points where user input is required is shown in green. A number of different options are shown depending on the additional optional parameters selected when running the pipeline.\label{fig:flow}](../images/Pipeline_flow_diagram.pdf)
 
-Figure \autoref{fig:flow} shows the basic pipeline operations. The pipeline will first sort the files in the given path, and create a file list which contains information about each file such as the type, filter, configuration, and target. Using the file list and the setting file, the pipeline will then create calibration files (e.g. bias, dark, flat) and then performs the necessary basic reductions to science files, grouped by target, including gain correction, bias subtraction, dark subtraction, flat correction, and trimming. A source mask, which masks out sources on the image, is created for internal use in downstream steps such as the background, NIR and fringe map creation. A mask is created for each image, which shows the position of bad pixels, cosmic rays, and satellite trails. In order to prepare images for median stacking, the 2D background of each science image is determined and subtracted. Science images are also divided by their exposure time, to allow the median stacking of images with different exposure times, and results in a reduced image with pixel values in e$^{-}$/s. For instruments that do not have astrometry i.e. a World Coordinate System (WCS) in the header, a WCS is added to the header based on the position and orientation of the telescope and instrument.
+Figure~\autoref{fig:flow} shows the basic pipeline operations. The pipeline will first sort the files in the given path, and create a file list which contains information about each file such as the type, filter, configuration, and target. Using the file list and the setting file, the pipeline will then create calibration files (e.g. bias, dark, flat) and then performs the necessary basic reductions to science files, grouped by target, including gain correction, bias subtraction, dark subtraction, flat correction, and trimming. A source mask, which masks out sources on the image, is created for internal use in downstream steps such as the background, NIR and fringe map creation. A mask is created for each image, which shows the position of bad pixels, cosmic rays, and satellite trails. In order to prepare images for median stacking, the 2D background of each science image is determined and subtracted. Science images are also divided by their exposure time, to allow the median stacking of images with different exposure times, and results in a reduced image with pixel values in e$^{-}$/s. For instruments that do not have astrometry i.e. a World Coordinate System (WCS) in the header, a WCS is added to the header based on the position and orientation of the telescope and instrument.
 
 After basic reductions, additional corrections are applied. For the NIR, the sky background changes on the order of a few minutes or less. Thus, for NIR observations, it is necessary to create an NIR sky map for each science image, based on observations occurring close in time. In the optical, redder filters such as $i$ and $z$-bands, can also suffer from fringing, which introduces low-level structure in the background. For filters that require this correction (which is set in the setting file for the instrument), the pipeline creates a fringe map based on all science images for a target for that filter.
 
