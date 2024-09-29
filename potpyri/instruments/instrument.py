@@ -525,7 +525,7 @@ class Instrument(object):
 
                 bkg_filename = self.get_bkg_name(processed_data.header, paths['work'])
                 if log: log.info(f'Writing background file: {bkg_filename}')
-                bkg_hdu = fits.PrimaryHDU(bkg.background)
+                bkg_hdu = fits.PrimaryHDU(bkg.background.value)
                 bkg_hdu.header = processed_data.header
                 bkg_hdu.writeto(bkg_filename, overwrite=True,
                     output_verify='silentfix')
