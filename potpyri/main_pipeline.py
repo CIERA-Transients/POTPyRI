@@ -120,7 +120,7 @@ def main_pipeline(instrument:str,
             if log: log.info(f'User input target for reduction: {target}')
 
         files = target_table['File']
-        stack = image_procs.image_proc(target_table, tel, paths, proc=proc, 
+        stack = image_procs.image_proc(target_table, tel, paths,
             skip_skysub=skip_skysub, fieldcenter=fieldcenter, out_size=out_size,
             log=log)
 

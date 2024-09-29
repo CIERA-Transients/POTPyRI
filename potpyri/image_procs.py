@@ -150,7 +150,7 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
 
     return(aligned_images, aligned_data)
 
-def image_proc(image_data, tel, paths, proc=None, skip_skysub=False, 
+def image_proc(image_data, tel, paths, skip_skysub=False, 
     fieldcenter=None, out_size=None, satellites=True, log=None):
 
     wavelength = tel.wavelength
@@ -209,10 +209,8 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
 
     # Bias subtraction, gain correction, flat correction, and flat fielding
     files = image_data['File']
-    staticmask = tel.get_static_mask(paths)
     processed = tel.process_science(files, fil, amp, binn, paths,
-        mbias=mbias, mflat=mflat, mdark=mdark, proc=proc, 
-        staticmask=staticmask, skip_skysub=skip_skysub, log=log)
+        mbias=mbias, mflat=mflat, mdark=mdark, skip_skysub=skip_skysub, log=log)
     
     # Get filenames for output processed data
     reduced_files = [p.header['FILENAME'] for p in processed]
