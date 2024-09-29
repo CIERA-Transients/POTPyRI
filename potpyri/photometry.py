@@ -210,7 +210,10 @@ def do_phot(img_file,
     data = img_hdu[0].data
     mask = img_hdu[1].data.astype(bool)
     error = img_hdu[2].data
-    mean, median, std_sky = sigma_clipped_stats(data[~mask], sigma=5.0)
+
+    # Get sky statistics
+    mean, median, std_sky = sigma_clipped_stats(data[~mask], sigma=5.0,
+        maxiters=21, grow=1)
 
     # Threshold for constructing star catalog
     threshold = std_sky*star_param['snthresh_final']/2.0
