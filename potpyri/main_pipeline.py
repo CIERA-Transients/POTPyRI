@@ -13,8 +13,8 @@ This project was funded by AST
 If you use this code for your work, please consider citing the package release.
 """
 
-# Last updated 09/21/2024
-__version__ = "2.0"
+# Last updated 09/29/2024
+__version__ = "2.1"
 
 import sys
 import os

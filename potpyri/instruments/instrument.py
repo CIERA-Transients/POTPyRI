@@ -1,6 +1,6 @@
 # Basic instrument class
 
-__version__ = "1.1" # Last edited 09/21/2024
+__version__ = "1.2" # Last edited 09/29/2024
 
 import os
 import astropy
@@ -215,27 +215,30 @@ class Instrument(object):
 
         return(bkg_filename)
 
-    def get_mbias_name(self, red_path, amp, binn):
+    def get_mbias_name(self, paths, amp, binn):
+        red_path = paths['cal']
         return(os.path.join(red_path, f'mbias_{amp}_{binn}.fits'))
 
-    def get_mdark_name(self, red_path, amp, binn):
+    def get_mdark_name(self, paths, amp, binn):
+        red_path = paths['cal']
         return(os.path.join(red_path, f'mdark_{amp}_{binn}.fits'))
 
-    def get_mflat_name(self, red_path, fil, amp, binn):
+    def get_mflat_name(self, paths, fil, amp, binn):
+        red_path = paths['cal']
         return(os.path.join(red_path, f'mflat_{fil}_{amp}_{binn}.fits'))
 
-    def load_bias(self, red_path, amp, binn):
-        bias = self.get_mbias_name(red_path, amp, binn)
+    def load_bias(self, paths, amp, binn):
+        bias = self.get_mbias_name(paths, amp, binn)
         mbias = CCDData.read(bias)
         return(mbias)
 
-    def load_dark(self, red_path, amp, binn):
-        dark = self.get_mdark_name(red_path, amp, binn)
+    def load_dark(self, paths, amp, binn):
+        dark = self.get_mdark_name(paths, amp, binn)
         mdark = CCDData.read(dark)
         return(mdark)
 
-    def load_flat(self, red_path, fil, amp, binn):
-        flat = self.get_mflat_name(red_path, fil, amp, binn)
+    def load_flat(self, paths, fil, amp, binn):
+        flat = self.get_mflat_name(paths, fil, amp, binn)
         mflat = CCDData.read(flat)
         return(mflat)
 
@@ -263,8 +266,6 @@ class Instrument(object):
 
     def create_bias(self, bias_list, amp, binn, paths,
         log=None, **kwargs):
-
-        staticmask = self.load_satmask(staticmask)
         
         if log:
             log.info(f'Processing bias files with {amp} amps and {binn} binning.')

@@ -1,6 +1,6 @@
 # Parameter file for GMOS/Gemini
 
-__version__ = "2.0" # Last edited 09/21/2024
+__version__ = "2.1" # Last edited 09/29/2024
 
 import os
 import ccdproc
