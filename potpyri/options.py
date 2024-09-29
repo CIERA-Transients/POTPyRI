@@ -112,7 +112,7 @@ def add_paths(data_path):
 
     # Get path to code directory
     paths = {'data': os.path.abspath(data_path)}
-    paths['abspath']=os.path.abspath(sys.argv[0])
+    paths['abspath']=os.path.abspath(__file__)
     paths['code']=os.path.split(paths['abspath'])[0]
     paths['config']=os.path.join(paths['code'], 'config')
     paths['raw']=os.path.join(data_path, 'raw') #path containing the raw data
