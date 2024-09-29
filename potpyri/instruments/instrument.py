@@ -477,6 +477,7 @@ class Instrument(object):
 
         processed = []
         for sci in sorted(sci_list):
+            if log: log.info(f'Importing {sci}')
             sci_full = self.import_image(sci, amp, log=log)
 
             # Load static mask for this specific file
