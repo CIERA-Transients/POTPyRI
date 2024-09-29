@@ -1,8 +1,8 @@
 "Functions for processing, masking, creating error images, and stacking images."
 "Authors: Charlie Kilpatrick"
 
-# Last updated on 09/21/2024
-__version__ = "2.0"
+# Last updated on 09/29/2024
+__version__ = "2.1"
 
 import os 
 import time
@@ -156,7 +156,6 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
     wavelength = tel.wavelength
 
     red_path = paths['red']
-    cal_path = paths['cal']
     work_path = paths['work']
 
     # All data in the table should be for one target
@@ -173,7 +172,7 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
     if tel.bias:
         if log: log.info('Loading master bias.')
         try:
-            mbias = tel.load_bias(cal_path, amp, binn)
+            mbias = tel.load_bias(paths, amp, binn)
         except:
             if log: log.error(f'''No master bias found for this configuration, 
                 skipping reduction for: {cal_type}''')
@@ -185,7 +184,7 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
     if tel.dark:
         if log: log.info('Loading master dark.')
         try:
-            mdark = tel.load_dark(cal_path, amp, binn)
+            mdark = tel.load_dark(paths, amp, binn)
         except:
             if log: log.error(f'''No master dark found for this configuration, 
                 skipping reduction for: {cal_type}.''')
@@ -197,7 +196,7 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
     if tel.flat:
         if log: log.info('Loading master flat.')
         try:
-            mflat = tel.load_flat(cal_path, fil, amp, binn)
+            mflat = tel.load_flat(paths, fil, amp, binn)
         except:
             if log: log.error(f'''No master flat present for filter {fil}, 
                 skipping reduction for: {cal_type}.''')

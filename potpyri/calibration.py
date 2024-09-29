@@ -1,8 +1,8 @@
 "Wrapper methods for creating bias, dark, and flat images from pipeline data."
 "Authors: Charlie Kilpatrick"
 
-# Initial version tracking on 09/21/2024
-__version__ = "1.0"
+# Initial version tracking on 09/29/2024
+__version__ = "1.1"
 
 import os
 import time
