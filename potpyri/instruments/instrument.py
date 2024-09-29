@@ -148,8 +148,6 @@ class Instrument(object):
         mask_file = os.path.join(paths['code'], 'data', 'staticmasks', 
             f'{instname}.staticmask.fits.fz')
 
-        print(mask_file)
-
         if os.path.exists(mask_file):
             return([mask_file])
         else:
