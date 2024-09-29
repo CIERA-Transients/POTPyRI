@@ -138,10 +138,15 @@ class Instrument(object):
     def get_time(self, hdr):
         return(float(hdr[self.mjd_keyword]))
 
-    def get_static_mask(self, paths):
+    def get_instrument_name(self, hdr):
+        return(self.name.lower())
+
+    def get_staticmask_filename(self, hdr, paths):
+
+        instname = self.get_instrument_name(hdr)
 
         mask_file = os.path.join(paths['code'], 'data', 'staticmasks', 
-            f'{self.name.lower()}.staticmask.fits.fz')
+            f'{instname}.staticmask.fits.fz')
 
         if os.path.exists(mask_file):
             return([mask_file])
@@ -256,7 +261,7 @@ class Instrument(object):
 
         return(frame_full)
 
-    def create_bias(self, bias_list, amp, binn, red_path, staticmask=None,
+    def create_bias(self, bias_list, amp, binn, paths,
         log=None, **kwargs):
 
         staticmask = self.load_satmask(staticmask)
@@ -269,9 +274,14 @@ class Instrument(object):
         for i, bias in enumerate(bias_list):
             if log: log.info(f'Importing {bias}')
             bias_full = self.import_image(bias, amp, log=log)
+
+            # Load static mask for this specific file
+            staticmask = self.load_staticmask(bias_full.header, paths)
+
             if staticmask is not None:
                 if log: log.info('Applying static mask')
                 bias_full.data[staticmask]=np.nan
+
             if self.cr_bias:
                 # Add a CR mask to the bias image
                 mean, median, stddev = sigma_clipped_stats(bias_full.data)
@@ -294,16 +304,13 @@ class Instrument(object):
         mbias.header['VER'] = (__version__, 
             'Version of telescope parameter file used.')
 
-        bias_filename = self.get_mbias_name(red_path, amp, binn)
+        bias_filename = self.get_mbias_name(paths['cal'], amp, binn)
         mbias.write(bias_filename, overwrite=True)
         log.info(f'Master bias written to {bias_filename}')
         
         return
 
-    def create_dark(self, dark_list, amp, binn, red_path, mbias=None, 
-        staticmask=None, log=None):
-
-        staticmask = self.load_satmask(staticmask)
+    def create_dark(self, dark_list, amp, binn, paths, mbias=None, log=None):
 
         if log:
             log.info(f'Processing dark files with {amp} amps and {binn} binning.')
@@ -314,9 +321,14 @@ class Instrument(object):
         for dark in dark_list:
             if log: log.info(f'Importing {dark}')
             dark_full = self.import_image(dark, amp, log=log)
+
+            # Load static mask for this specific file
+            staticmask = self.load_staticmask(dark_full.header, paths)
+
             if staticmask is not None:
                 if log: log.info('Applying static mask')
                 dark_full.data[staticmask]=np.nan
+
             exptimes.append(self.get_exptime(dark_full.header))
 
             if mbias is not None:
@@ -342,16 +354,14 @@ class Instrument(object):
         for i,im in enumerate(dark_list):
             mdark.header[f'FILE{i+1}']=os.path.basename(im)
         
-        darkname = self.get_mdark_name(red_path, amp, binn)
+        darkname = self.get_mdark_name(paths['cal'], amp, binn)
         if log: log.info(f'Writing master dark to {darkname}')
         mdark.write(darkname, overwrite=True)
         
         return
 
-    def create_flat(self, flat_list, fil, amp, binn, red_path, mbias=None, 
-        mdark=None, is_science=False, staticmask=None, log=None, **kwargs):
-
-        staticmask = self.load_satmask(staticmask)
+    def create_flat(self, flat_list, fil, amp, binn, paths, mbias=None, 
+        mdark=None, is_science=False, log=None, **kwargs):
 
         if log:
             log.info(f'Processing files for filter: {fil}')
@@ -362,6 +372,10 @@ class Instrument(object):
         for i, flat in enumerate(flat_list):
             if log: log.info(f'Importing {flat}')
             flat_full = self.import_image(flat, amp, log=log)
+            
+            # Load static mask for this specific file
+            staticmask = self.load_staticmask(flat_full.header, paths)
+
             if staticmask is not None:
                 if log: log.info('Applying static mask')
                 flat_full.data[staticmask]=np.nan
@@ -418,13 +432,15 @@ class Instrument(object):
         mflat.header['VER'] = (__version__, 
             'Version of telescope parameter file used.')
 
-        flat_filename = self.get_mflat_name(red_path, fil, amp, binn)
+        flat_filename = self.get_mflat_name(paths['cal'], fil, amp, binn)
         mflat.write(flat_filename, overwrite=True)
         log.info(f'Master flat written to {flat_filename}')
         
         return
 
-    def load_satmask(self, satmask_filename):
+    def load_staticmask(self, hdr, paths):
+
+        satmask_filename = self.get_staticmask_filename(hdr, paths)
 
         if (satmask_filename is not None and 
             len(satmask_filename)>0 and
@@ -455,18 +471,22 @@ class Instrument(object):
 
         return(input_mask)
 
-    def process_science(self, sci_list, fil, amp, binn, red_path, mbias=None,
-        mflat=None, mdark=None, proc=None, staticmask=None, skip_skysub=False, 
+    def process_science(self, sci_list, fil, amp, binn, paths, mbias=None,
+        mflat=None, mdark=None, proc=None, skip_skysub=False, 
         log=None):
-
-        staticmask = self.load_satmask(staticmask)
 
         processed = []
         for sci in sorted(sci_list):
             sci_full = self.import_image(sci, amp, log=log)
 
+            # Load static mask for this specific file
+            staticmask = self.load_staticmask(sci_full.header, paths)
+
             if staticmask is None:
                 staticmask = np.zeros(sci_full.data.shape).astype(bool)
+            else:
+                if log: log.info('Applying static mask')
+                sci_full.data[staticmask]=np.nan
 
             # Subtract bias
             if mbias is not None:
@@ -483,6 +503,8 @@ class Instrument(object):
             if mflat is not None:
                 if log: log.info('Flattening image')
                 sci_full = ccdproc.flat_correct(sci_full, mflat)
+                # Expand mask wherever sensitivity of the detector is low
+                # e.g., due to vignetting
                 staticmask = staticmask | (mflat.data < 0.5)
 
             # Expand input mask
@@ -501,51 +523,51 @@ class Instrument(object):
                 med_background = np.nanmedian(bkg.background)
                 if log: log.info(f'Median background: {med_background}')
 
-                bkg_filename = self.get_bkg_name(processed_data.header, red_path)
+                bkg_filename = self.get_bkg_name(processed_data.header, paths['work'])
                 if log: log.info(f'Writing background file: {bkg_filename}')
-                bkg_hdu = fits.PrimaryHDU(bkg.data)
+                bkg_hdu = fits.PrimaryHDU(bkg.background)
                 bkg_hdu.header = processed_data.header
                 bkg_hdu.writeto(bkg_filename, overwrite=True,
                     output_verify='silentfix')
 
-                final = processed_data.subtract(CCDData(bkg.background,
+                final_img = processed_data.subtract(CCDData(bkg.background,
                     unit=u.electron), propagate_uncertainties=True, 
                     handle_meta='first_found')
-                final.header['SATURATE'] -= med_background.value
-                final.header['SKYBKG'] = med_background.value
+                final_img.header['SATURATE'] -= med_background.value
+                final_img.header['SKYBKG'] = med_background.value
                 if log: log.info('Updating background and saturation values.')
             else:
-                final = processed_data
-                final.header['SKYBKG'] = 0.0
+                final_img = processed_data
+                final_img.header['SKYBKG'] = 0.0
 
             # Apply final masking based on excessively negative values
             mean, median, stddev = sigma_clipped_stats(final.data)
-            mask = final.data < median - 10 * stddev
-            final.data[mask] = np.nan
-            final.mask = final.mask | mask
+            mask = final_img.data < median - 10 * stddev
+            final_img.data[mask] = np.nan
+            final_img.mask = final_img.mask | mask
 
             # Convert data format to float32
-            final.data = final.data.astype(np.float32)
-            final.header['BITPIX']=-32
+            final_img.data = final_img.data.astype(np.float32)
+            final_img.header['BITPIX']=-32
 
             # Delete empty header keys
-            for key in list(final.header.keys()):
+            for key in list(final_img.header.keys()):
                 if not key.strip():
-                    if key in final.header.keys():
-                        del final.header[key]
+                    if key in final_img.header.keys():
+                        del final_img.header[key]
 
-            final_filename = self.get_sci_name(final.header, red_path)
+            final_filename = self.get_sci_name(final_img.header, paths['work'])
             
             # Edit additional header values
-            final.header['FILENAME']=final_filename
-            final.header['FILTER']=fil
-            final.header['AMPS']=amp 
-            final.header['BINNING']=binn
-            final.header['ORGFILE']=sci
-            final.header['EXTNAME']='SCI'
+            final_img.header['FILENAME']=final_filename
+            final_img.header['FILTER']=fil
+            final_img.header['AMPS']=amp 
+            final_img.header['BINNING']=binn
+            final_img.header['ORGFILE']=sci
+            final_img.header['EXTNAME']='SCI'
 
             if log: log.info(f'Writing final file: {final_filename}')
-            final.write(final_filename, overwrite=True)
-            processed.append(final)
+            final_img.write(final_filename, overwrite=True)
+            processed.append(final_img)
 
         return(processed)

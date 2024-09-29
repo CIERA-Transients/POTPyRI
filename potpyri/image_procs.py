@@ -211,7 +211,7 @@ def image_proc(image_data, tel, paths, proc=None, skip_skysub=False,
     # Bias subtraction, gain correction, flat correction, and flat fielding
     files = image_data['File']
     staticmask = tel.get_static_mask(paths)
-    processed = tel.process_science(files, fil, amp, binn, work_path,
+    processed = tel.process_science(files, fil, amp, binn, paths,
         mbias=mbias, mflat=mflat, mdark=mdark, proc=proc, 
         staticmask=staticmask, skip_skysub=skip_skysub, log=log)
     
