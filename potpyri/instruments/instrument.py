@@ -399,7 +399,7 @@ class Instrument(object):
             exptime = self.get_exptime(flat_full.header)
             log.info(f'Exposure time of image is {exptime}')
             
-            norm = 1./np.nanmedian(flat_full) #check for binning
+            norm = 1./np.nanmedian(flat_full.data)
             # Vet the flat normalization - it should not be negative
             if norm > 0.:
                 log.info(f'Flat normalization: {norm}')
