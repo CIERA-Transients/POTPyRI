@@ -49,9 +49,9 @@ Once POTPyRI and external dependencies are installed, the basic syntax to run th
 
 ```main_pipeline instrument data_path```
 
-where `instrument` is the name of the instrument you wish to reduce data from (see **Supported Instruments**), and `data_path` is the full path of the data you wish you reduce. Both the `instrument` and `data_path` required parameters. Additional parameters that can be set when running the pipeline are discussed in **Pipeline parameters**.
+where `instrument` is the name of the instrument you wish to reduce data from (see **Supported Instruments**), and `data_path` is the full path of the data you wish you reduce. Both the `instrument` and `data_path` are required parameters. Optional parameters are discussed in **Pipeline parameters**.
 
-The pipeline is designed to run with no user input, including file ingestion, pixel calibration with provided calibration files, astrometry, image stacking, photometry, and flux calibration. The pipeline will display prompts or instructions on the terminal in green or red to provide user feedback and indicate when an error is encountered. For more details on each of these sections, including how the pipeline performs each task, see below. 
+The pipeline is designed to run with no user input, including file ingestion, pixel calibration with provided calibration files, astrometry, image stacking, photometry, and flux calibration. The pipeline will display prompts or instructions on the terminal in green or red to provide user feedback and indicate when an error is encountered. For more details on each of these sections, including how the pipeline performs each task, read the sections below. 
 
 All processed data will be written out in the `data_path` under the `red` subdirectory.  Raw data are stored in `raw` and unused files are stored in `bad`.  Processed calibration files will be stored in `red/cals`, logs in `red/log`, and interstitial image files before stacking are stored in `log/workspace`. A description of each type of output file can be found in **Outputs**.
 
