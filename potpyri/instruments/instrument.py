@@ -541,7 +541,7 @@ class Instrument(object):
                 final_img.header['SKYBKG'] = 0.0
 
             # Apply final masking based on excessively negative values
-            mean, median, stddev = sigma_clipped_stats(final.data)
+            mean, median, stddev = sigma_clipped_stats(final_img.data)
             mask = final_img.data < median - 10 * stddev
             final_img.data[mask] = np.nan
             final_img.mask = final_img.mask | mask
