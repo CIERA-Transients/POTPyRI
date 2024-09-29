@@ -136,8 +136,6 @@ class Instrument(object):
         return(out_size)
 
     def get_time(self, hdr):
-        print('GENERIC INSTRUMENT METHOD')
-        print(self.mjd_keyword)
         return(float(hdr[self.mjd_keyword]))
 
     def get_instrument_name(self, hdr):
