@@ -232,8 +232,13 @@ class LRIS(instrument.Instrument):
                 readnoise=readnoises[j]*u.electron) 
                 for j,x in enumerate(raw)]
         elif amp=='4B' or amp=='4R':
-            raw = [CCDData.read(filename, hdu=x+1, unit='adu')
-                for x in range(int(amp[0]))]
+            raw = []
+            hdu = fits.open(filename)
+            for x in range(int(amp[0])):
+                hdr = hdu[x+1].header
+                hdr['CUNIT1']='deg'
+                hdr['CUNIT2']='deg'
+                raw.append(CCDData(hdu[x+1], header=hdr, unit=u.adu))
             red = [ccdproc.ccd_process(x, oscan=oscan_reg, 
                 oscan_model=models.Chebyshev1D(3), trim=x.header['DATASEC'], 
                 gain=gains[j]*u.electron/u.adu, 
