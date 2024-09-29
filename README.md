@@ -25,7 +25,8 @@ which will install the remaining dependencies from the requirements.txt file.
 
 POTPyRI has two external dependencies: `astrometry.net` and `source extractor`.  It is recommended that you install them via Homebrew on Mac OS systems or via `apt-get` on Ubuntu/Linux systems.  They are also available via the following Github repositories:
 
-https://github.com/dstndstn/astrometry.net\
+https://github.com/dstndstn/astrometry.net
+
 https://github.com/astromatic/sextractor
 
 Note that for `astrometry.net`, index files are required.  There is a utility script in POTPyRI that will attempt to install the latest index files.  Once you have successfully installed `astrometry.net` in your path, run:
