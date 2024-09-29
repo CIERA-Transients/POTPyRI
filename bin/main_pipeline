@@ -12,4 +12,6 @@ This script runs the main POTPyRI pipeline
 from potpyri import main_pipeline
 
 if __name__ == '__main__':
-    main_pipeline.main()
+    main_pipeline.options.test_for_dependencies()
+    args = main_pipeline.options.add_options()
+    main_pipeline.main_pipeline(**vars(args))
