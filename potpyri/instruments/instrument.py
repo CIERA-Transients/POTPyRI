@@ -473,8 +473,7 @@ class Instrument(object):
         return(input_mask)
 
     def process_science(self, sci_list, fil, amp, binn, paths, mbias=None,
-        mflat=None, mdark=None, proc=None, skip_skysub=False, 
-        log=None):
+        mflat=None, mdark=None, skip_skysub=False, log=None):
 
         processed = []
         for sci in sorted(sci_list):

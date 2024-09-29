@@ -292,6 +292,6 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
     if spec_num>0 and log: log.info(f'{spec_num} spectroscopy files found and removed from reduction.')
 
     t_end = time.time()
-    log.info(f'Sort_files ran in {t_end-t_start} sec')
+    log.info(f'sort_files ran in {t_end-t_start} sec')
 
     return(file_table)
