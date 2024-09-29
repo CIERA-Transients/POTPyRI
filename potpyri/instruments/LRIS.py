@@ -238,7 +238,7 @@ class LRIS(instrument.Instrument):
                 hdr = hdu[x+1].header
                 hdr['CUNIT1']='deg'
                 hdr['CUNIT2']='deg'
-                raw.append(CCDData(hdu[x+1], header=hdr, unit=u.adu))
+                raw.append(CCDData(hdu[x+1].data, header=hdr, unit=u.adu))
             red = [ccdproc.ccd_process(x, oscan=oscan_reg, 
                 oscan_model=models.Chebyshev1D(3), trim=x.header['DATASEC'], 
                 gain=gains[j]*u.electron/u.adu, 
