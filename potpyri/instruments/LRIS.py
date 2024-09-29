@@ -121,6 +121,14 @@ class LRIS(instrument.Instrument):
             filt = hdr['REDFILT']
         return(filt)
 
+    def get_time(self, hdr):
+        if 'MJD' in hdr.keys():
+            return(float(hdr['MJD']))
+        elif 'MJD-OBS' in hdr.keys():
+            return(float(hdr['MJD-OBS']))
+        else:
+            raise Exception('Could not find MJD header keyword.')
+
     def get_ampl(self, hdr):
         try:
             amp = str(hdr['NUMAMPS'])
