@@ -305,7 +305,7 @@ class Instrument(object):
         mbias.header['VER'] = (__version__, 
             'Version of telescope parameter file used.')
 
-        bias_filename = self.get_mbias_name(paths['cal'], amp, binn)
+        bias_filename = self.get_mbias_name(paths, amp, binn)
         mbias.write(bias_filename, overwrite=True)
         log.info(f'Master bias written to {bias_filename}')
         
@@ -355,7 +355,7 @@ class Instrument(object):
         for i,im in enumerate(dark_list):
             mdark.header[f'FILE{i+1}']=os.path.basename(im)
         
-        darkname = self.get_mdark_name(paths['cal'], amp, binn)
+        darkname = self.get_mdark_name(paths, amp, binn)
         if log: log.info(f'Writing master dark to {darkname}')
         mdark.write(darkname, overwrite=True)
         
@@ -433,7 +433,7 @@ class Instrument(object):
         mflat.header['VER'] = (__version__, 
             'Version of telescope parameter file used.')
 
-        flat_filename = self.get_mflat_name(paths['cal'], fil, amp, binn)
+        flat_filename = self.get_mflat_name(paths, fil, amp, binn)
         mflat.write(flat_filename, overwrite=True)
         log.info(f'Master flat written to {flat_filename}')
         
