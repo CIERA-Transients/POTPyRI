@@ -103,6 +103,15 @@ class LRIS(instrument.Instrument):
         else:
             return('*.fits.gz')
 
+    def get_instrument_name(self, hdr):
+        instrument = hdr['INSTRUME']
+        if instrument=='LRISBLUE':
+            return('lris.blue')
+        elif instrument=='LRIS':
+            return('lris.red')
+        else:
+            raise Exception('Cannot determine instrument name')
+
     # Specialized procedures for LRIS since we need to deal with red/blue
     def get_filter(self, hdr):
         instrument = hdr['INSTRUME']
