@@ -110,6 +110,32 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
 
         solved_images.append(file)
 
+    # Reject images from stack where either RADISP or DEDISP is >5-sigma outlier
+    if len(solved_images)>2:
+        radisp = [] ; dedisp = []
+        for file in solved_images:
+            hdu = fits.open(file, mode='readonly')
+            radisp.append(hdu[0].header['RADISP'])
+            dedisp.append(hdu[0].header['DEDISP'])
+
+        radisp = np.array(radisp) ; dedisp = np.array(dedisp)
+        ramean, ramedian, rastddev = sigma_clipped_stats(radisp)
+        demean, demedian, destddev = sigma_clipped_stats(dedisp)
+
+        if log: log.info(f'Median dispersion in R.A.={ramedian}')
+        if log: log.info(f'Median dispersion in Decl.={demedian}')
+
+        mask = (np.abs(radisp-ramedian) < 5 * rastddev) &\
+               (np.abs(dedisp-demedian) < 5 * destddev)
+
+        if log:
+            log.info('Rejecting the following images for high astrometric dispersion:')
+            for i,m in enumerate(mask):
+                if not m: log.info(solved_images[i])
+
+        solved_images = np.array(solved_images)[mask]
+
+
     if len(solved_images)==0:
         return(None, None)
 
