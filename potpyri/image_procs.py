@@ -125,8 +125,8 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
         if log: log.info(f'Median dispersion in R.A.={ramedian}')
         if log: log.info(f'Median dispersion in Decl.={demedian}')
 
-        mask = (np.abs(radisp-ramedian) < 5 * rastddev) &\
-               (np.abs(dedisp-demedian) < 5 * destddev)
+        mask = (radisp-ramedian < 5 * rastddev) &\
+               (dedisp-demedian < 5 * destddev)
 
         if log:
             log.info('Rejecting the following images for high astrometric dispersion:')
