@@ -3,7 +3,9 @@ import sys
 import io
 import os
 from pykoa.koa import Koa 
-from astropy.table import Table,Column
+from astropy.time import Time
+from astropy.table import Table
+from astropy.table import Column
 
 def login(cookie='/Users/ckilpatrick/.tapcookie'):
     if not os.path.exists(cookie):
@@ -15,7 +17,7 @@ def date_query(date, instr, form='ipac', cookie='/Users/ckilpatrick/.tapcookie')
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    outfile = os.path.join(outdir, f'{inst}.tbl')
+    outfile = os.path.join(outdir, f'{instr}.tbl')
     Koa.query_date(instr, date, outfile, overwrite=True, 
                    format=form, cookiepath=cookie)
 
@@ -28,6 +30,7 @@ def download_data(recfile, outdir, form='ipac', cookie='/Users/ckilpatrick/.tapc
     Koa.download(recfile, form, outdir, cookiepath=cookie)
 
 def add_options():
+    import argparse
     params = argparse.ArgumentParser()
     params.add_argument('date', 
         help='''Date for which to download data.''')
@@ -48,4 +51,4 @@ if __name__=="__main__":
     outfile, outdir = date_query(args.date, args.instrument, cookie=args.cookie_file)
     if outfile is not None:
         download_data(outfile, outdir, cookie=args.cookie_file)
-    
+

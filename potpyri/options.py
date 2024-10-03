@@ -75,6 +75,10 @@ def add_options():
         default=['CREATECALS','IMAGEPROC','WCS','DOPHOT','ABSPHOT'],
         nargs='+',
         help='''Stages to execute if running the pipeline in a modular way.''')
+    params.add_argument('--skip-flatten',
+        default=False,
+        action='store_true',
+        help='Tell the pipeline to skip flattening.')
 
     args = params.parse_args()
 

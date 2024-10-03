@@ -51,6 +51,7 @@ def main_pipeline(instrument:str,
                   file_list_name:str=None,
                   fieldcenter:list=None,
                   out_size:int=None,
+                  skip_flatten:bool=None,
                   **kwargs)->None:
 
     # start time
@@ -59,6 +60,8 @@ def main_pipeline(instrument:str,
     # import telescope parameter file
     module = importlib.import_module(f'potpyri.instruments.{instrument.upper()}')
     tel = getattr(module, instrument.upper())()
+
+    if skip_flatten: tel.flat=False
 
     # Generate code and data paths based on input path
     paths = options.add_paths(data_path)
