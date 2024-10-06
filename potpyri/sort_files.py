@@ -33,7 +33,7 @@ def is_bad(hdr, tel):
         # Check if telescope is binned the same in all directions, we do not
         # want to reduce images with variable binning in different directions
         bad = not binn == len(binn) * binn[0]
-
+        print(bad, binn)
 
     return(bad)
 
