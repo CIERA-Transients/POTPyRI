@@ -567,6 +567,11 @@ class Instrument(object):
             final_img.header['ORGFILE']=sci
             final_img.header['EXTNAME']='SCI'
 
+            # Get rid of header values if they exist
+            for key in ['DATASEC','BIASSEC','CCDSEC']:
+                if key in final_img.header.keys():
+                    del final_img.header[key]
+
             if log: log.info(f'Writing final file: {final_filename}')
             final_img.write(final_filename, overwrite=True)
             processed.append(final_img)

@@ -28,6 +28,13 @@ def is_bad(hdr, tel):
     bad = np.any([bool(re.search(v, str(hdr[k]).lower())) 
         for k,v in zip(keywords,values)])
 
+    binn = str(tel.get_binning(hdr))
+    if len(binn)>1:
+        # Check if telescope is binned the same in all directions, we do not
+        # want to reduce images with variable binning in different directions
+        bad = binn == len(binn) * binn[0]
+
+
     return(bad)
 
 def is_spec(hdr, tel):
