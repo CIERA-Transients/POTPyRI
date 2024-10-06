@@ -33,7 +33,6 @@ def is_bad(hdr, tel):
         # Check if telescope is binned the same in all directions, we do not
         # want to reduce images with variable binning in different directions
         bad = not binn == len(binn) * binn[0]
-        print(bad, binn)
 
     return(bad)
 
@@ -71,6 +70,13 @@ def is_dark(hdr, tel):
     dark = np.all([bool(re.search(v, str(hdr[k]).lower())) 
         for k,v in zip(keywords,values)])
 
+    # Similar to bad, require that dark have equivalent binning in both dirs
+    binn = str(tel.get_binning(hdr))
+    if len(binn)>1:
+        # Check if telescope is binned the same in all directions, we do not
+        # want to reduce images with variable binning in different directions
+        dark = binn == len(binn) * binn[0]
+
     return(dark)
 
 def is_bias(hdr, tel):
@@ -82,6 +88,13 @@ def is_bias(hdr, tel):
 
     bias = np.all([bool(re.search(v, str(hdr[k]).lower())) 
         for k,v in zip(keywords,values)])
+
+    # Similar to bad, require that bias have equivalent binning in both dirs
+    binn = str(tel.get_binning(hdr))
+    if len(binn)>1:
+        # Check if telescope is binned the same in all directions, we do not
+        # want to reduce images with variable binning in different directions
+        bias = binn == len(binn) * binn[0]
     
     return(bias)
 
