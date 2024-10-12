@@ -111,7 +111,7 @@ def test_for_dependencies():
 
 def add_paths(data_path):
 
-    if not os.path.exists(data_path):
+    if not os.path.exists(data_path, tel):
         raise Exception(f'Data path does not exist: {data_path}')
 
     # Get path to code directory
@@ -119,6 +119,7 @@ def add_paths(data_path):
     paths['abspath']=os.path.abspath(__file__)
     paths['code']=os.path.split(paths['abspath'])[0]
     paths['config']=os.path.join(paths['code'], 'config')
+    paths['caldb']=os.path.join(paths['code'], 'data', 'cal', tel.name.upper())
     paths['raw']=os.path.join(data_path, 'raw') #path containing the raw data
     paths['bad']=os.path.join(data_path, 'bad') #path containing the unused data
     paths['red']=os.path.join(data_path, 'red') #path to write the reduced files

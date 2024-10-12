@@ -28,7 +28,8 @@ if os.path.exists('requirements.txt'):
 setup_keywords['zip_safe'] = False
 setup_keywords['use_2to3'] = False
 setup_keywords['packages'] = find_packages()
-setup_keywords['package_data'] = {'potpyri': ['data/staticmasks/*.fz', 'config/*']}
+setup_keywords['package_data'] = {'potpyri': ['data/staticmasks/*.fz', 
+    'config/*', 'data/cal/*/*.fz']}
 setup_keywords['include_package_data'] = True
 setup_keywords['setup_requires'] = ['pytest-runner']
 setup_keywords['tests_require'] = ['pytest']

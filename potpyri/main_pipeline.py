@@ -64,7 +64,7 @@ def main_pipeline(instrument:str,
     if skip_flatten: tel.flat=False
 
     # Generate code and data paths based on input path
-    paths = options.add_paths(data_path)
+    paths = options.add_paths(data_path, tel)
 
     # Generate log file in corresponding directory for log
     log = logger.get_log(paths['log'])
@@ -95,13 +95,15 @@ def main_pipeline(instrument:str,
     dark_files = file_table[dark_match]
     science_data = file_table[science_match]
 
-    # Use science data as flat files if no flats and a lot of science data
-    if tel.flat and len(flat_files)==0 and len(science_data)>11:
-        flat_files = science_data
-
     calibration.do_bias(bias_files, tel, paths, log=log)
     calibration.do_dark(dark_files, tel, paths, log=log)
-    calibration.do_flat(flat_files, tel, paths, log=log)
+
+    # If there are no flats, use caldb flat instead of nightly flat, otherwise
+    # make flat as normal
+    if tel.flat and len(flat_files)==0:
+        paths['cal'] = paths['caldb']
+    else:
+        calibration.do_flat(flat_files, tel, paths, log=log)
 
     # Science images
     ################
