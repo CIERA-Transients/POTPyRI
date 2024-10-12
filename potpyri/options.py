@@ -109,9 +109,9 @@ def test_for_dependencies():
             apt-get, or directly from the source code:
             https://github.com/astromatic/sextractor.''')
 
-def add_paths(data_path):
+def add_paths(data_path, tel):
 
-    if not os.path.exists(data_path, tel):
+    if not os.path.exists(data_path):
         raise Exception(f'Data path does not exist: {data_path}')
 
     # Get path to code directory
