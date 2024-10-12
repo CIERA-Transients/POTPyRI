@@ -95,11 +95,25 @@ class BINOSPEC(instrument.Instrument):
         filename = os.path.abspath(filename)
         if log: log.info(f'Loading file: {filename}')
 
-        with fits.open(filename) as hdr:
-            header = hdr[self.raw_header_ext].header
+        hdu = fits.open(filename)
+        header = hdu[self.raw_header_ext].header
 
-        raw = [CCDData.read(filename, hdu=x+1, unit='adu') 
-            for x in range(int(amp))]
+        raw = []
+        for x in range(int(amp)):
+            data = hdu[x+1].data
+            hdr = hdu[x+1].header
+
+            if hdr['CRVAL1']<0:
+                hdr['CRVAL1']=0.0
+            if np.abs(hdr['CRVAL2'])>90:
+                hdr['CRVAL2']=0.0
+            if 'PRESSURE' in hdr.keys():
+                del hdr['PRESSURE']
+            if 'TEMP' in hdr.keys():
+                del hdr['TEMP']
+
+            raw.append(CCDData(data, header=hdr, unit=u.adu))
+
         red = [ccdproc.ccd_process(x, oscan=self.biassec[k], 
                oscan_model=models.Chebyshev1D(3), 
                trim=self.datasec[k], gain=self.gain[k]*u.electron/u.adu, 
