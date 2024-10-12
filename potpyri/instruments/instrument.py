@@ -229,17 +229,35 @@ class Instrument(object):
 
     def load_bias(self, paths, amp, binn):
         bias = self.get_mbias_name(paths, amp, binn)
-        mbias = CCDData.read(bias)
+        if os.path.exists(bias):
+            mbias = CCDData.read(bias)
+        elif os.path.exists(bias+'.fz'):
+            hdu = fits.open(bias+'.fz')
+            mbias = CCDData(hdu[1].data, header=hdu[1].header, unit=u.electron)
+        else:
+            raise Exception(f'Could not find bias: {bias}')
         return(mbias)
 
     def load_dark(self, paths, amp, binn):
         dark = self.get_mdark_name(paths, amp, binn)
-        mdark = CCDData.read(dark)
+        if os.path.exists(dark):
+            mdark = CCDData.read(dark)
+        elif os.path.exists(dark+'.fz'):
+            hdu = fits.open(dark+'.fz')
+            mdark = CCDData(hdu[1].data, header=hdu[1].header, unit=u.electron)
+        else:
+            raise Exception(f'Could not find dark: {dark}')
         return(mdark)
 
     def load_flat(self, paths, fil, amp, binn):
         flat = self.get_mflat_name(paths, fil, amp, binn)
-        mflat = CCDData.read(flat)
+        if os.path.exists(flat):
+            mflat = CCDData.read(flat)
+        elif os.path.exists(flat+'.fz'):
+            hdu = fits.open(flat+'.fz')
+            mflat = CCDData(hdu[1].data, header=hdu[1].header, unit=u.electron)
+        else:
+            raise Exception(f'Could not find flat: {flat}')
         return(mflat)
 
     def import_image(self, filename, amp, log=None):
