@@ -7,6 +7,7 @@ __version__ = "2.0"
 import numpy as np
 import subprocess
 import os
+import progressbar
 
 import matplotlib.pyplot as plt
 
@@ -91,7 +92,7 @@ def get_gaia_catalog(input_file, log=None):
         if log: log.error(f'Could not parse RA/DEC from header of {file}')
         return(False)
 
-    vizier = Vizier(columns=['RA_ICRS', 'DE_ICRS', 'Plx', 'PSS'])
+    vizier = Vizier(columns=['RA_ICRS', 'DE_ICRS', 'Plx', 'PSS','PM'])
     vizier.ROW_LIMIT = -1
 
     cat = vizier.query_region(coord, width=20 * u.arcmin, 
@@ -102,7 +103,7 @@ def get_gaia_catalog(input_file, log=None):
     else:
         return(None)
 
-    mask = (cat['PSS'] > 0.99) & (cat['Plx'] < 20)
+    mask = (cat['PSS'] > 0.99) & (cat['Plx'] < 20) & (cat['PM']<10)
     cat = cat[mask]
 
     return(cat)
@@ -322,10 +323,16 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     cat = get_gaia_catalog(file, log=log)
 
     if cat is None or len(cat)==0:
-        log.error(f'Could not get Gaia catalog or no stars for {file}')
+        if log:
+            log.error(f'Could not get Gaia catalog or no stars for {file}')
+        else:
+            print(f'Could not get Gaia catalog or no stars for {file}')
         return(False)
 
-    if log: log.info(f'Got {len(cat)} Gaia DR3 alignment stars')
+    if log: 
+        log.info(f'Got {len(cat)} Gaia DR3 alignment stars')
+    else:
+        print(f'Got {len(cat)} Gaia DR3 alignment stars')
 
     # Estimate sources that land within the image using WCS from header
     hdu = fits.open(file)
@@ -344,15 +351,26 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     cat = cat[mask]
 
     if cat is None or len(cat)==0:
-        log.error(f'No stars found in {file}')
+        if log: 
+            log.error(f'No stars found in {file}')
+        else:
+            print(f'No stars found in {file}')
         return(False)
 
-    if log: log.info(f'Found {len(cat)} stars in the image')
+    if log: 
+        log.info(f'Found {len(cat)} stars in the image')
+    else:
+        print(f'Found {len(cat)} stars in the image')
+
+    data = hdu[0].data
+    mask = hdu[1].data>0
+    data[mask]=np.nan
 
     x_cent = [] ; y_cent = [] ; aper_area = []
     for i,row in enumerate(cat):
         aper = CircularAperture((x_pix[i], y_pix[i]), 20.0)
-        aperstats = ApertureStats(hdu[0].data, aper)
+
+        aperstats = ApertureStats(data, aper)
 
         x_cent.append(aperstats.xcentroid)
         y_cent.append(aperstats.ycentroid)
@@ -361,20 +379,42 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     aper_area = np.array(aper_area)
     max_aper_area = np.max(aper_area[~np.isnan(aper_area)])
 
+    x_cent = np.array(x_cent)
+    y_cent = np.array(y_cent)
+
+    x_sep = np.abs(x_cent - x_pix)
+    y_sep = np.abs(y_cent - y_pix)
+
+    abs_sep = np.sqrt(x_sep**2 + y_sep**2)
+
     # Add centroids to the catalog
     cat.add_column(Column(x_cent, name='xcentroid'))
     cat.add_column(Column(y_cent, name='ycentroid'))
+    cat.add_column(Column(x_sep, name='xseparation'))
+    cat.add_column(Column(y_sep, name='yseparation'))
+    cat.add_column(Column(abs_sep, name='absseparation'))
     cat.add_column(Column(aper_area/max_aper_area, name='aper_area_frac'))
 
     mask = ~np.isnan(cat['xcentroid']) & ~np.isnan(cat['ycentroid']) &\
-        (cat['aper_area_frac']>0.99)
+        (cat['aper_area_frac']>0.99) & (cat['xseparation']<5.0) & (cat['yseparation']<5.0) &\
+        ~np.isnan(cat['xseparation']) & ~np.isnan(cat['yseparation'])
     cat = cat[mask]
 
-    if cat is None or len(cat)==0:
-        log.error(f'Could not centroid on any stars in {file}')
-        return(False)
+    if log: 
+        log.info(f'Centroided on {len(cat)} stars')
+    else:
+        print(f'Centroided on {len(cat)} stars')
 
-    if log: log.info(f'Centroided on {len(cat)} stars')
+    if len(cat)>500:
+        cat.sort('absseparation')
+        cat = cat[:500]
+
+    if cat is None or len(cat)==0:
+        if log:
+            log.error(f'Could not centroid on any stars in {file}')
+        else:
+            print(f'Could not centroid on any stars in {file}')
+        return(False)
 
     # Get central coordinate of image based on centroiding
     central_pix = (float(naxis1)/2., float(naxis2)/2.)
@@ -385,14 +425,23 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     coords = SkyCoord(cat['RA_ICRS'], cat['DE_ICRS'], unit=(u.deg, u.deg))
 
     sip_degree = None
-    if len(coords)>50:
+    if len(coords)>20:
         sip_degree = 2
-    if len(coords)>500:
+    if len(coords)>60:
         sip_degree = 4
-    if len(coords)>2500:
+    if len(coords)>200:
         sip_degree = 6
 
-    for i in np.arange(500):
+    if log:
+        log.info(f'Solving with SIP degree = {sip_degree}')
+    else:
+        print(f'Solving with SIP degree = {sip_degree}')
+
+    bar = progressbar.ProgressBar(maxval=50)
+    bar.start()
+
+    for i in np.arange(50):
+        bar.update(i+1)
         idx = np.arange(len(cat))
         size = int(len(cat)/2)
 
@@ -408,9 +457,13 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
         ra_cent.append(cent_coord.ra.degree)
         de_cent.append(cent_coord.dec.degree)
 
+    bar.finish()
+
     # Estimate systematic precision of new WCS
-    mean_ra, med_ra, std_ra = sigma_clipped_stats(ra_cent)
-    mean_de, med_de, std_de = sigma_clipped_stats(de_cent)
+    mean_ra, med_ra, std_ra = sigma_clipped_stats(ra_cent, maxiters=11,
+        sigma=5)
+    mean_de, med_de, std_de = sigma_clipped_stats(de_cent, maxiters=11,
+        sigma=5)
 
     fig, ax = plt.subplots()
     ax.scatter(ra_cent, de_cent)
@@ -423,11 +476,25 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
         proj_point=proj_point)
 
     header = new_wcs.to_header()
+    # Make sure SIP keywords were added
+    if sip_degree>0:
+        for key,val in new_wcs._write_sip_kw().items():
+            header[key] = val
+        header['CTYPE1']='RA---TAN-SIP'
+        header['CTYPE2']='DEC--TAN-SIP'
 
-    header['CRVAL1']=mean_ra
-    header['CRVAL2']=mean_de
-    header['CRPIX1']=central_pix[0]
-    header['CRPIX2']=central_pix[1]
+    # Delete all old WCS keys
+    delkeys = ['WCSNAME','CUNIT1','CUNIT2','CTYPE1','CTYPE2','CRPIX1','CRPIX2',
+        'CRVAL1','CRVAL2','CD1_1','CD1_2','CD2_1','CD2_2','RADECSYS',
+        'PC1_1','PC1_2','PC2_1','PC2_2','LONPOLE','LATPOLE','CDELT1','CDELT2']
+    while True:
+        found_key = False
+        for key in hdu[0].header.keys():
+            if any([k in key for k in delkeys]):
+                found_key=True
+                del hdu[0].header[key]
+        if not found_key:
+            break
 
     hdu[0].header.update(header)
 
@@ -439,6 +506,8 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
 
     if log:
         log.info(f'Dispersion in R.A.={ra_disp} arcsec, Dispersion in Decl.={de_disp} arcsec')
+    else:
+        print(f'Dispersion in R.A.={ra_disp} arcsec, Dispersion in Decl.={de_disp} arcsec')
 
     # Add header variables for dispersion in WCS solution
     hdu[0].header['RADISP']=(ra_disp, 'Dispersion in R.A. of WCS solution [Arcsec]')
@@ -449,11 +518,10 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     return(True)
 
 if __name__ == "__main__":
-    file='/Users/ckilpatrick/Downloads/FRB20240619D/2024.0905/red/workspace/FRB20240619D.i.ut240905.2.11.155815337.fits'
+    file='/Users/ckilpatrick/FRB20241005_r.r.ut241007.2.11.1412747896.fits'
 
     import importlib
     global tel
     tel = importlib.import_module('instruments.BINOSPEC')
 
-    solve_astrometry(file, tel, radius=0.5, replace=True, 
-        shift_only=False, log=None)
+    align_to_gaia(file, tel, radius=0.5, log=None)
