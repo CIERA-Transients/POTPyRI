@@ -21,6 +21,7 @@ from astropy.stats import sigma_clipped_stats
 from astropy.io import fits
 from astropy.io import ascii
 from astropy.coordinates import SkyCoord
+from astropy.coordinates import match_coordinates_sky
 from astropy.table import Table, Column
 from astropy.utils.exceptions import AstropyWarning
 from astropy.wcs import WCS
@@ -363,96 +364,34 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     else:
         print(f'Found {len(cat)} stars in the image')
 
-    saturate = hdu[0].header['SATURATE']
-
-    data = hdu[0].data
-    mask = hdu[1].data>0
-    data[mask]=np.nan
-    data[data>saturate]=np.nan
-
-    poisson = data
-    poisson[poisson<0.]=0.
-    rms = 0.5 * (
-            np.percentile(data[~np.isnan(data)], 84.13)
-            - np.percentile(data[~np.isnan(data)], 15.86)
-    )
-    error = np.sqrt(poisson + rms**2)
-
-    cat = photometry.get_star_catalog(data, mask, error, fwhm_init=10.0,
-        threshold=10.0, log=log)
-
-    print(cat)
-
-    with open('/Users/ckilpatrick/test.cat','w') as f:
-        for row in cat:
-            x=row['xcentroid']
-            y=row['ycentroid']
-            f.write(f'{x} {y} \n')
-    sys.exit()
-
-    x_cent = [] ; y_cent = [] ; aper_area = [] ; fwhms = []
-    for i,row in enumerate(cat):
-        aper = CircularAperture((x_pix[i], y_pix[i]), 10.0)
-
-        aperstats = ApertureStats(data, aper)
-
-        x_cent.append(aperstats.xcentroid)
-        y_cent.append(aperstats.ycentroid)
-        fwhms.append(aperstats.fwhm.value)
-        aper_area.append(aperstats.center_aper_area.value)
-
-    fwhms = np.array(fwhms)
-    mean_fwhm, med_fwhm, std_fwhm = sigma_clipped_stats(fwhms)
-
-    # Redo with updated FWHM value
-    x_cent = [] ; y_cent = [] ; aper_area = [] ; fwhms = []
-    for i,row in enumerate(cat):
-        aper = CircularAperture((x_pix[i], y_pix[i]), 2.5*med_fwhm)
-
-        aperstats = ApertureStats(data, aper)
-
-        x_cent.append(aperstats.xcentroid)
-        y_cent.append(aperstats.ycentroid)
-        fwhms.append(aperstats.fwhm.value)
-        aper_area.append(aperstats.center_aper_area.value)
-
-    fwhms = np.array(fwhms)
-    mean_fwhm, med_fwhm, std_fwhm = sigma_clipped_stats(fwhms)
-
-    aper_area = np.array(aper_area)
-    max_aper_area = np.max(aper_area[~np.isnan(aper_area)])
-
-    x_cent = np.array(x_cent)
-    y_cent = np.array(y_cent)
-
-    # Add centroids to the catalog
-    cat.add_column(Column(x_cent, name='xcentroid'))
-    cat.add_column(Column(y_cent, name='ycentroid'))
-    cat.add_column(Column(fwhms, name='fwhm'))
-    cat.add_column(Column(aper_area/max_aper_area, name='aper_area_frac'))
-
-    mask = ~np.isnan(cat['xcentroid']) & ~np.isnan(cat['ycentroid']) &\
-           (cat['aper_area_frac']>0.9) & ~np.isnan(cat['fwhm'])
-    cat = cat[mask]
-
-    cat.write('/Users/ckilpatrick/test.ecsv', format='ascii.ecsv', overwrite=True)
-    with open('/Users/ckilpatrick/test.cat','w') as f:
-        for row in cat:
-            x=row['Xpos']
-            y=row['Ypos']
-            f.write(f'{x} {y} \n')
+    cat = photometry.run_sextractor(file, log=log)
 
     if log: 
         log.info(f'Centroided on {len(cat)} stars')
     else:
         print(f'Centroided on {len(cat)} stars')
 
-    if cat is None or len(cat)==0:
+    cat_coords = SkyCoord(cat['ALPHA_J2000'], cat['DELTA_J2000'])
+    idx, d2d, d3d = match_coordinates_sky(cat_coords, coords)
+
+    sep_mask = d2d < 1.0 * u.arcsec
+    cat_coords_match = cat[sep_mask]
+    sky_coords_match = coords[idx[sep_mask]]
+
+    cat_coords_match.add_column(sky_coords_match['RA_ICRS'])
+    cat_coords_match.add_column(sky_coords_match['DE_ICRS'])
+
+    if cat_coords_match is None or len(cat_coords_match)==0:
         if log:
             log.error(f'Could not centroid on any stars in {file}')
         else:
             print(f'Could not centroid on any stars in {file}')
         return(False)
+    else:
+        if log:
+            log.info(f'Number of matched coordinates is {len(cat_coords_match)}')
+        else:
+            print(f'Number of matched coordinates is {len(cat_coords_match)}')
 
     # Get central coordinate of image based on centroiding
     central_pix = (float(naxis1)/2., float(naxis2)/2.)
@@ -460,7 +399,7 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
 
     # Bootstrap WCS solution and get center pixel
     ra_cent = [] ; de_cent = []
-    coords = SkyCoord(cat['RA_ICRS'], cat['DE_ICRS'], unit=(u.deg, u.deg))
+    coords = SkyCoord(cat_coords_match['RA_ICRS'], cat_coords_match['DE_ICRS'], unit=(u.deg, u.deg))
 
     sip_degree = None
     if len(coords)>20:
@@ -470,8 +409,6 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     if len(coords)>200:
         sip_degree = 6
 
-    sip_degree = 0
-
     if log:
         log.info(f'Solving with SIP degree = {sip_degree}')
     else:
@@ -480,7 +417,7 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     bar = progressbar.ProgressBar(maxval=500)
     bar.start()
 
-    idx = np.arange(len(cat))
+    idx = np.arange(len(cat_coords_match))
 
     for i in np.arange(500):
         bar.update(i+1)
@@ -488,7 +425,7 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
 
         idxs = np.random.choice(idx, size=size, replace=False)
 
-        xy = (cat['xcentroid'][idxs], cat['ycentroid'][idxs])
+        xy = (cat_coords_match['X_IMAGE'][idxs], cat_coords_match['Y_IMAGE'][idxs])
         c = coords[idxs]
 
         new_wcs = fit_wcs_from_points(xy, c, projection=w)
@@ -515,8 +452,9 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     plt.savefig(file.replace('.fits','_centroids.png'))
 
     # Generate "final" WCS
-    xy = (cat['xcentroid'], cat['ycentroid'])
-    coords = SkyCoord(cat['RA_ICRS'], cat['DE_ICRS'], unit=(u.deg, u.deg))
+    xy = (cat_coords_match['X_IMAGE'], cat_coords_match['Y_IMAGE'])
+    coords = SkyCoord(cat_coords_match['RA_ICRS'], cat_coords_match['DE_ICRS'], 
+        unit=(u.deg, u.deg))
     proj_point = SkyCoord(med_ra, med_de, unit='deg')
     new_wcs = fit_wcs_from_points(xy, coords, projection=w)
 
