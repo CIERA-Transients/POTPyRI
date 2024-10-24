@@ -569,6 +569,19 @@ class Instrument(object):
             final_img.data = final_img.data.astype(np.float32)
             final_img.header['BITPIX']=-32
 
+            rdnoise = np.mean(self.get_rdnoise(final_img.header))
+            final_img = ccdproc.create_deviation(final_img,
+                readnoise=rdnoise*u.electron,
+                disregard_nan=True)
+
+            # Add RMS noise to account for sky background
+            data = final_img.data
+            rms = 0.5 * (
+                np.percentile(data[~np.isnan(data)], 84.13)
+                - np.percentile(data[~np.isnan(data)], 15.86)
+            )
+            final_img.uncertainty = np.sqrt(final_img.uncertainty**2 + rms**2)
+
             # Delete empty header keys
             for key in list(final_img.header.keys()):
                 if not key.strip():
