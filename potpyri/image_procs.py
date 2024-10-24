@@ -637,8 +637,9 @@ def create_error(science_data, mask_data, rdnoise):
             - np.percentile(img_data[~mask], 15.86)
         )
 
-    poisson = img_data[img_data < 0.]=0.
-    error = np.sqrt(img_data + rms**2 + rdnoise)
+    poisson = img_data
+    poisson[poisson<0.]=0.
+    error = np.sqrt(poisson + rms**2 + rdnoise)
 
     error_hdu = fits.PrimaryHDU(error) #create mask Primary HDU
     error_hdu.header['VER'] = (__version__, 

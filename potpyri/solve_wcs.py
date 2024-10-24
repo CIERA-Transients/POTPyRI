@@ -28,6 +28,7 @@ from astropy.wcs.utils import fit_wcs_from_points
 
 # Internal dependency
 from potpyri import utilities
+from potpyri import photometry
 
 #turn Astropy warnings off
 import warnings
@@ -362,19 +363,61 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     else:
         print(f'Found {len(cat)} stars in the image')
 
+    saturate = hdu[0].header['SATURATE']
+
     data = hdu[0].data
     mask = hdu[1].data>0
     data[mask]=np.nan
+    data[data>saturate]=np.nan
 
-    x_cent = [] ; y_cent = [] ; aper_area = []
+    poisson = data
+    poisson[poisson<0.]=0.
+    rms = 0.5 * (
+            np.percentile(data[~np.isnan(data)], 84.13)
+            - np.percentile(data[~np.isnan(data)], 15.86)
+    )
+    error = np.sqrt(poisson + rms**2)
+
+    cat = photometry.get_star_catalog(data, mask, error, fwhm_init=10.0,
+        threshold=10.0, log=log)
+
+    print(cat)
+
+    with open('/Users/ckilpatrick/test.cat','w') as f:
+        for row in cat:
+            x=row['xcentroid']
+            y=row['ycentroid']
+            f.write(f'{x} {y} \n')
+    sys.exit()
+
+    x_cent = [] ; y_cent = [] ; aper_area = [] ; fwhms = []
     for i,row in enumerate(cat):
-        aper = CircularAperture((x_pix[i], y_pix[i]), 20.0)
+        aper = CircularAperture((x_pix[i], y_pix[i]), 10.0)
 
         aperstats = ApertureStats(data, aper)
 
         x_cent.append(aperstats.xcentroid)
         y_cent.append(aperstats.ycentroid)
+        fwhms.append(aperstats.fwhm.value)
         aper_area.append(aperstats.center_aper_area.value)
+
+    fwhms = np.array(fwhms)
+    mean_fwhm, med_fwhm, std_fwhm = sigma_clipped_stats(fwhms)
+
+    # Redo with updated FWHM value
+    x_cent = [] ; y_cent = [] ; aper_area = [] ; fwhms = []
+    for i,row in enumerate(cat):
+        aper = CircularAperture((x_pix[i], y_pix[i]), 2.5*med_fwhm)
+
+        aperstats = ApertureStats(data, aper)
+
+        x_cent.append(aperstats.xcentroid)
+        y_cent.append(aperstats.ycentroid)
+        fwhms.append(aperstats.fwhm.value)
+        aper_area.append(aperstats.center_aper_area.value)
+
+    fwhms = np.array(fwhms)
+    mean_fwhm, med_fwhm, std_fwhm = sigma_clipped_stats(fwhms)
 
     aper_area = np.array(aper_area)
     max_aper_area = np.max(aper_area[~np.isnan(aper_area)])
@@ -382,32 +425,27 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     x_cent = np.array(x_cent)
     y_cent = np.array(y_cent)
 
-    x_sep = np.abs(x_cent - x_pix)
-    y_sep = np.abs(y_cent - y_pix)
-
-    abs_sep = np.sqrt(x_sep**2 + y_sep**2)
-
     # Add centroids to the catalog
     cat.add_column(Column(x_cent, name='xcentroid'))
     cat.add_column(Column(y_cent, name='ycentroid'))
-    cat.add_column(Column(x_sep, name='xseparation'))
-    cat.add_column(Column(y_sep, name='yseparation'))
-    cat.add_column(Column(abs_sep, name='absseparation'))
+    cat.add_column(Column(fwhms, name='fwhm'))
     cat.add_column(Column(aper_area/max_aper_area, name='aper_area_frac'))
 
     mask = ~np.isnan(cat['xcentroid']) & ~np.isnan(cat['ycentroid']) &\
-        (cat['aper_area_frac']>0.99) & (cat['xseparation']<5.0) & (cat['yseparation']<5.0) &\
-        ~np.isnan(cat['xseparation']) & ~np.isnan(cat['yseparation'])
+           (cat['aper_area_frac']>0.9) & ~np.isnan(cat['fwhm'])
     cat = cat[mask]
+
+    cat.write('/Users/ckilpatrick/test.ecsv', format='ascii.ecsv', overwrite=True)
+    with open('/Users/ckilpatrick/test.cat','w') as f:
+        for row in cat:
+            x=row['Xpos']
+            y=row['Ypos']
+            f.write(f'{x} {y} \n')
 
     if log: 
         log.info(f'Centroided on {len(cat)} stars')
     else:
         print(f'Centroided on {len(cat)} stars')
-
-    if len(cat)>500:
-        cat.sort('absseparation')
-        cat = cat[:500]
 
     if cat is None or len(cat)==0:
         if log:
@@ -432,26 +470,28 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     if len(coords)>200:
         sip_degree = 6
 
+    sip_degree = 0
+
     if log:
         log.info(f'Solving with SIP degree = {sip_degree}')
     else:
         print(f'Solving with SIP degree = {sip_degree}')
 
-    bar = progressbar.ProgressBar(maxval=50)
+    bar = progressbar.ProgressBar(maxval=500)
     bar.start()
 
-    for i in np.arange(50):
+    idx = np.arange(len(cat))
+
+    for i in np.arange(500):
         bar.update(i+1)
-        idx = np.arange(len(cat))
-        size = int(len(cat)/2)
+        size = 100
 
         idxs = np.random.choice(idx, size=size, replace=False)
 
         xy = (cat['xcentroid'][idxs], cat['ycentroid'][idxs])
         c = coords[idxs]
 
-        new_wcs = fit_wcs_from_points(xy, c, proj_point=central_coo,
-            sip_degree=sip_degree)
+        new_wcs = fit_wcs_from_points(xy, c, projection=w)
 
         cent_coord = new_wcs.pixel_to_world(*central_pix)
         ra_cent.append(cent_coord.ra.degree)
@@ -459,42 +499,43 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
 
     bar.finish()
 
+    ra_cent = np.array(ra_cent)
+    de_cent = np.array(de_cent)
+
     # Estimate systematic precision of new WCS
     mean_ra, med_ra, std_ra = sigma_clipped_stats(ra_cent, maxiters=11,
-        sigma=5)
+        sigma=3)
     mean_de, med_de, std_de = sigma_clipped_stats(de_cent, maxiters=11,
-        sigma=5)
+        sigma=3)
+
+    mask = (np.abs(ra_cent-med_ra)<3*std_ra) & (np.abs(de_cent-med_de)<3*std_de)
 
     fig, ax = plt.subplots()
-    ax.scatter(ra_cent, de_cent)
+    ax.scatter(ra_cent[mask], de_cent[mask])
     plt.savefig(file.replace('.fits','_centroids.png'))
 
     # Generate "final" WCS
     xy = (cat['xcentroid'], cat['ycentroid'])
-    proj_point = SkyCoord(mean_ra, mean_de, unit='deg')
-    new_wcs = fit_wcs_from_points(xy, coords, sip_degree=sip_degree,
-        proj_point=proj_point)
+    coords = SkyCoord(cat['RA_ICRS'], cat['DE_ICRS'], unit=(u.deg, u.deg))
+    proj_point = SkyCoord(med_ra, med_de, unit='deg')
+    new_wcs = fit_wcs_from_points(xy, coords, projection=w)
+
+    print(new_wcs)
 
     header = new_wcs.to_header()
-    # Make sure SIP keywords were added
-    if sip_degree>0:
-        for key,val in new_wcs._write_sip_kw().items():
-            header[key] = val
-        header['CTYPE1']='RA---TAN-SIP'
-        header['CTYPE2']='DEC--TAN-SIP'
 
     # Delete all old WCS keys
-    delkeys = ['WCSNAME','CUNIT1','CUNIT2','CTYPE1','CTYPE2','CRPIX1','CRPIX2',
-        'CRVAL1','CRVAL2','CD1_1','CD1_2','CD2_1','CD2_2','RADECSYS',
-        'PC1_1','PC1_2','PC2_1','PC2_2','LONPOLE','LATPOLE','CDELT1','CDELT2']
-    while True:
-        found_key = False
-        for key in hdu[0].header.keys():
-            if any([k in key for k in delkeys]):
-                found_key=True
-                del hdu[0].header[key]
-        if not found_key:
-            break
+    #delkeys = ['WCSNAME','CUNIT1','CUNIT2','CTYPE1','CTYPE2','CRPIX1','CRPIX2',
+    #    'CRVAL1','CRVAL2','CD1_1','CD1_2','CD2_1','CD2_2','RADECSYS',
+    #    'PC1_1','PC1_2','PC2_1','PC2_2','LONPOLE','LATPOLE','CDELT1','CDELT2']
+    #while True:
+    #    found_key = False
+    #    for key in hdu[0].header.keys():
+    #        if any([k in key for k in delkeys]):
+    #            found_key=True
+    #            del hdu[0].header[key]
+    #    if not found_key:
+    #        break
 
     hdu[0].header.update(header)
 
@@ -518,10 +559,12 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     return(True)
 
 if __name__ == "__main__":
-    file='/Users/ckilpatrick/FRB20241005_r.r.ut241007.2.11.1412747896.fits'
+    file='/Users/ckilpatrick/FRB241005/red/workspace/FRB20241005_r.r.ut241007.2.11.1412743557.fits'
 
     import importlib
     global tel
     tel = importlib.import_module('instruments.BINOSPEC')
+    tel = tel.BINOSPEC()
 
+    solve_astrometry(file, tel, radius=0.5)
     align_to_gaia(file, tel, radius=0.5, log=None)
