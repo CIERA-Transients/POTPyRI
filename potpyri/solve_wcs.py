@@ -364,22 +364,46 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     else:
         print(f'Found {len(cat)} stars in the image')
 
-    cat = photometry.run_sextractor(file, log=log)
+    sky_cat = photometry.run_sextractor(file, log=log)
 
     if log: 
         log.info(f'Centroided on {len(cat)} stars')
     else:
         print(f'Centroided on {len(cat)} stars')
 
-    cat_coords = SkyCoord(cat['ALPHA_J2000'], cat['DELTA_J2000'])
-    idx, d2d, d3d = match_coordinates_sky(cat_coords, coords)
+    # Get central coordinate of image based on centroiding
+    central_pix = (float(naxis1)/2., float(naxis2)/2.)
+    central_coo = w.pixel_to_world(*central_pix)
 
-    sep_mask = d2d < 1.0 * u.arcsec
-    cat_coords_match = cat[sep_mask]
-    sky_coords_match = coords[idx[sep_mask]]
+    for i in np.arange(10):
 
-    cat_coords_match.add_column(sky_coords_match['RA_ICRS'])
-    cat_coords_match.add_column(sky_coords_match['DE_ICRS'])
+        cat_coords = w.pixel_to_world(sky_cat['X_IMAGE'], sky_cat['Y_IMAGE'])
+
+        idx, d2d, d3d = match_coordinates_sky(cat_coords, coords)
+
+        sep_mask = d2d < 2.5 * u.arcsec
+        cat_coords_match = sky_cat[sep_mask]
+        sky_coords_match = coords[idx[sep_mask]]
+
+        sip_degree = None
+        if len(cat_coords_match)>100:
+            sip_degree = 2
+        if len(cat_coords_match)>500:
+            sip_degree = 4
+        if len(cat_coords_match)>2000:
+            sip_degree = 6
+
+        print(len(sky_coords_match))
+
+        cat_coords_match.add_column(Column(sky_coords_match.ra.degree, name='RA_ICRS'))
+        cat_coords_match.add_column(Column(sky_coords_match.dec.degree, name='DE_ICRS'))
+
+        xy = (cat_coords_match['X_IMAGE'], cat_coords_match['Y_IMAGE'])
+        coords = SkyCoord(cat_coords_match['RA_ICRS'], cat_coords_match['DE_ICRS'], 
+            unit=(u.deg, u.deg))
+
+        w = fit_wcs_from_points(xy, coords, proj_point=central_coo,
+            sip_degree=sip_degree)
 
     if cat_coords_match is None or len(cat_coords_match)==0:
         if log:
@@ -393,21 +417,9 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
         else:
             print(f'Number of matched coordinates is {len(cat_coords_match)}')
 
-    # Get central coordinate of image based on centroiding
-    central_pix = (float(naxis1)/2., float(naxis2)/2.)
-    central_coo = w.pixel_to_world(*central_pix)
-
     # Bootstrap WCS solution and get center pixel
     ra_cent = [] ; de_cent = []
     coords = SkyCoord(cat_coords_match['RA_ICRS'], cat_coords_match['DE_ICRS'], unit=(u.deg, u.deg))
-
-    sip_degree = None
-    if len(coords)>20:
-        sip_degree = 2
-    if len(coords)>60:
-        sip_degree = 4
-    if len(coords)>200:
-        sip_degree = 6
 
     if log:
         log.info(f'Solving with SIP degree = {sip_degree}')
@@ -428,7 +440,7 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
         xy = (cat_coords_match['X_IMAGE'][idxs], cat_coords_match['Y_IMAGE'][idxs])
         c = coords[idxs]
 
-        new_wcs = fit_wcs_from_points(xy, c, projection=w)
+        new_wcs = fit_wcs_from_points(xy, c, proj_point=central_coo)
 
         cent_coord = new_wcs.pixel_to_world(*central_pix)
         ra_cent.append(cent_coord.ra.degree)
@@ -455,25 +467,30 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     xy = (cat_coords_match['X_IMAGE'], cat_coords_match['Y_IMAGE'])
     coords = SkyCoord(cat_coords_match['RA_ICRS'], cat_coords_match['DE_ICRS'], 
         unit=(u.deg, u.deg))
-    proj_point = SkyCoord(med_ra, med_de, unit='deg')
-    new_wcs = fit_wcs_from_points(xy, coords, projection=w)
-
-    print(new_wcs)
+    new_wcs = fit_wcs_from_points(xy, coords, proj_point=central_coo,
+        sip_degree=sip_degree)
 
     header = new_wcs.to_header()
+    header['CUNIT1']='deg'
+    header['CUNIT2']='deg'
+    if sip_degree>0:
+        header['CTYPE1']='RA---TAN-SIP'
+        header['CTYPE2']='DEC--TAN-SIP'
+        for kw, val in new_wcs._write_sip_kw().items():
+            header[kw] = val
 
     # Delete all old WCS keys
-    #delkeys = ['WCSNAME','CUNIT1','CUNIT2','CTYPE1','CTYPE2','CRPIX1','CRPIX2',
-    #    'CRVAL1','CRVAL2','CD1_1','CD1_2','CD2_1','CD2_2','RADECSYS',
-    #    'PC1_1','PC1_2','PC2_1','PC2_2','LONPOLE','LATPOLE','CDELT1','CDELT2']
-    #while True:
-    #    found_key = False
-    #    for key in hdu[0].header.keys():
-    #        if any([k in key for k in delkeys]):
-    #            found_key=True
-    #            del hdu[0].header[key]
-    #    if not found_key:
-    #        break
+    delkeys = ['WCSNAME','CUNIT1','CUNIT2','CTYPE1','CTYPE2','CRPIX1','CRPIX2',
+        'CRVAL1','CRVAL2','CD1_1','CD1_2','CD2_1','CD2_2','RADECSYS',
+        'PC1_1','PC1_2','PC2_1','PC2_2','LONPOLE','LATPOLE','CDELT1','CDELT2']
+    while True:
+        found_key = False
+        for key in hdu[0].header.keys():
+            if any([k in key for k in delkeys]):
+                found_key=True
+                del hdu[0].header[key]
+        if not found_key:
+            break
 
     hdu[0].header.update(header)
 
