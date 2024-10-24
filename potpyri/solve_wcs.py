@@ -375,7 +375,15 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     central_pix = (float(naxis1)/2., float(naxis2)/2.)
     central_coo = w.pixel_to_world(*central_pix)
 
+    if log:
+        log.info(f'Convering on fine WCS solution')
+    else:
+        print(f'Converging on fine WCS solution')
+
+    bar = progressbar.ProgressBar(maxval=10)
+    bar.start()
     for i in np.arange(10):
+        bar.update(i+1)
 
         cat_coords = w.pixel_to_world(sky_cat['X_IMAGE'], sky_cat['Y_IMAGE'])
 
@@ -393,8 +401,6 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
         if len(cat_coords_match)>2000:
             sip_degree = 6
 
-        print(len(sky_coords_match))
-
         cat_coords_match.add_column(Column(sky_coords_match.ra.degree, name='RA_ICRS'))
         cat_coords_match.add_column(Column(sky_coords_match.dec.degree, name='DE_ICRS'))
 
@@ -404,6 +410,13 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
 
         w = fit_wcs_from_points(xy, coords, proj_point=central_coo,
             sip_degree=sip_degree)
+
+    bar.finish()
+
+    if log:
+        log.info(f'Solved with SIP degree = {sip_degree}')
+    else:
+        print(f'Solved with SIP degree = {sip_degree}')
 
     if cat_coords_match is None or len(cat_coords_match)==0:
         if log:
@@ -421,17 +434,11 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     ra_cent = [] ; de_cent = []
     coords = SkyCoord(cat_coords_match['RA_ICRS'], cat_coords_match['DE_ICRS'], unit=(u.deg, u.deg))
 
-    if log:
-        log.info(f'Solving with SIP degree = {sip_degree}')
-    else:
-        print(f'Solving with SIP degree = {sip_degree}')
-
-    bar = progressbar.ProgressBar(maxval=500)
+    bar = progressbar.ProgressBar(maxval=1000)
     bar.start()
 
     idx = np.arange(len(cat_coords_match))
-
-    for i in np.arange(500):
+    for i in np.arange(1000):
         bar.update(i+1)
         size = 100
 
@@ -440,7 +447,7 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
         xy = (cat_coords_match['X_IMAGE'][idxs], cat_coords_match['Y_IMAGE'][idxs])
         c = coords[idxs]
 
-        new_wcs = fit_wcs_from_points(xy, c, proj_point=central_coo)
+        new_wcs = fit_wcs_from_points(xy, c, projection=w)
 
         cent_coord = new_wcs.pixel_to_world(*central_pix)
         ra_cent.append(cent_coord.ra.degree)
@@ -463,20 +470,13 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     ax.scatter(ra_cent[mask], de_cent[mask])
     plt.savefig(file.replace('.fits','_centroids.png'))
 
-    # Generate "final" WCS
-    xy = (cat_coords_match['X_IMAGE'], cat_coords_match['Y_IMAGE'])
-    coords = SkyCoord(cat_coords_match['RA_ICRS'], cat_coords_match['DE_ICRS'], 
-        unit=(u.deg, u.deg))
-    new_wcs = fit_wcs_from_points(xy, coords, proj_point=central_coo,
-        sip_degree=sip_degree)
-
-    header = new_wcs.to_header()
+    header = w.to_header()
     header['CUNIT1']='deg'
     header['CUNIT2']='deg'
     if sip_degree>0:
         header['CTYPE1']='RA---TAN-SIP'
         header['CTYPE2']='DEC--TAN-SIP'
-        for kw, val in new_wcs._write_sip_kw().items():
+        for kw, val in w._write_sip_kw().items():
             header[kw] = val
 
     # Delete all old WCS keys
