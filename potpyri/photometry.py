@@ -12,6 +12,7 @@ from photutils.psf import extract_stars
 from photutils.psf import PSFPhotometry
 
 from astropy.io import fits
+from astropy.io import ascii
 from astropy.stats import sigma_clipped_stats
 from astropy.stats import SigmaClip
 from astropy.nddata import NDData
@@ -28,9 +29,82 @@ import matplotlib.pyplot as plt
 from scipy.stats import sigmaclip
 import numpy as np
 import copy
+import os
 
 import warnings
 warnings.filterwarnings('ignore')
+
+
+def create_conv(outfile):
+    with open(outfile, 'w') as f:
+        f.write('CONV NORM \n')
+        f.write('1 2 1 \n')
+        f.write('2 4 2 \n')
+        f.write('1 2 1 \n')
+
+def create_params(outfile):
+    with open(outfile, 'w') as f:
+        f.write('NUMBER \n')
+        f.write('X_IMAGE \n')
+        f.write('Y_IMAGE \n')
+        f.write('ALPHA_J2000 \n')
+        f.write('DELTA_J2000 \n')
+        f.write('MAG_AUTO \n')
+        f.write('MAGERR_AUTO \n')
+        f.write('FLUX_AUTO \n')
+        f.write('FLUXERR_AUTO \n')
+        f.write('FWHM_IMAGE \n')
+
+def run_sextractor(img_file, log=None):
+
+    hdu = fits.open(img_file)
+
+    data = hdu[0].data
+
+    saturate = hdu[0].header['SATURATE']
+
+    paramfile = img_file.replace('.fits','.param')
+    convfile = img_file.replace('.fits','.conv')
+    tmpfile = img_file.replace('.fits','.tmp.fits')
+    catfile = img_file.replace('.fits','.cat')
+
+    create_params(paramfile)
+    create_conv(convfile)
+
+    datahdu = fits.PrimaryHDU()
+    datahdu.data = data
+    datahdu.header = hdu[0].header
+    datahdu.writeto(tmpfile, overwrite=True)
+
+    if log:
+        log.info(f'Running source extractor on {img_file}')
+    else:
+        print(f'Running source extractor on {img_file}')
+
+    cmd = f'sex {tmpfile} -CATALOG_NAME {catfile} -CATALOG_TYPE ASCII_HEAD '
+    cmd += f'-PARAMETERS_NAME {paramfile} -FILTER_NAME {convfile} '
+    cmd += f'-SATUR_LEVEL {saturate} > /dev/null 2> /dev/null'
+
+    os.system(cmd)
+
+    if os.path.exists(catfile):
+        if log:
+            log.info(f'Reading {catfile}')
+        else:
+            print(f'Reading {catfile}')
+        table = ascii.read(catfile)
+    else:
+        if log:
+            log.error(f'Reading {catfile}')
+        else:
+            print(f'Reading {catfile}')
+        table = None
+
+    for file in [tmpfile, catfile, paramfile, convfile]:
+        if os.path.exists(file):
+            os.remove(file)
+
+    return(table)
 
 def extract_aperture_stats(img_data, img_mask, img_error, stars, 
     aperture_radius=10.0, log=None):
@@ -453,12 +527,14 @@ def photloop(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
 if __name__=="__main__":
 
     # Pick image you want to test on
-    test = '/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/Binospec/red/GRB240809A_r_ep1.r.ut240812.2.11.stk.fits'
+    test = '/Users/ckilpatrick/FRB241005/red/workspace/FRB20241005_r.r.ut241007.2.11.1412743557.fits'
 
     # For testing - give different names so the module doesn't consider them
     # global variables that override the values in methods
-    f = 40.0
+    f = 50.0
     s={'snthresh_psf': f*2.0, 'fwhm_init': 5.0, 'snthresh_final': f}
 
     # Run methods
-    do_phot(test, star_param=s)
+    #do_phot(test, star_param=s)
+    table = run_sextractor(test)
+    print(table)
