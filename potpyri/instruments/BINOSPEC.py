@@ -121,7 +121,7 @@ class BINOSPEC(instrument.Instrument):
                gain_corrected=True) for k,x in enumerate(raw)]
 
         frame_full = CCDData(np.concatenate((red[0], 
-            np.empty((red[0].shape[0], 794)), red[1]), axis=1), 
+            np.empty((red[0].shape[0], 793)), red[1]), axis=1), 
             header=header,unit=u.electron)
 
         frame_full.header['SATURATE'] = self.saturation
