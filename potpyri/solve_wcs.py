@@ -1,8 +1,8 @@
 "Python script for WCS solution."
 "Authors: Kerry Paterson, Charlie Kilpatrick"
 
-# Last updated 09/21/2024
-__version__ = "2.0"
+# Last updated 10/24/2024
+__version__ = "2.1"
 
 import numpy as np
 import subprocess
@@ -34,43 +34,6 @@ from potpyri import photometry
 #turn Astropy warnings off
 import warnings
 warnings.simplefilter('ignore', category=AstropyWarning)
-
-def run_sextractor(input_file, cat_name, tel, sex_config_dir='./Config', 
-    log=None):
-
-    if not os.path.exists(os.path.join(sex_config_dir,'config')):
-        e = 'ERROR: Could not find source extractor config file!'
-        if log:
-            log.error(e)
-        raise Exception(e)
-    elif not os.path.exists(os.path.join(sex_config_dir,'params')):
-        e = 'ERROR: Could not find source extractor param file!'
-        if log:
-            log.error(e)
-        raise Exception(e)
-
-    config = os.path.join(sex_config_dir,'config')
-    param_file = os.path.join(sex_config_dir,'params')
-
-    cmd=['sex','-c',config,input_file,'-CATALOG_NAME',cat_name]
-    subprocess.call(cmd)
-
-    params = []
-    with open(param_file) as f:
-        for line in f:
-            params.append(line.split()[0].strip())
-
-    if os.path.exists(cat_name):
-        table = ascii.read(cat_name, names=params, comment='#')
-        if log:
-            log.info('SExtractor succesfully run, %d sources extracted.'%len(table))
-        return(table)
-    else:
-        e = 'ERROR: source extractor did not successfully produce {0}'
-        if log:
-            log.error(e)
-        raise Exception(e.format(cat_name))
-
 
 def get_gaia_catalog(input_file, log=None):
 
@@ -320,7 +283,8 @@ def solve_astrometry(file, tel, radius=0.5, replace=True,
         clean_up_astrometry(directory, file, exten)
         return(False)
 
-def align_to_gaia(file, tel, radius=0.5, log=None):
+def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
+    log=None):
 
     cat = get_gaia_catalog(file, log=log)
 
@@ -366,17 +330,12 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
 
     sky_cat = photometry.run_sextractor(file, log=log)
 
-    if log: 
-        log.info(f'Centroided on {len(cat)} stars')
-    else:
-        print(f'Centroided on {len(cat)} stars')
-
     # Get central coordinate of image based on centroiding
     central_pix = (float(naxis1)/2., float(naxis2)/2.)
     central_coo = w.pixel_to_world(*central_pix)
 
     if log:
-        log.info(f'Convering on fine WCS solution')
+        log.info(f'Converging on fine WCS solution')
     else:
         print(f'Converging on fine WCS solution')
 
@@ -387,11 +346,11 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
 
         cat_coords = w.pixel_to_world(sky_cat['X_IMAGE'], sky_cat['Y_IMAGE'])
 
-        idx, d2d, d3d = match_coordinates_sky(cat_coords, coords)
+        idx, d2d, d3d = match_coordinates_sky(coords, cat_coords)
 
-        sep_mask = d2d < 2.5 * u.arcsec
-        cat_coords_match = sky_cat[sep_mask]
-        sky_coords_match = coords[idx[sep_mask]]
+        sep_mask = d2d < max_search_radius
+        sky_coords_match = coords[sep_mask]
+        cat_coords_match = sky_cat[idx[sep_mask]]
 
         sip_degree = None
         if len(cat_coords_match)>100:
@@ -401,13 +360,16 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
         if len(cat_coords_match)>2000:
             sip_degree = 6
 
-        cat_coords_match.add_column(Column(sky_coords_match.ra.degree, name='RA_ICRS'))
-        cat_coords_match.add_column(Column(sky_coords_match.dec.degree, name='DE_ICRS'))
+        cat_coords_match.add_column(Column(sky_coords_match.ra.degree, 
+            name='RA_ICRS'))
+        cat_coords_match.add_column(Column(sky_coords_match.dec.degree, 
+            name='DE_ICRS'))
 
         xy = (cat_coords_match['X_IMAGE'], cat_coords_match['Y_IMAGE'])
-        coords = SkyCoord(cat_coords_match['RA_ICRS'], cat_coords_match['DE_ICRS'], 
-            unit=(u.deg, u.deg))
+        coords = SkyCoord(cat_coords_match['RA_ICRS'], 
+            cat_coords_match['DE_ICRS'], unit=(u.deg, u.deg))
 
+        central_coo = w.pixel_to_world(*central_pix)
         w = fit_wcs_from_points(xy, coords, proj_point=central_coo,
             sip_degree=sip_degree)
 
@@ -426,13 +388,14 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
         return(False)
     else:
         if log:
-            log.info(f'Number of matched coordinates is {len(cat_coords_match)}')
+            log.info(f'Matched to {len(cat_coords_match)} coordinates')
         else:
-            print(f'Number of matched coordinates is {len(cat_coords_match)}')
+            print(f'Matched to {len(cat_coords_match)} coordinates')
 
     # Bootstrap WCS solution and get center pixel
     ra_cent = [] ; de_cent = []
-    coords = SkyCoord(cat_coords_match['RA_ICRS'], cat_coords_match['DE_ICRS'], unit=(u.deg, u.deg))
+    coords = SkyCoord(cat_coords_match['RA_ICRS'], cat_coords_match['DE_ICRS'], 
+        unit=(u.deg, u.deg))
 
     bar = progressbar.ProgressBar(maxval=1000)
     bar.start()
@@ -444,9 +407,11 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
 
         idxs = np.random.choice(idx, size=size, replace=False)
 
-        xy = (cat_coords_match['X_IMAGE'][idxs], cat_coords_match['Y_IMAGE'][idxs])
+        xy = (cat_coords_match['X_IMAGE'][idxs], 
+              cat_coords_match['Y_IMAGE'][idxs])
         c = coords[idxs]
 
+        central_coo = w.pixel_to_world(*central_pix)
         new_wcs = fit_wcs_from_points(xy, c, projection=w)
 
         cent_coord = new_wcs.pixel_to_world(*central_pix)
@@ -471,6 +436,10 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     plt.savefig(file.replace('.fits','_centroids.png'))
 
     header = w.to_header()
+    header['CRPIX1']=central_pix[0]
+    header['CRPIX2']=central_pix[1]
+    header['CRVAL1']=med_ra
+    header['CRVAL2']=med_de
     header['CUNIT1']='deg'
     header['CUNIT2']='deg'
     if sip_degree>0:
@@ -501,20 +470,20 @@ def align_to_gaia(file, tel, radius=0.5, log=None):
     de_disp = float('%.6f'%de_disp)
 
     if log:
-        log.info(f'Dispersion in R.A.={ra_disp} arcsec, Dispersion in Decl.={de_disp} arcsec')
+        log.info(f'R.A. dispersion ={ra_disp}", Decl. dispersion={de_disp}"')
     else:
-        print(f'Dispersion in R.A.={ra_disp} arcsec, Dispersion in Decl.={de_disp} arcsec')
+        print(f'R.A. dispersion ={ra_disp}", Decl. dispersion={de_disp}"')
 
     # Add header variables for dispersion in WCS solution
-    hdu[0].header['RADISP']=(ra_disp, 'Dispersion in R.A. of WCS solution [Arcsec]')
-    hdu[0].header['DEDISP']=(de_disp, 'Dispersion in Decl. of WCS solution [Arcsec]')
+    hdu[0].header['RADISP']=(ra_disp, 'Dispersion in R.A. of WCS [Arcsec]')
+    hdu[0].header['DEDISP']=(de_disp, 'Dispersion in Decl. of WCS [Arcsec]')
 
     hdu.writeto(file, overwrite=True, output_verify='silentfix')
 
     return(True)
 
 if __name__ == "__main__":
-    file='/Users/ckilpatrick/FRB241005/red/workspace/FRB20241005_r.r.ut241007.2.11.1412743557.fits'
+    file='/Users/ckilpatrick/FRB241005/red/workspace/FRB20241005_r.r.ut241007.2.11.1412746860.fits'
 
     import importlib
     global tel
