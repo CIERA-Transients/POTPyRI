@@ -403,7 +403,11 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
     idx = np.arange(len(cat_coords_match))
     for i in np.arange(1000):
         bar.update(i+1)
-        size = 100
+
+        if len(idx)>200:
+            size = 100
+        else:
+            size = int(len(idx)/2)
 
         idxs = np.random.choice(idx, size=size, replace=False)
 

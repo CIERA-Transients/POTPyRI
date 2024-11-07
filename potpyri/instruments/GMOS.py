@@ -101,7 +101,10 @@ class GMOS(instrument.Instrument):
             return(self.gain)
 
     def raw_format(self, proc):
-        return('*.fits.bz2')
+        if str(proc).lower()=='dragons':
+            return('*.fits')
+        else:
+            return('*.fits.bz2')
 
     def get_ampl(self, hdr):
         nccd = hdr['NCCDS']
