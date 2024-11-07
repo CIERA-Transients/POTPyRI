@@ -352,7 +352,7 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
         sky_coords_match = coords[sep_mask]
         cat_coords_match = sky_cat[idx[sep_mask]]
 
-        sip_degree = None
+        sip_degree = 0
         if len(cat_coords_match)>100:
             sip_degree = 2
         if len(cat_coords_match)>500:
