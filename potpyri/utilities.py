@@ -69,7 +69,7 @@ def find_catalog(catalog,fil):
         catalog_ID, ra, dec, mag, err = 'II/349', 'RAJ2000', 'DEJ2000', fil.lower()+'mag', 'e_'+fil.lower()+'mag'
     elif catalog.upper() == 'SKYMAPPER':
         if fil.lower() not in ['u','v','g','r','i','z']: return(catalog_ID, ra, dec, mag, err)
-        catalog_ID, ra, dec, mag, err = 'II/358', 'RAICRS', 'DEICRS', fil.lower()+'PSF', 'e_'+fil.lower()+'PSF'
+        catalog_ID, ra, dec, mag, err = 'II/379', 'RAICRS', 'DEICRS', fil.lower()+'PSF', 'e_'+fil.lower()+'PSF'
 
     return(catalog_ID, ra, dec, mag, err)
 
