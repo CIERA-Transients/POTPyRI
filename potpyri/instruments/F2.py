@@ -117,6 +117,7 @@ class F2(instrument.Instrument):
 
         hdu = fits.open(filename)
 
+        # Create header
         hdr = hdu[1].header
         for key in hdu[0].header.keys():
             if key not in hdr.keys():
@@ -125,7 +126,10 @@ class F2(instrument.Instrument):
                 except ValueError:
                     continue
 
-        raw = CCDData(hdu[1].data, header=hdr, unit=u.adu)
+        # Create data array from first read
+        data = hdu[1].data[0,:,:]
+
+        raw = CCDData(data, header=hdr, unit=u.adu)
         red = ccdproc.ccd_process(raw, 
             gain=self.get_gain(raw.header)*u.electron/u.adu, 
             readnoise=self.get_rdnoise(raw.header)*u.electron)
