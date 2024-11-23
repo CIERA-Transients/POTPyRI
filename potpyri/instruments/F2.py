@@ -127,7 +127,9 @@ class F2(instrument.Instrument):
                     continue
 
         # Create data array from first read
-        data = hdu[1].data[0,:,:]
+        data = hdu[1].data
+        if len(data.shape)==3:
+            data = data[0,:,:]
 
         raw = CCDData(data, header=hdr, unit=u.adu)
         red = ccdproc.ccd_process(raw, 
