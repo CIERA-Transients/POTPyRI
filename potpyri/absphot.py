@@ -127,6 +127,13 @@ class absphot(object):
             cat.rename_column(cat_mag, 'mag')
             cat.rename_column(cat_err, 'mag_err')
 
+            # Convert to AB magnitudes
+            if catalog=='2MASS':
+                if filt=='J': cat['mag'] = cat['mag'] + (4.56-3.65)
+                if filt=='H': cat['mag'] = cat['mag'] + (4.71-3.32)
+                if filt=='K': cat['mag'] = cat['mag'] + (5.14-3.29)
+                if filt=='Ks': cat['mag'] = cat['mag'] + (5.14-3.29)
+
             if catalog=='2MASS' and filt=='Y':
                 cat = cat[~np.isnan(cat['Kmag'])]
                 cat['mag'], cat['mag_err'] = self.Y_band(cat['mag'], 
