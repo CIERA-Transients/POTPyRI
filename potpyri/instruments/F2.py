@@ -68,17 +68,17 @@ class F2(instrument.Instrument):
 
         # File sorting keywords
         self.science_keywords = ['DECKER','MASKNAME']
-        self.science_values = ['Open','None']
+        self.science_values = ['open','none']
         self.flat_keywords = ['OBJECT']
-        self.flat_values = ['GCALflat']
+        self.flat_values = ['gcalflat']
         self.bias_keywords = []
         self.bias_values = []
-        self.dark_keywords = ['FILTER','OBSTYPE']
-        self.dark_values = ['Dark','DARK']
+        self.dark_keywords = ['OBSTYPE']
+        self.dark_values = ['dark']
         self.spec_keywords = ['GRORDER']
         self.spec_values = ['1']
-        self.bad_keywords = []
-        self.bad_values = []
+        self.bad_keywords = ['DECKER']
+        self.bad_values = ['closed']
 
         self.detrend = True
         self.catalog_zp = '2MASS'

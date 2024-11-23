@@ -139,11 +139,11 @@ def handle_files(file_list, tel, paths, incl_bad=False, proc=None,
 
     if log: log.info('Sorting files and creating file lists.')
     if len(files)!=0:
-        log.info(f'{len(files)} files found.')
+        if log: log.info(f'{len(files)} files found.')
         file_table = sort_files(files, file_list, tel, paths, incl_bad=incl_bad, 
             log=log)
     else:
-        log.critical('No files found, please check data path and rerun.')
+        if log: log.critical('No files found, please check data path and rerun.')
         logging.shutdown()
         sys.exit(-1)
 
@@ -183,7 +183,10 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
 
     t_start = time.time()
     
-    if log: log.info(f'Running sort_files version: {__version__}')
+    if log: 
+        log.info(f'Running sort_files version: {__version__}')
+    else:
+        print(f'Running sort_files version: {__version__}')
 
     bad_num = 0
     spec_num = 0
@@ -205,12 +208,18 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
             check_data = file_open[ext].data
             file_open._verify()
         except IndexError:
-            if log: log.error(f'Moving file {f} to bad due to error opening file.')
+            if log: 
+                log.error(f'Moving file {f} to bad due to error opening file.')
+            else:
+                print(f'Moving file {f} to bad due to error opening file.')
             moved_path = paths['bad']
             if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
             continue
         except (TypeError, gzip.BadGzipFile, zlib.error):
-            if log: log.error(f'Moving file {f} to bad due to corrupted data.')
+            if log: 
+                log.error(f'Moving file {f} to bad due to corrupted data.')
+            else:
+                print(f'Moving file {f} to bad due to corrupted data.')
             moved_path = paths['bad']
             if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
             continue
@@ -227,7 +236,7 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
                 not is_dark(hdr, tel) and not is_flat(hdr, tel)):
                 file_type = 'BAD'
                 moved_path = paths['bad']
-                bad_num += 1            
+                bad_num += 1
             elif is_spec(hdr, tel):
                 file_type = 'SPEC'
                 moved_path = paths['bad']
@@ -253,7 +262,10 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
                 moved_path = paths['bad']
                 bad_num += 1
         except Exception as e:
-            if log: log.error(f'Moving file {f} to bad due to error: {e}')
+            if log: 
+                log.error(f'Moving file {f} to bad due to error: {e}')
+            else:
+                print(f'Moving file {f} to bad due to error: {e}')
             file_type = 'BAD'
             moved_path = paths['bad']
             bad_num += 1
@@ -263,7 +275,10 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
             if not os.path.exists(newfile):
                 shutil.move(f, moved_path)
             else:
-                if log: log.info(f'Removing existing file: {f}')
+                if log: 
+                    log.info(f'Removing existing file: {f}')
+                else:
+                    print(f'Removing existing file: {f}')
                 os.remove(f)
 
         if file_type=='BIAS':
@@ -291,11 +306,17 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
 
         currfile = os.path.join(moved_path, os.path.basename(f))
         if not os.path.exists(currfile):
-            if log: log.critical(f'Lost track of file {f}->{currfile}')
+            if log: 
+                log.critical(f'Lost track of file {f}->{currfile}')
+            else:
+                print(f'Lost track of file {f}->{currfile}')
             logging.shutdown()
             sys.exit(-1)
 
-        if log: log.info(f'File {i+1}/{len(files)}: {currfile} is {file_type},{target},{fil}')
+        if log: 
+            log.info(f'File {i+1}/{len(files)}: {currfile} is {file_type},{target},{fil}')
+        else:
+            print(f'File {i+1}/{len(files)}: {currfile} is {file_type},{target},{fil}')
 
         if (file_type!='BAD' and file_type!='SPEC') or incl_bad:
             file_table.add_row((currfile,target,targ_type,fil,amp,binn,exp,
@@ -303,8 +324,11 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
 
     file_table.sort(['Type','Target','CalType','File'])
 
-    ascii.write(file_table, file_list, format='fixed_width',
-        formats={'Time':'%5.6f'})
+    if len(file_table)>0:
+        ascii.write(file_table, file_list, format='fixed_width',
+            formats={'Time':'%5.6f'})
+    else:
+        if log: log.critical('No good files were ingested')
 
     if sci_num>0 and log: log.info(f'{sci_num} imaging science files found.')
     if bias_num>0 and log: log.info(f'{bias_num} bias files found.')
@@ -314,6 +338,25 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
     if spec_num>0 and log: log.info(f'{spec_num} spectroscopy files found and removed from reduction.')
 
     t_end = time.time()
-    log.info(f'sort_files ran in {t_end-t_start} sec')
+    if log: log.info(f'sort_files ran in {t_end-t_start} sec')
 
     return(file_table)
+
+
+if __name__=="__main__":
+
+    global tel
+    import importlib
+    module = importlib.import_module('instruments.F2')
+    tel = getattr(module, 'F2')()
+
+    files = glob.glob('/Users/ckilpatrick/Downloads/gemini_data/bad/*.bz2')
+    file_list = '/Users/ckilpatrick/Downloads/gemini_data/file_list.txt'
+
+    paths={}
+    paths['red']='/Users/ckilpatrick/Downloads/gemini_data/red'
+    paths['data']='/Users/ckilpatrick/Downloads/gemini_data'
+    paths['raw']='/Users/ckilpatrick/Downloads/gemini_data/raw'
+    paths['bad']='/Users/ckilpatrick/Downloads/gemini_data/bad'
+
+    sort_files(files, file_list, tel, paths, incl_bad=False, log=None)
