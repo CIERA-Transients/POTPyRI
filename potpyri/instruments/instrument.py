@@ -414,7 +414,7 @@ class Instrument(object):
                 flat_full.mask = mask.astype(np.uint8)
 
             exptime = self.get_exptime(flat_full.header)
-            log.info(f'Exposure time of image is {exptime}')
+            if log: log.info(f'Exposure time of image is {exptime}')
             
             norm = 1./np.nanmedian(flat_full.data)
             # Vet the flat normalization - it should not be negative
@@ -427,7 +427,11 @@ class Instrument(object):
                 
             scale.append(norm)
             flats.append(flat_full)
+            flat_full.write(f'/Users/ckilpatrick/flat{i}.fits',overwrite=True)
         
+        print(flats)
+        print(scale)
+
         mflat = ccdproc.combine(flats, method='median', scale=scale, 
             sigma_clip=True, clip_extrema=True)
 
