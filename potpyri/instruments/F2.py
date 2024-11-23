@@ -120,7 +120,10 @@ class F2(instrument.Instrument):
         hdr = hdu[1].header
         for key in hdu[0].header.keys():
             if key not in hdr.keys():
-                hdr[key]=hdu[0].header[key]
+                try:
+                    hdr[key]=hdu[0].header[key]
+                except ValueError:
+                    continue
 
         raw = CCDData(hdu[1].data, header=hdr, unit=u.adu)
         red = ccdproc.ccd_process(raw, 
