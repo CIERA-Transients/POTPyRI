@@ -359,7 +359,7 @@ class Instrument(object):
         if log: log.info('Creating master dark.')
         print(1./np.array(exptimes))
         mdark = ccdproc.combine(darks, method='median', 
-            scale=1./np.array(exptimes), sigma_clip=True, clip_extrema=True)
+            scale=np.array(exptimes), sigma_clip=True, clip_extrema=True)
 
         # Rescale to electrons by average of all exposure times
         avg_exptime = np.mean(exptimes)
