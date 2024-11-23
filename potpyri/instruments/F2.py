@@ -126,6 +126,12 @@ class F2(instrument.Instrument):
                 except ValueError:
                     continue
 
+        # Adjust WCS to be only 2 axes
+        for key in ['CRPIX3','CDELT3','CRVAL3','CD3_3']:
+            if key in hdr.keys():
+                del hdr[key]
+        hdr['WCSAXES']=2
+
         # Create data array from first read
         data = hdu[1].data
         if len(data.shape)==3:
