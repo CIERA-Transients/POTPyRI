@@ -60,8 +60,18 @@ def get_gaia_catalog(input_file, log=None):
     vizier = Vizier(columns=['RA_ICRS', 'DE_ICRS', 'Plx', 'PSS','PM'])
     vizier.ROW_LIMIT = -1
 
-    cat = vizier.query_region(coord, width=20 * u.arcmin, 
-        catalog='I/355/gaiadr3')
+    tries = 0
+    cat = None
+    while tries<4:
+        cat = vizier.query_region(coord, width=20 * u.arcmin, 
+            catalog='I/355/gaiadr3')
+        break
+    except requests.exceptions.ReadTimeout:
+        if log: log.error(f'Gaia catalog timeout.  Try #{tries+1}')
+        tries += 1
+
+    if cat is None:
+        raise Exception('ERROR: could not get Gaia catalog')
 
     if len(cat)>0:
         cat = cat[0]
