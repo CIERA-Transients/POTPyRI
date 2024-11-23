@@ -427,7 +427,6 @@ class Instrument(object):
                 
             scale.append(norm)
             flats.append(flat_full)
-            flat_full.write(f'/Users/ckilpatrick/flat{i}.fits',overwrite=True)
 
         mflat = ccdproc.combine(flats, method='median', scale=scale, 
             sigma_clip=True, clip_extrema=True)
