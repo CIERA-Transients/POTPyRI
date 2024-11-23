@@ -28,7 +28,7 @@ class F2(instrument.Instrument):
 
         # Detector specific characteristics
         self.pixscale = 0.1792
-        self.saturation = 65000.0
+        self.saturation = 65535.0
 
         self.min_exptime = 1.0
 
@@ -80,13 +80,14 @@ class F2(instrument.Instrument):
         self.bad_keywords = ['DECKER']
         self.bad_values = ['closed']
 
-        self.detrend = True
+        self.detrend = False
         self.catalog_zp = '2MASS'
 
         self.out_size = 2500
 
     def get_saturation(self, hdr):
-        return(self.saturation*hdr['NREADS'])
+        # Gives the saturation level in e-
+        return(self.saturation*hdr['NREADS']*hdr['GAIN'])
 
     def raw_format(self, proc):
         return('*.fits.bz2')
