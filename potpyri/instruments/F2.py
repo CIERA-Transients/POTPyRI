@@ -86,7 +86,7 @@ class F2(instrument.Instrument):
         self.out_size = 2500
 
     def get_saturation(self, hdr):
-        return(self.saturate*hdr['NREADS'])
+        return(self.saturation*hdr['NREADS'])
 
     def raw_format(self, proc):
         return('*.fits.bz2')
