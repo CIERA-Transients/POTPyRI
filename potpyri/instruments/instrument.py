@@ -569,6 +569,7 @@ class Instrument(object):
         mflat=None, mdark=None, skip_skysub=False, log=None):
 
         processed = []
+        processed_names = []
         for sci in sorted(sci_list):
             if log: log.info(f'Importing {sci}')
             sci_full = self.import_image(sci, amp, log=log)
