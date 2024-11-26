@@ -497,15 +497,17 @@ class Instrument(object):
             mask = sky_full.data > med + 5 * stddev
             sky_full.data[mask]=np.nan
 
+            norm = 1./med
+
             # Normalize by median sky background
-            sky_full = sky_full.multiply(1./med)
+            sky_full = sky_full.multiply(norm)
             
             # Vet the sky normalization - it should not be negative
             if norm > 0.:
-                log.info(f'Sky normalization: {1./med}')
+                log.info(f'Sky normalization: {norm}')
             else:
                 # Skip this file
-                log.error(f'Sky normalization: {1./med}')
+                log.error(f'Sky normalization: {norm}')
                 continue
                 
             skys.append(sky_full)
