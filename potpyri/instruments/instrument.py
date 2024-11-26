@@ -227,6 +227,10 @@ class Instrument(object):
         red_path = paths['cal']
         return(os.path.join(red_path, f'mflat_{fil}_{amp}_{binn}.fits'))
 
+    def get_msky_frame(self, paths, fil, amp, binn):
+        red_path = paths['cal']
+        return(os.path.join(red_path, f'msky_{fil}_{amp}_{binn}.fits'))
+
     def load_bias(self, paths, amp, binn):
         bias = self.get_mbias_name(paths, amp, binn)
         if os.path.exists(bias):
@@ -260,6 +264,17 @@ class Instrument(object):
             raise Exception(f'Could not find flat: {flat}')
         return(mflat)
 
+    def load_sky(self, paths, fil, amp, binn):
+        sky = self.get_msky_name(paths, fil, amp, binn)
+        if os.path.exists(sky):
+            msky = CCDData.read(sky)
+        elif os.path.exists(sky+'.fz'):
+            hdu = fits.open(sky+'.fz')
+            msky = CCDData(hdu[1].data, header=hdu[1].header, unit=u.electron)
+        else:
+            raise Exception(f'Could not find sky frame: {sky}')
+        return(msky)
+
     def import_image(self, filename, amp, log=None):
         filename = os.path.abspath(filename)
         if log: log.info(f'Loading file: {filename}')
@@ -279,6 +294,14 @@ class Instrument(object):
             header=header,unit=u.electron)
 
         frame_full.header['SATURATE'] = saturation(header)
+
+        return(frame_full)
+
+    def import_sci_image(self, filename, log=None):
+        filename = os.path.abspath(filename)
+        if log: log.info(f'Loading file: {filename}')
+
+        frame_full = CCDData.read(filename)
 
         return(frame_full)
 
@@ -456,6 +479,59 @@ class Instrument(object):
         
         return
 
+    def create_sky(self, sky_list, fil, amp, binn, paths, log=None, **kwargs):
+
+        if log:
+            log.info(f'Processing files for filter: {fil}')
+            log.info(f'{len(sky_list)} files found.')
+
+        scale = []
+        skys = []
+        for i, sky in enumerate(sky_list):
+            if log: log.info(f'Importing {flat}')
+            sky_full = self.import_sci_image(sky, log=log)
+
+            mean, med, stddev = sigma_clipped_stats(sky_full.data)
+
+            # Mask outliers
+            mask = sky_full.data > med + 5 * stddev
+            sky_full.data[mask]=np.nan
+
+            # Normalize by median sky background
+            sky_full = sky_full.multiply(1./med)
+            
+            # Vet the flat normalization - it should not be negative
+            if norm > 0.:
+                log.info(f'Sky normalization: {1./med}')
+            else:
+                # Skip this file
+                log.error(f'Sky normalization: {1./med}')
+                continue
+                
+            skys.append(sky_full)
+
+        msky = ccdproc.combine(skys, method='median', sigma_clip=True, 
+            clip_extrema=True)
+
+        # Mask sky image
+        msky.data[np.isinf(mflat.data)]=1.0
+        msky.data[mflat.data==0.0]=1.0
+        mean, median, stddev = sigma_clipped_stats(msky.data)
+        mask = msky.data > median + 10 * stddev
+        msky.data[mask]=1.0
+        
+        if log: 
+            log.info(f'Made sky for filter: {fil}, amp: {amp}, bin: {binn}.')
+        
+        msky.header['VER'] = (__version__, 
+            'Version of telescope parameter file used.')
+
+        sky_filename = self.get_msky_name(paths, fil, amp, binn)
+        msky.write(sky_filename, overwrite=True)
+        log.info(f'Master sky written to {sky_filename}')
+        
+        return
+
     def load_staticmask(self, hdr, paths):
 
         satmask_filename = self.get_staticmask_filename(hdr, paths)
@@ -531,7 +607,7 @@ class Instrument(object):
                 input_mask=staticmask)
             processed_data.data[processed_data.mask]=np.nan
 
-            if not skip_skysub:
+            if not skip_skysub and self.wavelength!='NIR':
                 if log: log.info('Calculating 2D background.')
                 bkg = Background2D(processed_data, (64, 64), filter_size=(3, 3),
                     sigma_clip=SigmaClip(sigma=3), exclude_percentile=80,
@@ -607,6 +683,21 @@ class Instrument(object):
 
             if log: log.info(f'Writing final file: {final_filename}')
             final_img.write(final_filename, overwrite=True)
+            
             processed.append(final_img)
+            processed_names.append(final_filename)
+
+        # Create sky image and subtract from every science frame
+        if self.wavelength=='NIR':
+            self.create_sky(processed_names, fil, amp, binn, paths, 
+                log=log)
+            sky_frame = self.load_sky(paths, fil, amp, binn)
+
+            for i,frame in enumerate(processed):
+
+                mean, med, stddev = sigma_clipped_stats(frame.data)
+                frame_sky = sky_frame.multiply(med)
+
+                processed[i] = frame.subtract(frame_sky)
 
         return(processed)
