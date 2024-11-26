@@ -497,9 +497,9 @@ class Instrument(object):
             mask = sky_full.data > med + 5 * stddev
             sky_full.data[mask]=np.nan
 
-            norm = 1./med
-
             # Normalize by median sky background
+            mean, med, stddev = sigma_clipped_stats(sky_full.data)
+            norm = 1./med
             sky_full = sky_full.multiply(norm)
             
             # Vet the sky normalization - it should not be negative
@@ -509,6 +509,9 @@ class Instrument(object):
                 # Skip this file
                 log.error(f'Sky normalization: {norm}')
                 continue
+
+            sky_full.mask[np.isnan(sky_full.data)]=True
+            sky_full.data[np.isnan(sky_full.data)]=1.0
                 
             skys.append(sky_full)
 
@@ -693,14 +696,18 @@ class Instrument(object):
 
         # Create sky image and subtract from every science frame
         if self.wavelength=='NIR':
-            self.create_sky(processed_names, fil, amp, binn, paths, 
-                log=log)
+            sky_frame = self.get_msky_name(paths, fil, amp, binn)
+            if not os.path.exists(sky_frame):
+                self.create_sky(processed_names, fil, amp, binn, paths, 
+                    log=log)
+            
             sky_frame = self.load_sky(paths, fil, amp, binn)
 
             for i,frame in enumerate(processed):
 
                 mean, med, stddev = sigma_clipped_stats(frame.data)
-                frame_sky = sky_frame.multiply(med)
+                frame_sky = sky_frame.multiply(med, 
+                    propagate_uncertainties=True, handle_meta='first_found')
 
                 processed[i] = frame.subtract(frame_sky)
                 processed[i].header['SKYBKG']=med
