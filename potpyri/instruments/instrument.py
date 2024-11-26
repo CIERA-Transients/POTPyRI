@@ -709,7 +709,8 @@ class Instrument(object):
                 frame_sky = sky_frame.multiply(med, 
                     propagate_uncertainties=True, handle_meta='first_found')
 
-                processed[i] = frame.subtract(frame_sky)
+                processed[i] = frame.subtract(frame_sky, 
+                    propagate_uncertainties=True, handle_meta='first_found')
                 processed[i].header['SKYBKG']=med
                 processed[i].header['SATURATE']-=med
 
