@@ -703,5 +703,14 @@ class Instrument(object):
                 frame_sky = sky_frame.multiply(med)
 
                 processed[i] = frame.subtract(frame_sky)
+                processed[i].header['SKYBKG']=med
+                processed[i].header['SATURATE']-=med
+
+                # Rewrite file
+                final_filename = self.get_sci_name(processed[i].header, 
+                    paths['work'])
+
+                if log: log.info(f'Writing final file: {final_filename}')
+                processed[i].write(final_filename, overwrite=True)
 
         return(processed)
