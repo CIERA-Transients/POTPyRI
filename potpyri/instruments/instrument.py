@@ -227,7 +227,7 @@ class Instrument(object):
         red_path = paths['cal']
         return(os.path.join(red_path, f'mflat_{fil}_{amp}_{binn}.fits'))
 
-    def get_msky_frame(self, paths, fil, amp, binn):
+    def get_msky_name(self, paths, fil, amp, binn):
         red_path = paths['cal']
         return(os.path.join(red_path, f'msky_{fil}_{amp}_{binn}.fits'))
 
