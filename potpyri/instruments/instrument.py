@@ -488,7 +488,7 @@ class Instrument(object):
         scale = []
         skys = []
         for i, sky in enumerate(sky_list):
-            if log: log.info(f'Importing {flat}')
+            if log: log.info(f'Importing {sky}')
             sky_full = self.import_sci_image(sky, log=log)
 
             mean, med, stddev = sigma_clipped_stats(sky_full.data)
@@ -500,7 +500,7 @@ class Instrument(object):
             # Normalize by median sky background
             sky_full = sky_full.multiply(1./med)
             
-            # Vet the flat normalization - it should not be negative
+            # Vet the sky normalization - it should not be negative
             if norm > 0.:
                 log.info(f'Sky normalization: {1./med}')
             else:
@@ -514,8 +514,8 @@ class Instrument(object):
             clip_extrema=True)
 
         # Mask sky image
-        msky.data[np.isinf(mflat.data)]=1.0
-        msky.data[mflat.data==0.0]=1.0
+        msky.data[np.isinf(msky.data)]=1.0
+        msky.data[msky.data==0.0]=1.0
         mean, median, stddev = sigma_clipped_stats(msky.data)
         mask = msky.data > median + 10 * stddev
         msky.data[mask]=1.0
@@ -608,9 +608,9 @@ class Instrument(object):
                 input_mask=staticmask)
             processed_data.data[processed_data.mask]=np.nan
 
+            if log: log.info(f'Wavelength is {self.wavelength}')
             if not skip_skysub and self.wavelength!='NIR':
                 if log: log.info('Calculating 2D background.')
-                if log: log.info(f'Wavelength is {self.wavelength}')
                 bkg = Background2D(processed_data, (64, 64), filter_size=(3, 3),
                     sigma_clip=SigmaClip(sigma=3), exclude_percentile=80,
                     bkg_estimator=MeanBackground(), mask=processed_data.mask, 
