@@ -609,6 +609,7 @@ class Instrument(object):
 
             if not skip_skysub and self.wavelength!='NIR':
                 if log: log.info('Calculating 2D background.')
+                if log: log.info(f'Wavelength is {self.wavelength}')
                 bkg = Background2D(processed_data, (64, 64), filter_size=(3, 3),
                     sigma_clip=SigmaClip(sigma=3), exclude_percentile=80,
                     bkg_estimator=MeanBackground(), mask=processed_data.mask, 
