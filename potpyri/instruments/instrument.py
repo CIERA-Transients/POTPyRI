@@ -622,7 +622,7 @@ class Instrument(object):
             processed_data.data[processed_data.mask]=np.nan
 
             if log: log.info(f'Wavelength is {self.wavelength}')
-            if not skip_skysub and self.wavelength!='NIR':
+            if not skip_skysub and not self.needs_sky_subtraction(fil):
                 if log: log.info('Calculating 2D background.')
                 bkg = Background2D(processed_data, (64, 64), filter_size=(3, 3),
                     sigma_clip=SigmaClip(sigma=3), exclude_percentile=80,
