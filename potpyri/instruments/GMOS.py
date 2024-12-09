@@ -88,6 +88,13 @@ class GMOS(instrument.Instrument):
 
         self.out_size = 3200
 
+    # Perform sky subtraction with GMOS z-band data
+    def needs_sky_subtraction(self, filt):
+        if filt.lower.startswith('z'):
+            return(True)
+        else:
+            return(False)
+
     def get_rdnoise(self, hdr):
         try:
             return(hdr['RDNOISE'])
