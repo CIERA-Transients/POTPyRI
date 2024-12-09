@@ -90,7 +90,7 @@ class GMOS(instrument.Instrument):
 
     # Perform sky subtraction with GMOS z-band data
     def needs_sky_subtraction(self, filt):
-        if filt.lower.startswith('z'):
+        if filt.lower().startswith('z'):
             return(True)
         else:
             return(False)
