@@ -96,6 +96,14 @@ class Instrument(object):
         # Default final image size for binning of 1x1
         self.out_size = 5000
 
+    # Determine whether sky subtraction is needed for the current reduction
+    def needs_sky_subtraction(self, filt):
+        # Default is to do sky subtraction for all NIR cameras
+        if self.wavelength=='NIR':
+            return(True)
+        else:
+            return(False)
+
     # Use these if a single value is needed for gain, rdnoise, etc.
     def get_rdnoise(self, hdr):
         return(self.rdnoise)
@@ -695,7 +703,7 @@ class Instrument(object):
             processed_names.append(final_filename)
 
         # Create sky image and subtract from every science frame
-        if self.wavelength=='NIR':
+        if self.needs_sky_subtraction(fil):
             sky_frame = self.get_msky_name(paths, fil, amp, binn)
             if not os.path.exists(sky_frame):
                 self.create_sky(processed_names, fil, amp, binn, paths, 
