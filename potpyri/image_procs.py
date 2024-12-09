@@ -539,9 +539,20 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
     # Astroscrappy requires added sky background, so add this value back
     # Set the sky background to some nominal value if it is too low for CR rej
     skybkg = hdu[0].header['SKYBKG']
-    if skybkg < 1000.0: skybkg = 1000.0
-    data = data + skybkg
+    if log:
+        log.info(f'Sky background in science frame is {skybkg}')
+    else:
+        print(f'Sky background in science frame is {skybkg}')
 
+    if skybkg < 2000.0: 
+        skybkg = 2000.0
+        if log:
+            log.info('Setting sky background to 2000.0')
+        else:
+            print('Setting sky background to 2000.0')
+
+    # Set data background to skybkg
+    data = data + skybkg
     # Also need to adjust the saturation level by SKYBKG for saturated pixels
     saturation += skybkg
     
