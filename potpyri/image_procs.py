@@ -199,9 +199,11 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
         if log: log.info('Loading master bias.')
         try:
             mbias = tel.load_bias(paths, amp, binn)
-        except:
-            if log: log.error(f'''No master bias found for this configuration, 
-                skipping reduction for: {cal_type}''')
+        except Exception as e:
+            if log: 
+                log.error('No master bias found for this configuration')
+                log.error(f'Skipping reduction for: {cal_type}')
+                log.error(e)
             return(None)
     else:
         mbias = None
@@ -211,9 +213,11 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
         if log: log.info('Loading master dark.')
         try:
             mdark = tel.load_dark(paths, amp, binn)
-        except:
-            if log: log.error(f'''No master dark found for this configuration, 
-                skipping reduction for: {cal_type}.''')
+        except Exception as e:
+            if log: 
+                log.error('No master dark found for this configuration')
+                log.error(f'Skipping reduction for: {cal_type}')
+                log.error(e)
             return(None)
     else:
         mdark = None
@@ -223,9 +227,11 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
         if log: log.info('Loading master flat.')
         try:
             mflat = tel.load_flat(paths, fil, amp, binn)
-        except:
-            if log: log.error(f'''No master flat present for filter {fil}, 
-                skipping reduction for: {cal_type}.''')
+        except Exception as e:
+            if log: 
+                log.error('No master bias found for this configuration')
+                log.error(f'Skipping reduction for: {cal_type}')
+                log.error(e)
             return(None)
     else:
         mflat = None
