@@ -237,7 +237,7 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
                 file_type = 'BAD'
                 moved_path = paths['bad']
                 bad_num += 1
-            elif is_spec(hdr, tel):
+            elif (is_spec(hdr, tel) and not is_bias(hdr, tel)):
                 file_type = 'SPEC'
                 moved_path = paths['bad']
                 spec_num += 1
