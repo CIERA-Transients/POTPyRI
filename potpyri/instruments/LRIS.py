@@ -59,7 +59,7 @@ class LRIS(instrument.Instrument):
         # Keywords for selecting files from Sort_files object
         # This allows a single file type to be used for multiple purposes (e.g., for
         # generating a flat-field image from science exposures)
-        self.filetype_keywords = {'SCIENCE':'SCIENCE', 'FLAT':'FLAT,SCIENCE', 
+        self.filetype_keywords = {'SCIENCE':'SCIENCE', 'FLAT':'[SCIENCE,FLAT]', 
             'DARK':'DARK','BIAS':'BIAS'}
 
         # Header keywords
