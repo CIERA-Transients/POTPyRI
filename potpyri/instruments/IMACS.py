@@ -79,7 +79,7 @@ class IMACS(instrument.Instrument):
         self.bad_keywords = []
         self.bad_values = []
 
-        self.detrend = True
+        self.detrend = False
         self.catalog_zp = 'PS1'
 
         self.out_size = 5000
