@@ -26,8 +26,8 @@ class IMACS(instrument.Instrument):
         self.name = 'IMACS'
 
         # Extensions for keeping track of general metadata and WCS
-        self.raw_header_ext = 1
-        self.wcs_extension = 1
+        self.raw_header_ext = 0
+        self.wcs_extension = 0
 
         # Detector specific characteristics
         self.pixscale = 0.111
@@ -62,22 +62,22 @@ class IMACS(instrument.Instrument):
         self.exptime_keyword = 'EXPTIME'
         self.filter_keyword = 'FILTER'
         self.mjd_keyword = 'MJD'
-        self.bin_keyword = 'CCDSUM'
+        self.bin_keyword = 'BINNING'
         self.amp_keyword = '2'
 
         # File sorting keywords
-        self.science_keywords = ['MASK','SCRN']
-        self.science_values = ['imaging','stowed']
-        self.flat_keywords = ['MASK','SCRN']
-        self.flat_values = ['imaging','deployed']
+        self.science_keywords = ['GISMO','SLITMASK']
+        self.science_values = ['none','f/4-imaging']
+        self.flat_keywords = ['OBJECT']
+        self.flat_values = ['twiflat']
         self.bias_keywords = []
         self.bias_values = []
         self.dark_keywords = []
         self.dark_values = []
-        self.spec_keywords = ['MASK']
-        self.spec_values = ['spectroscopy']
-        self.bad_keywords = ['MASK']
-        self.bad_values = ['mira']
+        self.spec_keywords = []
+        self.spec_values = []
+        self.bad_keywords = []
+        self.bad_values = []
 
         self.detrend = True
         self.catalog_zp = 'PS1'
@@ -90,6 +90,23 @@ class IMACS(instrument.Instrument):
         elap = Time(datestr)-Time('1980-01-01')
         elap = int(np.round(elap.to(u.second).value))
         return(elap)
+
+    def get_time(self, hdr):
+        return(float(Time(hdr['DATE-OBS']).mjd))
+
+    def get_filter(self, hdr):
+        filt = hdr[self.filter_keyword]
+        filtmap = {'Bessell_V1':'V',
+                   'CTIO-I1': 'I'}
+        filt = filtmap[filt]
+        return(filt)
+
+    def get_ampl(self, hdr):
+        try:
+            amp = str(hdr['CHIP'])
+        except:
+            amp = None
+        return(amp)
 
     # Raw image format for ingestion
     def raw_format(self, proc):
