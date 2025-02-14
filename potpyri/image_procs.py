@@ -330,8 +330,12 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
             print(f'Writing out all file data: {fullfilename}')
         hdulist.writeto(fullfilename, overwrite=True, output_verify='silentfix')
     
-    if log: log.info('Creating median stack.') 
-    sci_med = stack_data(aligned_data, tel, masks, errors, log=log)
+    if log: log.info('Creating median stack.')
+    if len(aligned_data)>1:
+        sci_med = stack_data(aligned_data, tel, masks, errors, log=log)
+    else:
+        sci_med = aligned_data[0]
+        
     sci_med = add_stack_mask(sci_med, aligned_data)
 
     if tel.detrend:
