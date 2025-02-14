@@ -326,7 +326,7 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
 
     if len(file_table)>0:
         ascii.write(file_table, file_list, format='fixed_width',
-            formats={'Time':'%5.6f'})
+            formats={'Time':'%5.6f'}, overwrite=True)
     else:
         if log: log.critical('No good files were ingested')
 
@@ -347,16 +347,16 @@ if __name__=="__main__":
 
     global tel
     import importlib
-    module = importlib.import_module('instruments.F2')
-    tel = getattr(module, 'F2')()
+    module = importlib.import_module('instruments.IMACS')
+    tel = getattr(module, 'IMACS')()
 
-    files = glob.glob('/Users/ckilpatrick/Downloads/gemini_data/bad/*.bz2')
-    file_list = '/Users/ckilpatrick/Downloads/gemini_data/file_list.txt'
+    files = glob.glob('/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/raw/*.fits')
+    file_list = '/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/file_list.txt'
 
     paths={}
-    paths['red']='/Users/ckilpatrick/Downloads/gemini_data/red'
-    paths['data']='/Users/ckilpatrick/Downloads/gemini_data'
-    paths['raw']='/Users/ckilpatrick/Downloads/gemini_data/raw'
-    paths['bad']='/Users/ckilpatrick/Downloads/gemini_data/bad'
+    paths['red']='/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/red'
+    paths['data']='/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS'
+    paths['raw']='/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/raw'
+    paths['bad']='/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/bad'
 
     sort_files(files, file_list, tel, paths, incl_bad=False, log=None)

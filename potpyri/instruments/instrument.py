@@ -136,7 +136,8 @@ class Instrument(object):
 
     def get_binning(self, hdr):
         if self.bin_keyword in hdr.keys():
-            binn = str(hdr[self.bin_keyword]).replace(' ','')
+            binn = str(hdr[self.bin_keyword]).lower().replace(' ','')
+            binn = binn.replace('x','')
             binn = binn.replace(',','')
             return(binn)
         else:
