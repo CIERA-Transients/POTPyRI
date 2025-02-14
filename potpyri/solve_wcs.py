@@ -151,9 +151,14 @@ def solve_astrometry(file, tel, radius=0.5, replace=True,
         newfile = fullfile.replace(exten,'.solved.fits')
 
     # Handle pixel scale guess
-    scale = tel.pixscale
-    scale_high = float('%.4f'%(scale * 1.2))
-    scale_low = float('%.4f'%(scale * 0.8))
+    scale = tel.get_pixscale()
+    if scale is not None:
+        scale = float(scale)
+        scale_high = float('%.4f'%(scale * 1.2))
+        scale_low = float('%.4f'%(scale * 0.8))
+    else:
+        scale_high = 5.0
+        scale_low = 0.05
 
     # Get RA and Dec
     ra = float('%.6f'%coord.ra.degree)

@@ -69,7 +69,7 @@ def generate_wcs(tel, binn, fieldcenter, out_size):
     w = {'NAXES':2, 'NAXIS1': out_size, 'NAXIS2': out_size,
         'EQUINOX': 2000.0, 'LONPOLE': 180.0, 'LATPOLE': 0.0}
 
-    pixscale = tel.pixscale
+    pixscale = tel.get_pixscale()
     cdelt = pixscale * int(str(binn)[0])/3600.0
 
     w['CDELT1'] = -1.0 * cdelt
