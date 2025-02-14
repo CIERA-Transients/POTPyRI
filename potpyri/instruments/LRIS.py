@@ -190,8 +190,8 @@ class LRIS(instrument.Instrument):
         if self.exptime_keyword in hdr.keys():
             return(float(hdr[self.exptime_keyword]))
         else:
-            t1 = Time(h['DATE-BEG'])
-            t2 = Time(h['DATE-END'])
+            t1 = Time(hdr['DATE-BEG'])
+            t2 = Time(hdr['DATE-END'])
             dt = t2 - t1
             return(dt.to_value('sec'))
 
