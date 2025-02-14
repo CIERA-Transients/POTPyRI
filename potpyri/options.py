@@ -16,7 +16,7 @@ def add_options():
         default=None, 
         type=str.upper,
         choices=['BINOSPEC','DEIMOS','GMOS','LRIS','MMIRS','MOSFIRE',
-            'BINO','MMIR','F2'],
+            'BINO','MMIR','F2','IMACS','FOURSTAR'],
         help='''Name of instrument (must be in instruments dir) of data to 
         reduce. Required to run pipeline.''')
     params.add_argument('data_path', 
