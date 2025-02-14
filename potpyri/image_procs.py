@@ -281,6 +281,7 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
     if log: log.info('Creating mask and error arrays.')
     masks = []
     errors = []
+    data_images = []
     for stack_img in aligned_images:
         hdu = fits.open(stack_img, mode='readonly')
         hdr = hdu[0].header
@@ -328,18 +329,20 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
             log.info(f'Writing out all file data: {fullfilename}')
         else:
             print(f'Writing out all file data: {fullfilename}')
+
         hdulist.writeto(fullfilename, overwrite=True, output_verify='silentfix')
+        data_images.append(fullfilename)
     
     if log: log.info('Creating median stack.')
     if len(aligned_data)>1:
         sci_med = stack_data(aligned_data, tel, masks, errors, log=log)
-    else:
-        sci_med = aligned_data[0]
-        
-    sci_med = add_stack_mask(sci_med, aligned_data)
+        sci_med = add_stack_mask(sci_med, aligned_data)
 
-    if tel.detrend:
-        sci_med = detrend_stack(sci_med)
+        if tel.detrend:
+            sci_med = detrend_stack(sci_med)
+
+    else:
+        sci_med = fits.open(data_images[0])
 
     sci_med[0].data = sci_med[0].data.astype(np.float32)
     sci_med[1].data = sci_med[1].data.astype(np.uint8)
@@ -444,6 +447,9 @@ def stack_data(stacking_data, tel, masks, errors, log=None):
     scale = 1./exptimes
 
     all_data = np.array([s.data for s in stacking_data])
+
+    if len(scale)==1:
+        stack_method='average'
 
     sci_med = combine(stacking_data, weights=weights, scale=scale,
         method=stack_method, mem_limit=64e9)
@@ -676,22 +682,24 @@ def create_error(science_data, mask_data, rdnoise):
 
 if __name__=="__main__":
 
-    t = ascii.read('/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/Binospec/file_list.txt',
+    t = ascii.read('/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/file_list.txt',
         format='fixed_width')
-    mask = t['Target']=='GRB240809A_r_ep1'
+    mask = t['TargType']=='IceCube2_I_1_11'
     t = t[mask]
 
     t.sort('File')
 
     global tel
-    tel = importlib.import_module('instruments.BINOSPEC')
+    import importlib
+    module = importlib.import_module('instruments.IMACS')
+    tel = getattr(module, 'IMACS')()
 
     paths={}
-    paths['red']='/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/Binospec/red'
-    paths['work']='/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/Binospec/red/workspace'
-    paths['cal']='/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/Binospec/red/cals'
+    paths['red']='/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/red'
+    paths['work']='/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/red/workspace'
+    paths['cal']='/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/red/cals'
     paths['code']=os.path.dirname(sys.argv[0])
 
-    image_proc(t, tel, paths, fieldcenter=['15:50:08.0920','-2:16:08.617'],
-        out_size=5000, proc=None, log=None)
+    image_proc(t, tel, paths, fieldcenter=None,
+        out_size=4200, log=None)
 
