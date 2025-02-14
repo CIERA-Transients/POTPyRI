@@ -118,7 +118,7 @@ class IMACS(instrument.Instrument):
 
         hdu = fits.open(filename)
 
-        data = hdu[0].data
+        data = hdu[0].data[:4096,:]
         header = hdu[self.raw_header_ext].header
 
         raw = CCDData(data, header=header, unit=u.adu)
