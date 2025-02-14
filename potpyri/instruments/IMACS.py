@@ -82,7 +82,7 @@ class IMACS(instrument.Instrument):
         self.detrend = False
         self.catalog_zp = 'PS1'
 
-        self.out_size = 5000
+        self.out_size = 4200
 
     # Get a unique image number that can be derived only from the file header
     def get_number(self, hdr):
@@ -98,7 +98,8 @@ class IMACS(instrument.Instrument):
         filt = hdr[self.filter_keyword]
         filtmap = {'Bessell_V1':'V',
                    'CTIO-I1': 'I'}
-        filt = filtmap[filt]
+        if filt in filtmap.keys():
+            filt = filtmap[filt]
         return(filt)
 
     def get_ampl(self, hdr):
