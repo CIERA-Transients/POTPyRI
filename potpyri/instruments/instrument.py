@@ -104,16 +104,16 @@ class Instrument(object):
         else:
             return(False)
 
+    # Get pixel scale for imagers with varying focal ratios (e.g., IMACS)
+    def get_pixscale(self):
+        return(self.pixscale)
+
     # Use these if a single value is needed for gain, rdnoise, etc.
     def get_rdnoise(self, hdr):
         return(self.rdnoise)
 
     def get_gain(self, hdr):
         return(self.gain)
-
-    # Get pixel scale for imagers with varying focal ratios (e.g., IMACS)
-    def get_pixscale(self, hdr):
-        return(self.pixscale)
 
     # Get specific header keywords from file
     def get_target(self, hdr):
