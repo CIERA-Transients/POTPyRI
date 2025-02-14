@@ -117,11 +117,11 @@ class IMACS(instrument.Instrument):
         if log: log.info(f'Loading file: {filename}')
 
         hdu = fits.open(filename)
+
+        data = hdu[0].data
         header = hdu[self.raw_header_ext].header
 
-        raw = CCDData.read(filename, header=header,
-            unit=u.adu)
-
+        raw = CCDData(data, header=header, unit=u.adu)
         red = ccdproc.ccd_process(raw, oscan=header['BIASSEC'], 
                oscan_model=models.Chebyshev1D(3), 
                trim=header['DATASEC'], gain=header['EGAIN']*u.electron/u.adu, 
