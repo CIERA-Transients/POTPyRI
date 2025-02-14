@@ -31,7 +31,7 @@ class IMACS(instrument.Instrument):
 
         # Detector specific characteristics
         self.pixscale = 0.111
-        self.saturation = 65000
+        self.saturation = 60000
 
         self.min_exptime = 1.0
 
@@ -119,32 +119,16 @@ class IMACS(instrument.Instrument):
         hdu = fits.open(filename)
         header = hdu[self.raw_header_ext].header
 
-        raw = []
-        for x in range(int(amp)):
-            data = hdu[x+1].data
-            hdr = hdu[x+1].header
+        raw = CCDData.read(filename, header=header,
+            unit=u.adu)
 
-            if hdr['CRVAL1']<0:
-                hdr['CRVAL1']=0.0
-            if np.abs(hdr['CRVAL2'])>90:
-                hdr['CRVAL2']=0.0
-            if 'PRESSURE' in hdr.keys():
-                del hdr['PRESSURE']
-            if 'TEMP' in hdr.keys():
-                del hdr['TEMP']
-
-            raw.append(CCDData(data, header=hdr, unit=u.adu))
-
-        red = [ccdproc.ccd_process(x, oscan=self.biassec[k], 
+        red = ccdproc.ccd_process(raw, oscan=header['BIASSEC'], 
                oscan_model=models.Chebyshev1D(3), 
-               trim=self.datasec[k], gain=self.gain[k]*u.electron/u.adu, 
-               readnoise=self.rdnoise[k]*u.electron, 
-               gain_corrected=True) for k,x in enumerate(raw)]
+               trim=header['DATASEC'], gain=header['EGAIN']*u.electron/u.adu, 
+               readnoise=header['ENOISE']*u.electron, 
+               gain_corrected=True)
 
-        frame_full = CCDData(np.concatenate((red[0], 
-            np.empty((red[0].shape[0], 794)), red[1]), axis=1), 
-            header=header,unit=u.electron)
-
+        frame_full = red
         frame_full.header['SATURATE'] = self.saturation
 
         return(frame_full)
