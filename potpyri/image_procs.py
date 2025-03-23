@@ -177,7 +177,8 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
     return(aligned_images, aligned_data)
 
 def image_proc(image_data, tel, paths, skip_skysub=False, 
-    fieldcenter=None, out_size=None, satellites=True, log=None):
+    fieldcenter=None, out_size=None, satellites=True, cosmic_ray=True,
+    log=None):
 
     wavelength = tel.wavelength
 
@@ -287,7 +288,7 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
         hdr = hdu[0].header
         clean, mask = create_mask(stack_img,
             hdr['SATURATE'], np.mean(tel.get_rdnoise(hdr)),
-            log=log, outpath=work_path)
+            log=log, cosmic_ray=cosmic_ray, outpath=work_path)
         error = create_error(stack_img, mask, np.mean(tel.get_rdnoise(hdr)))
 
         masks.append(mask)
@@ -540,7 +541,7 @@ def mask_satellites(images, filenames, log=None):
 
 def create_mask(science_data, saturation, rdnoise, sigclip=3.5, 
     sigfrac=0.2, objlim=4.5, niter=6, outpath='', grow=0, satellites=True,
-    log=None):
+    cosmic_ray=True, log=None):
 
     t_start = time.time()
     
@@ -588,11 +589,16 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
     scidata = CCDData(data, unit=u.electron, mask=inmask, 
         wcs=WCS(hdu[0].header), meta=hdu[0].header)
 
-    newdata, mask_cr = cosmicray_lacosmic(data,
-        readnoise=rdnoise, satlevel=saturation, verbose=True,
-        sigclip=sigclip, sigfrac=sigfrac, objlim=objlim, niter=niter)
+    mask_cr = np.zeros(data.shape)
+    mask_cr = mask_cr.astype(np.uint8)
 
-    mask_cr = mask_cr.astype(np.uint8) #set cosmic ray mask type
+    if cosmic_ray:
+        newdata, mask_cr = cosmicray_lacosmic(data,
+            readnoise=rdnoise, satlevel=saturation, verbose=True,
+            sigclip=sigclip, sigfrac=sigfrac, objlim=objlim, niter=niter)
+
+        mask_cr = mask_cr.astype(np.uint8) #set cosmic ray mask type
+
     mask_cr[mask_cr == 1] = 2 #set cosmic ray flag
 
      #combine bad pixel, cosmic ray, saturated star and satellite trail masks
