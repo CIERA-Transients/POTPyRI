@@ -161,23 +161,23 @@ class GMOS(instrument.Instrument):
             for k,x in enumerate(raw)]
 
         if header['INSTRUME'] == 'GMOS-S':
-            if amp == '12':
+            if str(amp) == '12':
                 full = CCDData(np.concatenate(
                     red[2:4]+[np.zeros([np.shape(red[3])[0],40])]+\
                     red[4:8]+[np.zeros([np.shape(red[7])[0],40])]+\
                     red[8:10],axis=1),
                     header=header,unit=u.electron)
-            elif amp == '4':
+            elif str(amp) == '4':
                 full = CCDData(np.concatenate(red,axis=1),
                     header=header,unit=u.electron)
         elif header['INSTRUME'] == 'GMOS-N':
-            if amp == '12':
+            if str(amp) == '12':
                 full = CCDData(np.concatenate(
                     red[2:4]+[np.zeros([np.shape(red[3])[0],30])]+\
                     red[4:8]+[np.zeros([np.shape(red[7])[0],30])]+\
                     red[8:10],axis=1),
                     header=header,unit=u.electron)
-            elif amp == '4':
+            elif str(amp) == '4':
                 full = CCDData(np.concatenate(red,axis=1),
                     header=header,unit=u.electron)
 
