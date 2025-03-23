@@ -52,6 +52,7 @@ def main_pipeline(instrument:str,
                   fieldcenter:list=None,
                   out_size:int=None,
                   skip_flatten:bool=None,
+                  skip_cr:bool=None,
                   **kwargs)->None:
 
     # start time
@@ -127,7 +128,7 @@ def main_pipeline(instrument:str,
         files = target_table['File']
         stack = image_procs.image_proc(target_table, tel, paths,
             skip_skysub=skip_skysub, fieldcenter=fieldcenter, out_size=out_size,
-            log=log)
+            cosmic_ray=~skip_cr, log=log)
 
         if stack is None:
             if log: log.error(f'Could not generate a stack for {tar}')

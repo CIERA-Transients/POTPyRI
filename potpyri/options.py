@@ -79,6 +79,10 @@ def add_options():
         default=False,
         action='store_true',
         help='Tell the pipeline to skip flattening.')
+    params.add_argument('--skip-cr',
+        default=False,
+        action='store_true',
+        help='Tell the pipeline to skip cosmic ray detection.')
 
     args = params.parse_args()
 
