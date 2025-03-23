@@ -10,6 +10,7 @@ import importlib
 import numpy as np
 import logging
 import sys
+import copy
 
 # Needed for satellite trail detection - dependency can be removed later if 
 # we turn off satellite masking or use some other algorithm (e.g., the Rubin one)
