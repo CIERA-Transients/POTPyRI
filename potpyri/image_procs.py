@@ -419,7 +419,7 @@ def detrend_stack(stack):
 
     return(stack)
 
-def stack_data(stacking_data, tel, masks, errors, log=None):
+def stack_data(stacking_data, tel, masks, errors, mem_limit=8.0e9, log=None):
 
     stack_method = tel.stack_method
     if not stack_method:
@@ -453,8 +453,49 @@ def stack_data(stacking_data, tel, masks, errors, log=None):
     if len(scale)==1:
         stack_method='average'
 
-    sci_med = combine(stacking_data, weights=weights, scale=scale,
-        method=stack_method, mem_limit=64e9)
+    # Determine if intermediate stacks are needed
+    # Get size of individual frame, account for data, noise, and mask
+    exdata = stacking_data[0].data
+    size = 64.0/8.0 * exdata.shape[0]*exdata.shape[1] * 2 + exdata.shape[0]*exdata.shape[1]
+
+    if log:
+        log.info(f'Image size is {size}')
+    else:
+        print(f'Image size is {size}')
+
+    # Get maximum size of chunk
+    max_chunk = int(np.floor(mem_limit / 4.0 / (size)))
+    if max_chunk==0: max_chunk=1
+
+    if len(stacking_data)<=max_chunk:
+        sci_med = combine(stacking_data, weights=weights, scale=scale,
+            method=stack_method, mem_limit=mem_limit)
+    else:
+        nimgs = len(stacking_data) * 1.0
+        nchunks = int(np.ceil(nimgs/(1.0*max_chunk)))
+
+        if log:
+            log.info(f'Splitting stacking into {nchunks} chunks')
+        else:
+            print(f'Splitting stacking into {nchunks} chunks')
+
+        inter_med = []
+        for i in np.arange(nchunks):
+            if log:
+                log.info(f'Stacking chunk {i+1}/{nchunks}')
+            else:
+                print(f'Stacking chunk {i+1}/{nchunks}')
+            start = i*max_chunk
+            end = (i+1)*max_chunk
+            if end>len(stacking_data): end=None
+
+            sci_med = combine(stacking_data[start:end], 
+                weights=weights[start:end], scale=scale[start:end],
+                method=stack_method, mem_limit=mem_limit)
+
+            inter_med.append(sci_med)
+
+        sci_med = combine(inter_med, method=stack_method)
 
     sci_med = sci_med.to_hdu()
 
@@ -691,24 +732,40 @@ def create_error(science_data, mask_data, rdnoise):
 
 if __name__=="__main__":
 
-    t = ascii.read('/Users/ckilpatrick/Downloads/gemini_data_i/file_list.txt',
+    t = ascii.read('/Users/ckilpatrick/Downloads/FRB20250316A/2025.0323/file_list.txt',
         format='fixed_width')
-    mask = t['TargType']=='sGRB250322A_i_12_22'
+    mask = t['TargType']=='FRB20250316A_r_2_11'
     t = t[mask]
 
     t.sort('File')
 
     global tel
     import importlib
-    module = importlib.import_module('instruments.GMOS')
-    tel = getattr(module, 'GMOS')()
+    module = importlib.import_module('instruments.BINOSPEC')
+    tel = getattr(module, 'BINOSPEC')()
 
     paths={}
-    paths['red']='/Users/ckilpatrick/Downloads/gemini_data_i/red'
-    paths['work']='/Users/ckilpatrick/Downloads/gemini_data_i/workspace'
-    paths['cal']='/Users/ckilpatrick/Downloads/gemini_data_i/red/cals'
+    paths['red']='/Users/ckilpatrick/Downloads/FRB20250316A/2025.032/red'
+    paths['work']='/Users/ckilpatrick/Downloads/FRB20250316A/2025.032/workspace'
+    paths['cal']='/Users/ckilpatrick/Downloads/FRB20250316A/2025.032/red/cals'
     paths['code']=os.path.dirname(sys.argv[0])
 
-    image_proc(t, tel, paths, fieldcenter=None,
-        out_size=4200, cosmic_ray=False, log=None)
+    import glob
+    files = glob.glob('/Users/ckilpatrick/Downloads/FRB20250316A/2025.0323/red/workspace/*_data.fits')
+    aligned_data=[]
+    masks=[]
+    errors=[]
+    for file in files:
+        hdu = fits.open(file)
+        wcs = WCS(hdu[0].header)
+        image = CCDData(hdu[0].data, meta=hdu[0].header, wcs=wcs, 
+            unit=u.electron)
+        aligned_data.append(image)
+        masks.append(hdu['MASK'])
+        errors.append(hdu['ERROR'])
+
+    sci_med = stack_data(aligned_data, tel, masks, errors, log=None)
+
+    #image_proc(t, tel, paths, fieldcenter=None,
+    #    out_size=4200, cosmic_ray=False, log=None)
 
