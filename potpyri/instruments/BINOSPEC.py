@@ -103,9 +103,9 @@ class BINOSPEC(instrument.Instrument):
             data = hdu[x+1].data
             hdr = hdu[x+1].header
 
-            if hdr['CRVAL1']<0:
+            if 'CRVAL1' in hdr.keys() and hdr['CRVAL1']<0:
                 hdr['CRVAL1']=0.0
-            if np.abs(hdr['CRVAL2'])>90:
+            if 'CRVAL2' in hdr.keys() and np.abs(hdr['CRVAL2'])>90:
                 hdr['CRVAL2']=0.0
             if 'PRESSURE' in hdr.keys():
                 del hdr['PRESSURE']
