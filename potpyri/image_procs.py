@@ -598,6 +598,8 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
             sigclip=sigclip, sigfrac=sigfrac, objlim=objlim, niter=niter)
 
         mask_cr = mask_cr.astype(np.uint8) #set cosmic ray mask type
+    else:
+        newdata = copy.copy(data)
 
     mask_cr[mask_cr == 1] = 2 #set cosmic ray flag
 
@@ -688,24 +690,24 @@ def create_error(science_data, mask_data, rdnoise):
 
 if __name__=="__main__":
 
-    t = ascii.read('/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/file_list.txt',
+    t = ascii.read('/Users/ckilpatrick/Downloads/gemini_data_i/file_list.txt',
         format='fixed_width')
-    mask = t['TargType']=='IceCube2_I_1_11'
+    mask = t['TargType']=='sGRB250322A_i_12_22'
     t = t[mask]
 
     t.sort('File')
 
     global tel
     import importlib
-    module = importlib.import_module('instruments.IMACS')
-    tel = getattr(module, 'IMACS')()
+    module = importlib.import_module('instruments.GMOS')
+    tel = getattr(module, 'GMOS')()
 
     paths={}
-    paths['red']='/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/red'
-    paths['work']='/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/red/workspace'
-    paths['cal']='/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/red/cals'
+    paths['red']='/Users/ckilpatrick/Downloads/gemini_data_i/red'
+    paths['work']='/Users/ckilpatrick/Downloads/gemini_data_i/workspace'
+    paths['cal']='/Users/ckilpatrick/Downloads/gemini_data_i/red/cals'
     paths['code']=os.path.dirname(sys.argv[0])
 
     image_proc(t, tel, paths, fieldcenter=None,
-        out_size=4200, log=None)
+        out_size=4200, cosmic_ray=False, log=None)
 
