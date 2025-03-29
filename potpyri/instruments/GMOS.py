@@ -150,8 +150,10 @@ class GMOS(instrument.Instrument):
 
     def import_image(self, filename, amp, log=None):
 
+        binn = "22"
         with fits.open(filename) as hdr:
             header = hdr[0].header
+            binn = self.get_binning(hdr[1].header)
 
         raw = [CCDData.read(filename, hdu=x+1, unit='adu') 
             for x in range(int(amp))]
@@ -166,8 +168,8 @@ class GMOS(instrument.Instrument):
         if header['INSTRUME'] == 'GMOS-S':
             if str(amp) == '12':
                 full = CCDData(np.concatenate(
-                    red[2:4]+[np.zeros([np.shape(red[3])[0],40])]+\
-                    red[4:8]+[np.zeros([np.shape(red[7])[0],40])]+\
+                    red[2:4]+[np.zeros([np.shape(red[3])[0],80/int(binn[0])])]+\
+                    red[4:8]+[np.zeros([np.shape(red[7])[0],80/int(binn[0])])]+\
                     red[8:10],axis=1),
                     header=header,unit=u.electron)
             elif str(amp) == '4':
@@ -176,8 +178,8 @@ class GMOS(instrument.Instrument):
         elif header['INSTRUME'] == 'GMOS-N':
             if str(amp) == '12':
                 full = CCDData(np.concatenate(
-                    red[2:4]+[np.zeros([np.shape(red[3])[0],30])]+\
-                    red[4:8]+[np.zeros([np.shape(red[7])[0],30])]+\
+                    red[2:4]+[np.zeros([np.shape(red[3])[0],60/int(binn[0])])]+\
+                    red[4:8]+[np.zeros([np.shape(red[7])[0],60/int(binn[0])])]+\
                     red[8:10],axis=1),
                     header=header,unit=u.electron)
             elif str(amp) == '4':
@@ -185,5 +187,8 @@ class GMOS(instrument.Instrument):
                     header=header,unit=u.electron)
 
         full.header['SATURATE'] = self.saturation
+
+        # Add header keyword for binning
+        full.header['CCDSUM'] = binn
 
         return(full)

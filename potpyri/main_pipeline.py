@@ -139,6 +139,8 @@ def main_pipeline(instrument:str,
         # a specific input coordinate
         if fieldcenter is None and out_size is None:
             if log: log.info('Solving WCS.')
+            with fits.open(stack) as f:
+                binn = tel.get_binning(f[0].header)
             solve_wcs.solve_astrometry(stack, tel, log=log)
 
         # Photometry and flux calibration
