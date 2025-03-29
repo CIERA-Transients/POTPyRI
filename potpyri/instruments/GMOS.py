@@ -30,7 +30,7 @@ class GMOS(instrument.Instrument):
         self.wcs_extension = 0
 
         # Detector specific characteristics
-        self.pixscale = 0.0803*2
+        self.pixscale = 0.0803
         self.saturation = 65535.0
 
         self.min_exptime = 1.0
@@ -43,6 +43,9 @@ class GMOS(instrument.Instrument):
         # Parameters for handling calibration files
         # Run rejection on possible CR pixels in bias
         self.cr_bias = True 
+
+        # Extend header to first file extension for purposes of sort_files
+        self.extend_header = True
 
         # How to combine images during stacking
         self.stack_method = 'median'
@@ -66,7 +69,7 @@ class GMOS(instrument.Instrument):
         self.exptime_keyword = 'EXPTIME'
         self.filter_keyword = 'FILTER2'
         self.mjd_keyword = 'MJD'
-        self.bin_keyword = '22'
+        self.bin_keyword = 'CCDSUM'
         self.amp_keyword = 'NCCDS'
 
         # File sorting keywords

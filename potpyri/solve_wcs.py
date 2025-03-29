@@ -99,7 +99,7 @@ def clean_up_astrometry(directory, file, exten):
         if os.path.exists(f):
             os.remove(f)
 
-def solve_astrometry(file, tel, radius=0.5, replace=True, 
+def solve_astrometry(file, tel, binn, radius=0.5, replace=True, 
     shift_only=False, log=None):
 
     # Starting solve, print file and directory for reference
@@ -151,7 +151,7 @@ def solve_astrometry(file, tel, radius=0.5, replace=True,
         newfile = fullfile.replace(exten,'.solved.fits')
 
     # Handle pixel scale guess
-    scale = tel.get_pixscale()
+    scale = tel.get_pixscale() * int(binn[0])
     if scale is not None:
         scale = float(scale)
         scale_high = float('%.4f'%(scale * 1.2))
