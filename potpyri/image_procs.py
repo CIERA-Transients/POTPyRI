@@ -101,7 +101,7 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
     aligned_data = []
     for file in reduced_files:
         # Coarse WCS solution using astrometry.net
-        success = solve_wcs.solve_astrometry(file, tel, shift_only=False, 
+        success = solve_wcs.solve_astrometry(file, tel, binn, shift_only=False, 
             log=log)
         if not success: continue
 

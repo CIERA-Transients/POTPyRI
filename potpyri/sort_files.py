@@ -205,6 +205,15 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
             file_open = fits.open(f, mode='readonly')
             ext = tel.raw_header_ext
             hdr = file_open[ext].header
+
+            # Extend header to first extension?
+            if tel.extend_header:
+                if len(hdu)>ext+1:
+                    extra_hdr = file_open[ext+1].header
+                    for key in extra_hdr.keys():
+                        if key not in hdr.keys():
+                            hdr[key] = extra_hdr[key]
+
             check_data = file_open[ext].data
             file_open._verify()
         except IndexError:
