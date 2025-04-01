@@ -351,21 +351,27 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
 
     return(file_table)
 
-
-if __name__=="__main__":
+def test_sort_files(instrument, data_path):
 
     global tel
     import importlib
-    module = importlib.import_module('instruments.IMACS')
-    tel = getattr(module, 'IMACS')()
+    from potpyri import options
 
-    files = glob.glob('/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/raw/*.fits')
-    file_list = '/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/file_list.txt'
+    # import telescope parameter file
+    module = importlib.import_module(f'potpyri.instruments.{instrument.upper()}')
+    tel = getattr(module, instrument.upper())()
 
-    paths={}
-    paths['red']='/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/red'
-    paths['data']='/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS'
-    paths['raw']='/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/raw'
-    paths['bad']='/Users/ckilpatrick/Dropbox/Data/GW/S250206dm/IMACS/bad'
+    # Generate code and data paths based on input path
+    paths = options.add_paths(data_path, tel)
 
-    sort_files(files, file_list, tel, paths, incl_bad=False, log=None)
+    # This contains all of the file data
+    file_list = os.path.join(paths['data'], 'file_list.txt')
+    file_table = handle_files(file_list, tel, paths)
+
+
+if __name__=="__main__":
+    instrument=sys.argv[1]
+    data_path=sys.argv[2]
+
+    # Test basic method with command-line input instrument and data path
+    test_sort_files(instrument, data_path)
