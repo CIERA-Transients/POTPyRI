@@ -167,9 +167,10 @@ class GMOS(instrument.Instrument):
 
         if header['INSTRUME'] == 'GMOS-S':
             if str(amp) == '12':
+                gap = int(80/int(binn[0]))
                 full = CCDData(np.concatenate(
-                    red[2:4]+[np.zeros([np.shape(red[3])[0],80/int(binn[0])])]+\
-                    red[4:8]+[np.zeros([np.shape(red[7])[0],80/int(binn[0])])]+\
+                    red[2:4]+[np.zeros([np.shape(red[3])[0],gap])]+\
+                    red[4:8]+[np.zeros([np.shape(red[7])[0],gap])]+\
                     red[8:10],axis=1),
                     header=header,unit=u.electron)
             elif str(amp) == '4':
@@ -177,9 +178,10 @@ class GMOS(instrument.Instrument):
                     header=header,unit=u.electron)
         elif header['INSTRUME'] == 'GMOS-N':
             if str(amp) == '12':
+                gap = int(60/int(binn[0]))
                 full = CCDData(np.concatenate(
-                    red[2:4]+[np.zeros([np.shape(red[3])[0],60/int(binn[0])])]+\
-                    red[4:8]+[np.zeros([np.shape(red[7])[0],60/int(binn[0])])]+\
+                    red[2:4]+[np.zeros([np.shape(red[3])[0],gap])]+\
+                    red[4:8]+[np.zeros([np.shape(red[7])[0],gap])]+\
                     red[8:10],axis=1),
                     header=header,unit=u.electron)
             elif str(amp) == '4':
