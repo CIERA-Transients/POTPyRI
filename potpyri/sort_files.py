@@ -1,8 +1,8 @@
 "Function to sort files for main_pipeline."
 "Authors: Owen Eskandari, Kerry Paterson, Charlie Kilpatrick"
 
-# Last updated 09/21/2024
-__version__ = "3.0"
+# Last updated 04/01/2025
+__version__ = "3.1"
 
 from astropy.io import fits
 from astropy.io import ascii
@@ -208,7 +208,7 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
 
             # Extend header to first extension?
             if tel.extend_header:
-                if len(hdu)>ext+1:
+                if len(file_open)>ext+1:
                     extra_hdr = file_open[ext+1].header
                     for key in extra_hdr.keys():
                         if key not in hdr.keys():
