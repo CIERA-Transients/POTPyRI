@@ -160,9 +160,10 @@ class Instrument(object):
     def get_staticmask_filename(self, hdr, paths):
 
         instname = self.get_instrument_name(hdr)
+        binn = self.get_binning(hdr)
 
         mask_file = os.path.join(paths['code'], 'data', 'staticmasks', 
-            f'{instname}.staticmask.fits.fz')
+            f'{instname}.{binn}.staticmask.fits.fz')
 
         if os.path.exists(mask_file):
             return([mask_file])
