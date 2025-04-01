@@ -150,7 +150,6 @@ class GMOS(instrument.Instrument):
 
     def import_image(self, filename, amp, log=None):
 
-        binn = "22"
         with fits.open(filename) as hdr:
             header = hdr[0].header
             binn = self.get_binning(hdr[1].header)
