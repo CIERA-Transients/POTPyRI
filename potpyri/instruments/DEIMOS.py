@@ -42,6 +42,9 @@ class DEIMOS(instrument.Instrument):
         # Run rejection on possible CR pixels in bias
         self.cr_bias = True 
 
+        # Extend header to first file extension for purposes of sort_files
+        self.extend_header = False
+
         # How to combine images during stacking
         self.stack_method = 'median'
 
