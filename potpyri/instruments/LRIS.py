@@ -192,6 +192,8 @@ class LRIS(instrument.Instrument):
     def get_exptime(self, hdr):
         if self.exptime_keyword in hdr.keys():
             return(float(hdr[self.exptime_keyword]))
+        elif 'TTIME' in hdr.keys():
+            return(float(hdr['TTIME']))
         else:
             t1 = Time(hdr['DATE-BEG'])
             t2 = Time(hdr['DATE-END'])
