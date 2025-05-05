@@ -110,6 +110,7 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
             hdu = fits.open(file)
             hdu[0].header['RADISP']=0.0
             hdu[0].header['DEDISP']=0.0
+            hdu.writeto(file, overwrite=True)
         else:
             success = solve_wcs.align_to_gaia(file, tel, log=log)
             if not success: continue
