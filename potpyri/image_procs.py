@@ -94,7 +94,7 @@ def generate_wcs(tel, binn, fieldcenter, out_size):
     return(w)
 
 def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None,
-    out_size=None, log=None):
+    out_size=None, skip_gaia=False, log=None):
 
     solved_images = []
     aligned_images = []
@@ -106,8 +106,13 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
         if not success: continue
 
         # Fine WCS solution using Gaia DR3 point sources
-        success = solve_wcs.align_to_gaia(file, tel, log=log)
-        if not success: continue
+        if skip_gaia:
+            hdu = fits.open(file)
+            hdu[0].header['RADISP']=0.0
+            hdu[0].header['DEDISP']=0.0
+        else:
+            success = solve_wcs.align_to_gaia(file, tel, log=log)
+            if not success: continue
 
         solved_images.append(file)
 
@@ -179,7 +184,7 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
 
 def image_proc(image_data, tel, paths, skip_skysub=False, 
     fieldcenter=None, out_size=None, satellites=True, cosmic_ray=True,
-    log=None):
+    skip_gaia=False, log=None):
 
     wavelength = tel.wavelength
 
@@ -275,7 +280,8 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
         use_wcs = None
 
     aligned_images, aligned_data = align_images(reduced_files, paths, tel, binn,
-        use_wcs=use_wcs, fieldcenter=fieldcenter, out_size=out_size, log=log)
+        use_wcs=use_wcs, fieldcenter=fieldcenter, out_size=out_size, 
+        skip_gaia=skip_gaia, log=log)
 
     if aligned_images is None or aligned_data is None:
         return(None)
