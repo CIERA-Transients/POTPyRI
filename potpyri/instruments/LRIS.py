@@ -1,6 +1,6 @@
 # Parameter file for LRIS/Keck
 
-__version__ = "2.0" # Last edited 09/21/2024
+__version__ = "2.1" # Last edited 05/16/2025
 
 import os
 import ccdproc
@@ -143,7 +143,7 @@ class LRIS(instrument.Instrument):
         if instrument == 'LRIS':
             side = 'R'
 
-        ampmode = hdr['AMPMODE'].replace(',','_')
+        ampmode = '_'+hdr['AMPMODE'].replace(',','_').replace(':','_')
 
         fullamp = amp+side+ampmode
 
@@ -159,21 +159,25 @@ class LRIS(instrument.Instrument):
 
     def get_rdnoise(self, hdr):
         amp = self.get_ampl(hdr)
-        if amp=='4B':
+        if amp=='4B_SINGLE_A':
             readnoise = [3.825,3.825,3.825,3.825]
-        if amp=='4R':
+        if amp=='4R_HSPLIT_VSPLIT':
             readnoise = [3.565,3.565,3.565,3.565]
-        if amp=='1R':
+        if amp=='1R_HSPLIT_VUP':
+            readnoise = [4]
+        if amp=='1R_HSPLIT_VSPLIT':
             readnoise = [4]
         return(readnoise)
 
     def get_gain(self, hdr):
         amp = self.get_ampl(hdr)
-        if  amp=='4B':
+        if  amp=='4B_SINGLE_A':
             gains = [1.55,1.56,1.63,1.70]
-        if amp=='4R':
+        if amp=='4R_HSPLIT_VSPLIT':
             gains = [1.71,1.64,1.61,1.67]
-        if amp=='1R':
+        if amp=='1R_HSPLIT_VUP':
+            gains = [1]
+        if amp=='1R_HSPLIT_VSPLIT':
             gains = [1]
         return(gains)
 
@@ -181,11 +185,17 @@ class LRIS(instrument.Instrument):
         amp = self.get_ampl(hdr)
         binn = int(self.get_binning(hdr)[0])
 
-        if amp=='4B':
+        if amp=='4B_SINGLE_A':
             oscan_reg = '[1:50,1:4096]'
-        if amp=='4R':
+        if amp=='4R_HSPLIT_VSPLIT':
             oscan_reg = '[1:7,1:2520]'
-        if amp=='1R':
+        if amp=='1R_HSPLIT_VUP':
+            b1=int(2065./binn)
+            b2=int(2170./binn)
+            b3=np.max([int(1./binn),1])
+            b4=int(4248./binn)
+            oscan_reg = f'[{b1}:{b2},{b3}:{b4}]'
+        if amp=='1R_HSPLIT_VSPLIT':
             b1=int(2065./binn)
             b2=int(2170./binn)
             b3=np.max([int(1./binn),1])
@@ -241,14 +251,14 @@ class LRIS(instrument.Instrument):
         readnoises = self.get_rdnoise(header)
         oscan_reg = self.get_overscan(header)
 
-        if amp=='1R':
+        if amp=='1R_HSPLIT_VUP' or amp=='1R_HSPLIT_VSPLIT':
             raw = [CCDData.read(filename, hdu=0, unit='adu')]
             red = [ccdproc.ccd_process(x, oscan=oscan_reg, 
                 oscan_model=models.Chebyshev1D(3), 
                 gain=gains[j]*u.electron/u.adu, 
                 readnoise=readnoises[j]*u.electron) 
                 for j,x in enumerate(raw)]
-        elif amp=='4B' or amp=='4R':
+        elif amp=='4B_SINGLE_A' or amp=='4R_HSPLIT_VSPLIT':
             raw = []
             hdu = fits.open(filename)
             for x in range(int(amp[0])):
@@ -262,16 +272,15 @@ class LRIS(instrument.Instrument):
                 readnoise=readnoises[j]*u.electron) 
                 for j,x in enumerate(raw)]
 
-        if amp=='1R':
+        if amp=='1R_HSPLIT_VUP' or amp=='1R_HSPLIT_VSPLIT':
             bin1,bin2 = header['BINNING'].split(',')
             bin1 = float(bin1) ; bin2=float(bin2)
-            ampmode = header['AMPMODE']
-            if ampmode=='HSPLIT,VUP':
+            if amp=='1R_HSPLIT_VUP':
                 full = CCDData(np.concatenate(
                         [red[0][self.get_1R_datasec(1, binning=bin1)],
                          red[0][self.get_1R_datasec(2, binning=bin1)]],
                         axis=0),header=header,unit=u.electron)
-            elif ampmode=='HSPLIT,VSPLIT':
+            elif amp=='1R_HSPLIT_VSPLIT':
                 full = CCDData(np.concatenate([np.concatenate(
                         [red[0][self.get_1R_datasec(1, binning=bin1)],
                          red[0][self.get_1R_datasec(2, binning=bin1)]],axis=1),
@@ -280,15 +289,15 @@ class LRIS(instrument.Instrument):
                          red[0][self.get_1R_datasec(4, binning=bin2)]],axis=1)],
                         axis=0),header=header,unit=u.electron)
             else:
-                raise Exception(f'Do not recognize LRISr ampmode {ampmode}')
-        elif amp=='4B':
+                raise Exception(f'Do not recognize LRISr amp {amp}')
+        elif amp=='4B_SINGLE_A':
             full = CCDData(np.concatenate([red[0],
                             np.fliplr(red[1]),
                             np.zeros([np.shape(red[1])[0],111]),
                             red[2],np.fliplr(red[3])],axis=1),
                             header=header,unit=u.electron)
             full = ccdproc.trim_image(full[700:3120,396:3940])
-        elif amp=='4R':
+        elif amp=='4R_HSPLIT_VSPLIT':
             full = CCDData(np.concatenate([red[1],
                         np.fliplr(red[0]),
                         np.zeros([np.shape(red[0])[0],200]),
