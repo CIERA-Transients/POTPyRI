@@ -220,6 +220,13 @@ class LRIS(instrument.Instrument):
             elif amp==4:
                 return(np.s_[1152:1784,1177:2069])
 
+    def get_2R_datasec(self, amp, binning=1):
+        if binning==1:
+            if amp==1:
+                return(np.s_[830:3336,284:2064])
+            elif amp==2:
+                return(np.s_[830:3336,2170:3956])
+
     def import_image(self, filename, amp, log=None):
 
         with fits.open(filename) as hdr:
@@ -253,13 +260,22 @@ class LRIS(instrument.Instrument):
         if amp=='1R':
             bin1,bin2 = header['BINNING'].split(',')
             bin1 = float(bin1) ; bin2=float(bin2)
-            full = CCDData(np.concatenate([np.concatenate(
-                    [red[0][self.get_1R_datasec(1, binning=bin1)],
-                     red[0][self.get_1R_datasec(2, binning=bin1)]],axis=1),
-                    np.concatenate(
-                    [red[0][self.get_1R_datasec(3, binning=bin2)],
-                     red[0][self.get_1R_datasec(4, binning=bin2)]],axis=1)],
-                    axis=0),header=header,unit=u.electron)
+            ampmode = header['AMPMODE']
+            if ampmode=='HSPLIT,VUP':
+                full = CCDData(np.concatenate(
+                        [red[0][self.get_1R_datasec(1, binning=bin1)],
+                         red[0][self.get_1R_datasec(2, binning=bin1)]],
+                        axis=0),header=header,unit=u.electron)
+            elif ampmode=='HSPLIT,VSPLIT':
+                full = CCDData(np.concatenate([np.concatenate(
+                        [red[0][self.get_1R_datasec(1, binning=bin1)],
+                         red[0][self.get_1R_datasec(2, binning=bin1)]],axis=1),
+                        np.concatenate(
+                        [red[0][self.get_1R_datasec(3, binning=bin2)],
+                         red[0][self.get_1R_datasec(4, binning=bin2)]],axis=1)],
+                        axis=0),header=header,unit=u.electron)
+            else:
+                raise Exception(f'Do not recognize LRISr ampmode {ampmode}')
         elif amp=='4B':
             full = CCDData(np.concatenate([red[0],
                             np.fliplr(red[1]),
