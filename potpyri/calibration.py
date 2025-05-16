@@ -22,8 +22,8 @@ def do_bias(bias_table, tel, paths, log=None):
         cal_table = bias_table[mask]
         
         bias_num += 1
-        amp = cal_type.split('_')[0]
-        binn = cal_type.split('_')[1]
+        amp = cal_table['Amp'][0]
+        binn = cal_table['Binning'][0]
 
         bias_name = tel.get_mbias_name(paths, amp, binn)
         
@@ -53,9 +53,9 @@ def do_dark(dark_table, tel, paths, log=None):
         mask = dark_table['CalType']==cal_type
         cal_table = dark_table[mask]
             
-        exp = cal_type.split('_')[0]
-        amp = cal_type.split('_')[1]
-        binn = cal_type.split('_')[2]
+        exp = cal_table['Exp'][0]
+        amp = cal_table['Amp'][0]
+        binn = cal_table['Binning'][0]
 
         dark_name = tel.get_mdark_name(paths, amp, binn)
 
@@ -89,10 +89,11 @@ def do_flat(flat_table, tel, paths, log=None):
         mask = flat_table['CalType']==cal_type
         cal_table = flat_table[mask]
 
-        fil = flat_table[mask]['Filter'][0]
-        amp = flat_table[mask]['Amp'][0]
-        binn = flat_table[mask]['Binning'][0]
-        is_science = np.any([f=='SCIENCE' for f in flat_table[mask]['Type']])
+        fil = cal_table['Filter'][0]
+        amp = cal_table['Amp'][0]
+        binn = cal_table['Binning'][0]
+
+        is_science = np.any([f=='SCIENCE' for f in cal_table['Type']])
 
         flat_name = tel.get_mflat_name(paths, fil, amp, binn)
 

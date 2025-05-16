@@ -277,8 +277,8 @@ class LRIS(instrument.Instrument):
             bin1 = float(bin1) ; bin2=float(bin2)
             if amp=='1R_HSPLIT_VUP':
                 full = CCDData(np.concatenate(
-                        [red[0][self.get_1R_datasec(1, binning=bin1)],
-                         red[0][self.get_1R_datasec(2, binning=bin1)]],
+                        [red[0][self.get_2R_datasec(1, binning=bin1)],
+                         red[0][self.get_2R_datasec(2, binning=bin1)]],
                         axis=0),header=header,unit=u.electron)
             elif amp=='1R_HSPLIT_VSPLIT':
                 full = CCDData(np.concatenate([np.concatenate(
