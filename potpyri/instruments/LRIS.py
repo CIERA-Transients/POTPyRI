@@ -142,7 +142,12 @@ class LRIS(instrument.Instrument):
             side = 'B'
         if instrument == 'LRIS':
             side = 'R'
-        return(amp+side)
+
+        ampmode = hdr['AMPMODE'].replace(',','_')
+
+        fullamp = amp+side+ampmode
+
+        return(fullamp)
 
     def get_binning(self, header):
         if self.bin_keyword in header.keys():
