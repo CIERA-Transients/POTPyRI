@@ -241,6 +241,11 @@ class LRIS(instrument.Instrument):
                 return(np.s_[830:3336,284:2064])
             elif amp==2:
                 return(np.s_[830:3336,2170:3956])
+        elif binning==2:
+            if amp==1:
+                return(np.s_[437:1784,146:1032])
+            elif amp==2:
+                return(np.s_[437:1784,1177:2069])
 
     def import_image(self, filename, amp, log=None):
 
@@ -276,10 +281,11 @@ class LRIS(instrument.Instrument):
             bin1,bin2 = header['BINNING'].split(',')
             bin1 = float(bin1) ; bin2=float(bin2)
             if amp=='1R_HSPLIT_VUP':
-                full = CCDData(np.concatenate(
+                full = CCDData(
+                        np.concatenate(
                         [red[0][self.get_2R_datasec(1, binning=bin1)],
-                         red[0][self.get_2R_datasec(2, binning=bin1)]],
-                        axis=1),header=header,unit=u.electron)
+                         red[0][self.get_2R_datasec(2, binning=bin1)]], axis=1),
+                            header=header,unit=u.electron)
             elif amp=='1R_HSPLIT_VSPLIT':
                 full = CCDData(np.concatenate([np.concatenate(
                         [red[0][self.get_1R_datasec(1, binning=bin1)],
