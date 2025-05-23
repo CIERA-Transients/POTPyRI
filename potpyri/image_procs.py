@@ -101,8 +101,8 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
     aligned_data = []
     for file in reduced_files:
         # Coarse WCS solution using astrometry.net
-        success = solve_wcs.solve_astrometry(file, tel, binn, shift_only=False, 
-            log=log)
+        success = solve_wcs.solve_astrometry(file, tel, binn, paths, 
+            shift_only=False, log=log)
         if not success: continue
 
         # Fine WCS solution using Gaia DR3 point sources
