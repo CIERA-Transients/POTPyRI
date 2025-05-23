@@ -142,7 +142,7 @@ def main_pipeline(instrument:str,
             if log: log.info('Solving WCS.')
             with fits.open(stack) as f:
                 binn = tel.get_binning(f[0].header)
-            solve_wcs.solve_astrometry(stack, tel, binn, log=log)
+            solve_wcs.solve_astrometry(stack, tel, binn, paths, log=log)
 
         # Photometry and flux calibration
         if log: log.info('Running psf photometry loop for zero point.')

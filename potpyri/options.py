@@ -134,6 +134,11 @@ def add_paths(data_path, tel):
     paths['log']=os.path.join(data_path, 'red', 'log')
     paths['cal']=os.path.join(data_path, 'red', 'cals')
     paths['work']=os.path.join(data_path, 'red', 'workspace')
+
+    p=subprocess.run(['which','sex'], capture_output=True)
+
+    paths['source_extractor']=p.stdout.decode().strip()
+    
     for key in paths.keys():
         if key in ['caldb']: continue
         if not os.path.exists(paths[key]): os.makedirs(paths[key])

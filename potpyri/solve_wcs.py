@@ -99,7 +99,7 @@ def clean_up_astrometry(directory, file, exten):
         if os.path.exists(f):
             os.remove(f)
 
-def solve_astrometry(file, tel, binn, radius=0.5, replace=True, 
+def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True, 
     shift_only=False, log=None):
 
     # Starting solve, print file and directory for reference
@@ -176,7 +176,9 @@ def solve_astrometry(file, tel, binn, radius=0.5, replace=True,
     data = p.stdout.decode().lower()
 
     if '--use-source-extractor' in data:
+        source_extractor_path = paths['source_extractor']
         args += '--use-source-extractor '
+        args += f'--source-extractor-path {source_extractor_path} '
     elif '--use-sextractor' in data:
         args += '--use-sextractor '
 
