@@ -83,5 +83,13 @@ where = ["."]
 include = ["potpyri*"]
 namespaces = false
 
+[tool.setuptools.package-data]
+potpyri = ["data/staticmasks/*.fz", "config/*", "data/cal/*/*.fz"]
+
+[project.scripts]
+main_pipeline = "potpyri.main_pipeline:main"
+download_anet_index = "potpyri.archives.download_anet_index:main"
+download_keck_data = "potpyri.archives.download_keck_data:main"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
