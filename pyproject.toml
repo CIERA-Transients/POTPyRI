@@ -55,11 +55,10 @@ dependencies = [
     "matplotlib",
     "numpy",
     "photutils",
-    "progressbar33",
+    "progressbar",
     "pykoa",
-    "Requests",
+    "requests",
     "scipy",
-    "setuptools",
     { conda = "astrometry" }, 
     { conda = "astromatic-source-extractor" }
 ]
