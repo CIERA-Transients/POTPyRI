@@ -128,17 +128,12 @@ def add_paths(data_path, tel):
     paths['code']=os.path.split(paths['abspath'])[0]
     paths['config']=os.path.join(paths['code'], 'config')
     paths['caldb']=os.path.join(paths['code'], 'data', 'cal', tel.name.upper())
-    paths['raw']=os.path.join(data_path, 'raw') #path containing the raw data
-    paths['bad']=os.path.join(data_path, 'bad') #path containing the unused data
-    paths['red']=os.path.join(data_path, 'red') #path to write the reduced files
-    paths['log']=os.path.join(data_path, 'red', 'log')
-    paths['cal']=os.path.join(data_path, 'red', 'cals')
-    paths['work']=os.path.join(data_path, 'red', 'workspace')
-
-    p=subprocess.run(['which','sex'], capture_output=True)
-
-    paths['source_extractor']=p.stdout.decode().strip()
-    
+    paths['raw']=os.path.join(paths['data'], 'raw') #path containing the raw data
+    paths['bad']=os.path.join(paths['data'], 'bad') #path containing the unused data
+    paths['red']=os.path.join(paths['data'], 'red') #path to write the reduced files
+    paths['log']=os.path.join(paths['data'], 'red', 'log')
+    paths['cal']=os.path.join(paths['data'], 'red', 'cals')
+    paths['work']=os.path.join(paths['data'], 'red', 'workspace')
     for key in paths.keys():
         if key in ['caldb']: continue
         if not os.path.exists(paths[key]): os.makedirs(paths[key])
