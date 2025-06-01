@@ -7,11 +7,11 @@ from astropy.time import Time
 from astropy.table import Table
 from astropy.table import Column
 
-def login(cookie='/Users/ckilpatrick/.tapcookie'):
-    if not os.path.exists(cookie):
+def login(cookie=None):
+    if cookie and os.path.isfile(cookie):
         Koa.login(cookie)
 
-def date_query(date, instr, form='ipac', cookie='/Users/ckilpatrick/.tapcookie'):
+def date_query(date, instr, form='ipac', cookie=None):
     t = Time(date)
     outdir = t.datetime.strftime('%Y%m%d')
     if not os.path.exists(outdir):
@@ -26,7 +26,7 @@ def date_query(date, instr, form='ipac', cookie='/Users/ckilpatrick/.tapcookie')
     else:
         return(None, None)
 
-def download_data(recfile, outdir, form='ipac', cookie='/Users/ckilpatrick/.tapcookie'):
+def download_data(recfile, outdir, form='ipac', cookie=None):
     Koa.download(recfile, form, outdir, cookiepath=cookie)
 
 def add_options():

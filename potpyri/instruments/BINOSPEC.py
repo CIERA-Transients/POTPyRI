@@ -91,6 +91,12 @@ class BINOSPEC(instrument.Instrument):
 
         self.out_size = 5000
 
+    def raw_format(self, proc):
+        if proc:
+            return('sci_img_*proc.fits*')
+        else:
+            return('sci_img*[!proc].fits*')
+
     # Get a unique image number that can be derived only from the file header
     def get_number(self, hdr):
         datestr = hdr['DATE-OBS']
