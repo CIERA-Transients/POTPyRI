@@ -138,6 +138,9 @@ def add_paths(data_path, tel):
         if key in ['caldb']: continue
         if not os.path.exists(paths[key]): os.makedirs(paths[key])
 
+    p=subprocess.run(['which','sex'], capture_output=True)
+    paths['source_extractor']=p.stdout.decode().strip()
+
     # Copy config directory to data path
     if not os.path.exists(os.path.join(paths['data'], 'config')):
         shutil.copytree(paths['config'], os.path.join(paths['data'], 'config'))
