@@ -42,7 +42,7 @@ def add_options():
     args = params.parse_args()
     return(args)
 
-if __name__=="__main__":
+def main():
     args = add_options()
 
     if args.cookie_file is not None:
@@ -52,3 +52,5 @@ if __name__=="__main__":
     if outfile is not None:
         download_data(outfile, outdir, cookie=args.cookie_file)
 
+if __name__=="__main__":
+    main()
