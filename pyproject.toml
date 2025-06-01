@@ -59,6 +59,10 @@ dependencies = [
     "scipy"
 ]
 
+[tool.conda-lock.dependencies]
+astrometry = ">=0.1"
+astromatic-source-extractor = ">=1.0"
+
 [project.optional-dependencies]
 test = ["pytest", "pytest-cov", "requests"]
 docs = ["sphinx==8.1.3", "nbsphinx", "sphinx-astropy", "pandoc", "sphinx-multiversion", "sphinxawesome-theme"]
