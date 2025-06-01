@@ -224,6 +224,8 @@ class absphot(object):
             metadata['ZPTNSTAR']=len(flux)
             metadata['ZPTMAG']=zpt
             metadata['ZPTMUCER']=zpterr
+            metadata['ZPTCAT']=catalog
+            metadata['ZPTPHOT']=phottable
 
             # Add limiting magnitudes
             if 'FWHM' in header.keys() and 'SKYSIG' in header.keys():
