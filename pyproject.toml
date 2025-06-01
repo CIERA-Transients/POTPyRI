@@ -1,0 +1,87 @@
+# Guide (user-friendly):
+# https://packaging.python.org/en/latest/guides/writing-pyproject-toml/
+
+# Specification (technical, formal):
+# https://packaging.python.org/en/latest/specifications/pyproject-toml/
+
+
+# Choosing a build backend:
+# https://packaging.python.org/en/latest/tutorials/packaging-projects/#choosing-a-build-backend
+[build-system]
+requires = ["setuptools>=38.3.0", "wheel", "setuptools_scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+version_file = "hst123/_version.py"
+version_scheme = "post-release"
+local_scheme = "no-local"
+
+
+[project]
+name = "POTPyRI"
+dynamic = ["version"]
+description = "Data reduction pipeline for imaging from large aperture telescopes."
+readme = "README.md"
+requires-python = ">=3.10.0"
+license = {file = "LICENSE.txt"}
+
+authors = [
+  {name = "Kerry Paterson", email = "paterson@mpia.de" },
+  {name = "Owen Eskandari", email = "oeskandari@wisc.edu" },
+  {name = "Charlie Kilpatrick", email = "ckilpatrick@northwestern.edu" }
+]
+
+maintainers = [
+  {name = "Charlie Kilpatrick", email = "ckilpatrick@northwestern.edu" }
+]
+
+classifiers = [
+  "Development Status :: 1 - Planning",
+  "Topic :: Scientific/Engineering :: Astronomy",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3 :: Only",
+]
+
+[tool.unidep]
+channels = ["conda-forge"]
+dependencies = [
+    "acstools",
+    "astropy",
+    "astroquery",
+    "beautifulsoup4",
+    "ccdproc",
+    "matplotlib",
+    "numpy",
+    "photutils",
+    "progressbar33",
+    "pykoa",
+    "Requests",
+    "scipy",
+    "setuptools",
+    { conda = "astrometry" }, 
+    { conda = "astromatic-source-extractor" }
+]
+platforms = [
+    "linux-64"
+]
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-cov", "requests"]
+docs = ["sphinx==8.1.3", "nbsphinx", "sphinx-astropy", "pandoc", "sphinx-multiversion", "sphinxawesome-theme"]
+
+[project.urls]
+"Documentation" = "https://CIERA-Transients.github.io/POTPyRI/"
+"Source" = "https://github.com/CIERA-Transients/POTPyRI"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["potpyri*"]
+namespaces = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
