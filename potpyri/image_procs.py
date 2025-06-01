@@ -369,6 +369,15 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
     eff_time = np.sum(exptimes**2)/np.sum(exptimes)
     total_time = np.sum(exptimes)
 
+    # Rescale both data and error images by effective exposure times so they 
+    # are in e- instead of e-/s
+    sci_med[0].data = sci_med[0].data * eff_time
+    sci_med[2].data = sci_med[2].data * eff_time
+
+    # Explicitly note that data and error extensions are in ELECTRONS
+    sci_med[0].header['BUNIT'] = 'ELECTRONS'
+    sci_med[2].header['BUNIT'] = 'ELECTRONS'
+
     # Add both formats for code that requires either
     sci_med[0].header['MJD-OBS'] = (mid_time, 
         'Mid-MJD of the observation sequence.')
