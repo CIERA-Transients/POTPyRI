@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 """
 Automatic generalized pipeline for imaging reduction. Creates coadded images 
 for each target.  Files are automatically sorted and categorized based on 
