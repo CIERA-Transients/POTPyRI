@@ -14,7 +14,7 @@ If you use this code, please reference Paterson et al. (in prep.)
 
 The recommended installation is via conda and pip.  First create a conda environment:
 
-```conda create -n potpyri python=3.11 cython numpy```
+```conda create -n potpyri python=3.12```
 
 Then to install POTPyRI, run:
 
@@ -25,14 +25,16 @@ pip install git+https://github.com/CIERA-Transients/POTPyRI.git@dev
 
 which will install the remaining dependencies from the requirements.txt file.
 
-### External Dependencies
+### Non-Python Dependencies
 
-POTPyRI has two external dependencies: `astrometry.net` and `source extractor`.  It is recommended that you install them via Homebrew on Mac OS systems or via `apt-get` on Ubuntu/Linux systems.  They are also available via the following Github repositories:
+POTPyRI has two non-python dependencies: `astrometry.net` and `source extractor`.  The package file will install these dependencies on `linux-64` and `osx-64` environments for which there are working conda repositories.  On newer Mac OS systems (`osx-arm64`), conda will not be able to install these packages and they must be built manually.  The recommended installation method is with Homebrew (https://brew.sh/) via:
 
-https://github.com/dstndstn/astrometry.net
-https://github.com/astromatic/sextractor
+```
+brew install sextractor
+brew install astrometry-net
+```
 
-Note that for `astrometry.net`, index files are required.  There is a utility script in POTPyRI that will attempt to install the latest index files.  Once you have successfully installed `astrometry.net` in your path, run:
+Finally, note that for `astrometry.net`, index files are required.  There is a utility script in POTPyRI that will attempt to install the latest index files.  Once you have successfully installed `astrometry.net` in your path, run:
 
 ```
 download_anet_index
@@ -40,12 +42,15 @@ download_anet_index
 
 ## Supported Instruments
 
-- GMOS (Gemini)
-- MOSFIRE (Keck)
-- MMIRS (MMT)
 - BINOSPEC (MMT)
-- LRIS (Keck)
 - DEIMOS (Keck)
+- Flamingos2 (Gemini)
+- FourStar (Magellan)
+- GMOS (Gemini)
+- IMACS (Magellan)
+- LRIS (Keck)
+- MMIRS (MMT)
+- MOSFIRE (Keck)
 
 ## Running
 
