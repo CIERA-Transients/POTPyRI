@@ -1,0 +1,27 @@
+/* Remove divider lines between API entries */
+dl.py dd {
+    border-top: none !important;
+}
+
+dl.py > dt {
+    border-top: none !important;
+    border-bottom: none !important;
+}
+
+/* Make text in code blocks semi-bold */
+.highlight {
+    font-weight: 500; /* Semi-bold */
+}
+
+/* Optional: Ensure pre-formatted text is also semi-bold */
+pre {
+    font-weight: 500; /* Semi-bold */
+}
+
+.scrollable-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    max-width: 100%;
+    border: 1px solid #ccc;
+}
