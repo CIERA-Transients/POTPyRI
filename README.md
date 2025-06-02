@@ -1,5 +1,9 @@
 # POTPyRI: Pipeline for Optical/infrared Telescopes in Python for Reducing Images
 
+[![GitHub Actions](https://github.com/CIERA-Transients/POTPyRI/actions/workflows/build-test.yml/badge.svg)](https://github.com/CIERA-Transients/POTPyRI/actions/workflows/build-test.yml)
+[![Docs](https://img.shields.io/badge/docs-latest-blue)](https://ciera-transients.github.io/POTPyRI/)
+
+
 Data reduction pipeline for imaging from large aperture telescopes
 
 ## Usage
