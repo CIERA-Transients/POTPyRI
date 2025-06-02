@@ -2,11 +2,13 @@ from potpyri import main_pipeline
 from potpyri import options
 from potpyri import logger
 from potpyri import sort_files
+
 import numpy as np
-from tests.utils import download_github_file
 import astropy.utils.data
 import importlib
 import os
+
+from tests.utils import download_github_file
 
 def test_potpyri_sort(tmp_path):
 
