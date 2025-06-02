@@ -9,8 +9,8 @@ import copy
 import ccdproc
 import numpy as np
 
-from photutils import Background2D
-from photutils import MeanBackground
+from photutils.background import Background2D
+from photutils.background import MeanBackground
 
 import astropy.units as u
 from astropy.io import fits
