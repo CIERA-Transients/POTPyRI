@@ -21,7 +21,7 @@ BOLD_SEQ = "\033[1m"
 
 def get_log(log_dir):
 
-    datestr = datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+    datestr = datetime.datetime.now(datetime.UTC).strftime('%Y%m%d_%H%M%S')
     base_logname = f'log_{datestr}.log'
     log_filename = os.path.join(log_dir, base_logname)
     log = ColoredLogger(log_filename)
