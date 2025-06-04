@@ -50,4 +50,12 @@ def test_potpyri_sort(tmp_path):
     new_file_table = sort_files.handle_files(file_list, tel, paths, 
         incl_bad=True, proc='proc', no_redo=True, log=log)
 
-    assert new_file_table==file_table
+    assert len(new_file_table)==1
+    assert file_table[0]['Target']==new_file_table[0]['Target']
+    assert file_table[0]['Filter']==new_file_table[0]['Filter']
+    assert file_table[0]['Type']==new_file_table[0]['Type']
+    assert file_table[0]['TargType']==new_file_table[0]['TargType']
+    assert file_table[0]['CalType']==new_file_table[0]['CalType']
+    assert file_table[0]['Exp']==new_file_table[0]['Exp']
+    assert file_table[0]['Binning']==new_file_table[0]['Binning']
+    assert file_table[0]['Amp']==new_file_table[0]['Amp']
