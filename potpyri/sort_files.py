@@ -128,6 +128,18 @@ def handle_files(file_list, tel, paths, incl_bad=False, proc=None,
     if os.path.exists(file_list): 
         if no_redo:
             file_table = ascii.read(file_list, format='fixed_width')
+
+            # Explicitly set column data types
+            file_table['Target'].data = file_table['Target'].data.astype(str)
+            file_table['TargType'].data = file_table['TargType'].data.astype(str)
+            file_table['Filter'].data = file_table['Filter'].data.astype(str)
+            file_table['Amp'].data = file_table['Amp'].data.astype(str)
+            file_table['Binning'].data = file_table['Binning'].data.astype(str)
+            file_table['Exp'].data = file_table['Exp'].data.astype(str)
+            file_table['Type'].data = file_table['Type'].data.astype(str)
+            file_table['CalType'].data = file_table['CalType'].data.astype(str)
+            file_table['Time'].data = file_table['Time'].data.astype(np.float64)
+
             return(file_table)
         else:
             os.remove(file_list)

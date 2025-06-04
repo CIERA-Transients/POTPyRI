@@ -17,7 +17,6 @@ def test_potpyri_sort(tmp_path):
     git_file_path = 'Binospec/raw/sci_img_2024.0812.034220_proc.fits.fz'
     file_path = download_github_file(git_file_path, use_cached=True)
 
-    print(file_path)
     data_path, basefile = os.path.split(file_path)
 
     instrument = 'BINOSPEC'
