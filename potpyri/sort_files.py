@@ -130,15 +130,15 @@ def handle_files(file_list, tel, paths, incl_bad=False, proc=None,
             file_table = ascii.read(file_list, format='fixed_width')
 
             # Explicitly set column data types
-            file_table['Target'].data = file_table['Target'].data.astype(str)
-            file_table['TargType'].data = file_table['TargType'].data.astype(str)
-            file_table['Filter'].data = file_table['Filter'].data.astype(str)
-            file_table['Amp'].data = file_table['Amp'].data.astype(str)
-            file_table['Binning'].data = file_table['Binning'].data.astype(str)
-            file_table['Exp'].data = file_table['Exp'].data.astype(str)
-            file_table['Type'].data = file_table['Type'].data.astype(str)
-            file_table['CalType'].data = file_table['CalType'].data.astype(str)
-            file_table['Time'].data = file_table['Time'].data.astype(np.float64)
+            file_table['Target'] = file_table['Target'].astype(str)
+            file_table['TargType'] = file_table['TargType'].astype(str)
+            file_table['Filter'] = file_table['Filter'].astype(str)
+            file_table['Amp'] = file_table['Amp'].astype(str)
+            file_table['Binning'] = file_table['Binning'].astype(str)
+            file_table['Exp'] = file_table['Exp'].astype(str)
+            file_table['Type'] = file_table['Type'].astype(str)
+            file_table['CalType'] = file_table['CalType'].astype(str)
+            file_table['Time'] = file_table['Time'].astype(np.float64)
 
             return(file_table)
         else:
