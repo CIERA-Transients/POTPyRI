@@ -127,7 +127,7 @@ def handle_files(file_list, tel, paths, incl_bad=False, proc=None,
     # Always regenerate file list from existing data in data, raw, and bad
     if os.path.exists(file_list): 
         if no_redo:
-            file_table = Table.read(file_list, format='ascii.ecsv')
+            file_table = ascii.read(file_list, format='fixed_width')
             return(file_table)
         else:
             os.remove(file_list)
