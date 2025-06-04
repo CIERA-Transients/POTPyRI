@@ -46,3 +46,9 @@ def test_potpyri_sort(tmp_path):
     assert file_table[0]['Exp']=="120.0"
     assert file_table[0]['Binning']=="11"
     assert file_table[0]['Amp']=="2"
+
+    # Test the no_redo flag
+    new_file_table = sort_files.handle_files(file_list, tel, paths, 
+        incl_bad=True, proc='proc', no_redo=True, log=log)
+
+    assert new_file_table==file_table
