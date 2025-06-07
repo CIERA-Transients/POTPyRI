@@ -1,7 +1,7 @@
-from potpyri import main_pipeline
-from potpyri import options
-from potpyri import logger
-from potpyri import sort_files
+from potpyri.scripts import main_pipeline
+from potpyri.utils import options
+from potpyri.utils import logger
+from potpyri.stages import sort_files
 
 import numpy as np
 import astropy.utils.data
