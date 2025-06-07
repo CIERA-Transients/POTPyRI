@@ -12,20 +12,15 @@ from tests.utils import download_github_file
 
 def test_potpyri_sort(tmp_path):
 
+    instrument = 'BINOSPEC'
+
     # Science file (just tellurics)
     cache_dir = astropy.utils.data._get_download_cache_loc()
     git_file_path = 'Binospec/raw/sci_img_2024.0812.034220_proc.fits.fz'
     file_path = download_github_file(git_file_path, use_cached=True)
 
     data_path, basefile = os.path.split(file_path)
-
-    instrument = 'BINOSPEC'
-
-    module = importlib.import_module(f'potpyri.instruments.{instrument.upper()}')
-    tel = getattr(module, instrument.upper())()
-
-    # Generate code and data paths based on input path
-    paths = options.add_paths(data_path, tel)
+    paths, tel = options.initialize_telescope(instrument, data_path)
 
     # Generate log file in corresponding directory for log
     log = logger.get_log(paths['log'])

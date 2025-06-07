@@ -5,11 +5,12 @@
 __version__ = "1.0"
 
 import os
+import importlib
 import shutil
 import sys
 import subprocess
 
-def add_options():
+def init_options():
     import argparse
     params = argparse.ArgumentParser(description='Path of data.')
     params.add_argument('instrument', 
@@ -88,6 +89,11 @@ def add_options():
         action='store_true',
         help='Tell the pipeline to skip Gaia alignment during WCS.')
 
+    return(params)
+
+
+def add_options():
+    params = init_options()
     args = params.parse_args()
 
     # Handle/parse options
@@ -146,3 +152,14 @@ def add_paths(data_path, tel):
         shutil.copytree(paths['config'], os.path.join(paths['data'], 'config'))
 
     return(paths)
+
+def initialize_telescope(instrument, data_path):
+
+    module = importlib.import_module(f'potpyri.instruments.{instrument.upper()}')
+    tel = getattr(module, instrument.upper())()
+
+    # Generate code and data paths based on input path
+    paths = add_paths(data_path, tel)
+
+    return(paths, tel)
+

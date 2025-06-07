@@ -14,6 +14,18 @@ def do_bias(bias_table, tel, paths, log=None):
 
     # Exit if telescope does not require bias
     if not tel.bias:
+        if log:
+            log.info('No bias is required.')
+        else:
+            print('No bias is required.')
+        return(None)
+
+    # Exit if bias_table has no images
+    if len(bias_table)==0:
+        if log:
+            log.info('No bias images were provided for this setup.')
+        else:
+            print('No bias images were provided for this setup.')
         return(None)
 
     bias_num = 0
@@ -47,6 +59,14 @@ def do_dark(dark_table, tel, paths, log=None):
 
     # Exit if telescope does not require dark
     if not tel.dark:
+        return(None)
+
+    # Exit if dark_table has no images
+    if len(dark_table)==0:
+        if log:
+            log.info('No dark images were provided for this setup.')
+        else:
+            print('No dark images were provided for this setup.')
         return(None)
 
     for cal_type in np.unique(dark_table['CalType']):
@@ -83,6 +103,14 @@ def do_flat(flat_table, tel, paths, log=None):
 
     # Exit if telescope does not require dark
     if not tel.flat:
+        return(None)
+
+    # Exit if flat_table has no images
+    if len(flat_table)==0:
+        if log:
+            log.info('No flat images were provided for this setup.')
+        else:
+            print('No flat images were provided for this setup.')
         return(None)
 
     for cal_type in np.unique(flat_table['CalType']):
