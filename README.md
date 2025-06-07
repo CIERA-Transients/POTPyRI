@@ -14,7 +14,7 @@ If you use this code, please reference Paterson et al. (in prep.)
 
 The recommended installation is via conda and pip.  First create a conda environment:
 
-```conda create -n potpyri python=3.12```
+```conda create -n potpyri python=3.12 pip-tools```
 
 Then to install POTPyRI, run:
 
