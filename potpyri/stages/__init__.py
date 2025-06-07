@@ -1,7 +1,7 @@
-from .absphot import *
-from .calibration import *
-from .image_procs import *
-from .photometry import *
-from .solve_wcs import *
-from .sort_files import *
+from . import absphot
+from . import calibration
+from . import image_procs
+from . import photometry
+from . import solve_wcs
+from . import sort_files
 
