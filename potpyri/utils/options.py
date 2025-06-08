@@ -10,15 +10,16 @@ import shutil
 import sys
 import subprocess
 
+from potpyri import instruments
+
 def init_options():
     import argparse
     params = argparse.ArgumentParser(description='Path of data.')
     params.add_argument('instrument', 
         default=None, 
         type=str.upper,
-        choices=['BINOSPEC','DEIMOS','GMOS','LRIS','MMIRS','MOSFIRE',
-            'F2','IMACS','FOURSTAR'],
-        help='''Name of instrument (must be in instruments dir) of data to 
+        choices=instruments.__all__,
+        help='''Name of instrument (must be in instruments directory) of data to 
         reduce. Required to run pipeline.''')
     params.add_argument('data_path', 
         default=None, 
