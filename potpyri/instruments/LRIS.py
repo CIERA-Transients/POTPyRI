@@ -249,8 +249,13 @@ class LRIS(instrument.Instrument):
 
     def import_image(self, filename, amp, log=None):
 
-        with fits.open(filename) as hdr:
-            header = hdr[0].header
+        with fits.open(filename) as file_open:
+            header = file_open[0].header
+            if len(file_open)>1:
+                extra_hdr = file_open[1].header
+                for key in extra_hdr.keys():
+                    if key not in hdr.keys():
+                        hdr[key] = extra_hdr[key]
 
         gains = self.get_gain(header)
         readnoises = self.get_rdnoise(header)
