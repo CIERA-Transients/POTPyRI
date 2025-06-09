@@ -276,6 +276,8 @@ def get_star_catalog(img_data, img_mask, img_error, fwhm_init=5.0,
 def do_phot(img_file,
     fwhm_scale_psf=4.5, oversampling=1,
     star_param={'snthresh_psf': 20.0, 'fwhm_init': 8.0, 'snthresh_final': 10.0},
+    save_psf_img=False,
+    save_residual_hdu=False,
     log=None):
 
     img_hdu = fits.open(img_file)
@@ -482,21 +484,26 @@ def do_phot(img_file,
         img_hdu.append(newhdu)
 
     # Write out a EPSF quality image and add raw data to img_hdu
-    norm = simple_norm(epsf.data, 'log', percent=99.)
-    plt.imshow(epsf.data, norm=norm, origin='lower', cmap='viridis')
-    plt.colorbar()
-    outname = img_file.replace('.fits','.epsf.png')
-    plt.savefig(outname)
-    plt.clf()
+    # Useful for validating the photometry methods
+    if save_psf_img:
+        norm = simple_norm(epsf.data, 'log', percent=99.)
+        plt.imshow(epsf.data, norm=norm, origin='lower', cmap='viridis')
+        plt.colorbar()
+        outname = img_file.replace('.fits','.epsf.png')
+        plt.savefig(outname)
+        plt.clf()
 
     # Add the residual image to img_hdu
-    newhdu = fits.ImageHDU(residual_image)
-    newhdu.name = 'RESIDUAL'
-    if newhdu.name in [h.name for h in img_hdu]:
-        img_hdu[newhdu.name] = newhdu
-    else:
-        img_hdu.append(newhdu)
+    # Can be used to validate the quality of PSF fitting to point sources
+    if save_residual_hdu:
+        newhdu = fits.ImageHDU(residual_image)
+        newhdu.name = 'RESIDUAL'
+        if newhdu.name in [h.name for h in img_hdu]:
+            img_hdu[newhdu.name] = newhdu
+        else:
+            img_hdu.append(newhdu)
 
+    # Always add the PSF to the image as an extension
     newhdu = fits.ImageHDU(epsf.data)
     newhdu.name='PSF'
     if newhdu.name in [h.name for h in img_hdu]:
