@@ -254,15 +254,21 @@ class LRIS(instrument.Instrument):
             if len(file_open)>1:
                 extra_hdr = file_open[1].header
                 for key in extra_hdr.keys():
-                    if key not in hdr.keys():
-                        hdr[key] = extra_hdr[key]
+                    if key not in header.keys():
+                        header[key] = extra_hdr[key]
 
         gains = self.get_gain(header)
         readnoises = self.get_rdnoise(header)
         oscan_reg = self.get_overscan(header)
 
         if amp=='1R_HSPLIT_VUP' or amp=='1R_HSPLIT_VSPLIT':
-            raw = [CCDData.read(filename, hdu=0, unit='adu')]
+            with fits.open(filename) as file_open:
+                if len(file_open)>1 and file_open[1].name=='COMPRESSED_IMAGE':
+                    use_hdu=1
+                else:
+                    use_hdu=0
+                    
+            raw = [CCDData.read(filename, hdu=use_hdu, unit='adu')]
             red = [ccdproc.ccd_process(x, oscan=oscan_reg, 
                 oscan_model=models.Chebyshev1D(3), 
                 gain=gains[j]*u.electron/u.adu, 
