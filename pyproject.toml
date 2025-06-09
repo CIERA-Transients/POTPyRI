@@ -47,7 +47,7 @@ dependencies = [
     "astroquery",
     "beautifulsoup4",
     "ccdproc",
-    "gdrive",
+    "gdown",
     "matplotlib",
     "numpy",
     "photutils",
