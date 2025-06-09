@@ -13,9 +13,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
 version_file = "potpyri/_version.py"
-version_scheme = "post-release"
-local_scheme = "no-local"
-
 
 [project]
 name = "POTPyRI"
@@ -50,6 +47,7 @@ dependencies = [
     "astroquery",
     "beautifulsoup4",
     "ccdproc",
+    "gdrive",
     "matplotlib",
     "numpy",
     "photutils",
@@ -80,7 +78,7 @@ include = ["potpyri*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-potpyri = ["data/staticmasks/*.fz", "data/config/*", "data/cal/*/*.fz"]
+potpyri = ["data/staticmasks/*.fz", "data/cal/*/*.fz"]
 
 [project.scripts]
 main_pipeline = "potpyri.scripts.main_pipeline:main"
