@@ -182,7 +182,7 @@ def generate_epsf(img_file, x, y, size=11, oversampling=2, maxiters=11,
 def extract_fwhm_from_epsf(epsf, fwhm_init):
 
     # Get the raw data for the FWHM and size in x and y
-    data = epsf.normalized_data
+    data = epsf.data
     x = np.arange(data.shape[0])
     y = np.arange(data.shape[1])
     xx, yy = np.meshgrid(x, y) 
@@ -227,8 +227,8 @@ def run_photometry(img_file, epsf, fwhm, threshold, shape, stars):
         init_params=stars_tbl)
 
     # Also generate a residual image for quality control
-    residual_image = photometry.make_residual_image(image, (shape, shape),
-        include_localbkg=True)
+    residual_image = photometry.make_residual_image(image, 
+        psf_shape=(shape, shape), include_localbkg=True)
 
     # Mask results table for sources with bad flux error, fit flux, or centroid
     mask = ~np.isnan(result_tab['flux_err'])
@@ -527,7 +527,7 @@ def photloop(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
 if __name__=="__main__":
 
     # Pick image you want to test on
-    test = '/Users/ckilpatrick/FRB241005/red/workspace/FRB20241005_r.r.ut241007.2.11.1412743557.fits'
+    test = '/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/GMOS/red/sGRB240615A-GRB.i.ut240618.12.22.stk.fits'
 
     # For testing - give different names so the module doesn't consider them
     # global variables that override the values in methods
@@ -535,6 +535,5 @@ if __name__=="__main__":
     s={'snthresh_psf': f*2.0, 'fwhm_init': 5.0, 'snthresh_final': f}
 
     # Run methods
-    #do_phot(test, star_param=s)
-    table = run_sextractor(test)
-    print(table)
+    do_phot(test, star_param=s)
+    #table = run_sextractor(test)
