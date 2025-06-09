@@ -4,6 +4,21 @@ import os
 from astropy.time import Time
 import astropy.utils.data
 
+def make_dummy_wcs():
+    header = {'WCSAXES': 2,
+              'CTYPE1': 'RA---TAN',
+              'CTYPE2': 'DEC--TAN',
+              'CRPIX1': 1.0,
+              'CRPIX2': 1.0,
+              'CRVAL1': 30.0,
+              'CRVAL2': -30.0,
+              'CD1_1': -5.61222E-05,
+              'CD1_2': 0.0,
+              'CD2_1': 0.0,
+              'CD2_2': 5.61222E-05}
+
+    return(header)
+
 def download_github_file(
         git_file_path: str,
         output_dir: str | None = None,
