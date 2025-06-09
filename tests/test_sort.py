@@ -8,16 +8,14 @@ import astropy.utils.data
 import importlib
 import os
 
-from tests.utils import download_github_file
+from tests.utils import download_gdrive_file
 
 def test_potpyri_sort(tmp_path):
 
     instrument = 'BINOSPEC'
 
-    # Science file (just tellurics)
-    cache_dir = astropy.utils.data._get_download_cache_loc()
-    git_file_path = 'Binospec/raw/sci_img_2024.0812.034220_proc.fits.fz'
-    file_path = download_github_file(git_file_path, use_cached=True)
+    # Raw science file
+    file_path = download_gdrive_file('Binospec/raw/sci_img_2024.0812.034220_proc.fits.fz', use_cached=True)
 
     data_path, basefile = os.path.split(file_path)
     paths, tel = options.initialize_telescope(instrument, data_path)

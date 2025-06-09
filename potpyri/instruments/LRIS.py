@@ -100,11 +100,11 @@ class LRIS(instrument.Instrument):
     def raw_format(self, proc):
 
         if str(proc)=='archive':
-            return('*.fits')
+            return('*.fits*')
         elif str(proc)=='raw':
             return('*[b,r]*.fits')
         else:
-            return('*.fits.gz')
+            return('*.fits*')
 
     def get_instrument_name(self, hdr):
         instrument = hdr['INSTRUME']
