@@ -11,10 +11,10 @@ from tests.utils import download_gdrive_file
 
 def test_absphot(tmp_path):
 
-    instrument = 'GMOS'
+    instrument = 'LRIS'
 
     # Raw science file
-    file_path = download_gdrive_file('GMOS/red/sGRB240615A-GRB.i.ut240618.12.22.stk.fits.fz', use_cached=True)
+    file_path = download_gdrive_file('LRISr/red/R155_host.R.ut240629.1R.11.stk.fits.fz', use_cached=True)
 
     # Strip out extensions added by photometry loop if they exist
     hdu = fits.open(file_path)
@@ -36,7 +36,9 @@ def test_absphot(tmp_path):
     cal = absphot.absphot()
     zpt, zpterr = cal.find_zeropoint(file_path, hdu['SCI'].header['FILTER'], cat, log=log)
 
+    breakpoint()
+
     assert cat=='PS1'
-    assert filt=='i'
-    assert np.abs(zpt-33.649132)<0.01
+    assert filt=='R'
+    assert np.abs(zpt-27.576871)<0.01
     assert zpterr<0.01
