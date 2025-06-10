@@ -2,6 +2,10 @@ from potpyri.utils import options
 from potpyri.utils import logger
 from potpyri.stages import absphot
 
+from astropy.io import ascii
+from astropy.table import Table
+from astropy.coordinates import SkyCoord
+
 import os
 import numpy as np
 
@@ -23,10 +27,13 @@ def test_absphot(tmp_path):
     log = logger.get_log(paths['log'])
 
     hdu = fits.open(file_path)
+
+    cal = absphot.absphot()
     cat = tel.get_catalog(hdu['SCI'].header)
     filt = hdu['SCI'].header['FILTER']
-    cal = absphot.absphot()
-    zpt, zpterr = cal.find_zeropoint(file_path, hdu['SCI'].header['FILTER'], cat, log=log)
+
+    zpt, zpterr = cal.find_zeropoint(file_path, hdu['SCI'].header['FILTER'], 
+        cat, log=log)
 
     assert cat=='PS1'
     assert filt=='R'
