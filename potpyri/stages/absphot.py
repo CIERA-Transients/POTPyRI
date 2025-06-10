@@ -151,7 +151,7 @@ class absphot(object):
             return(None)
 
     def find_zeropoint(self, cmpfile, filt, catalog, match_radius=2.5*u.arcsec,
-        phottable='APPPHOT', log=None):
+        phottable='APPPHOT', input_catalog=None, log=None):
 
         if log:
             log.info(f'Importing catalog from file: {cmpfile}')
@@ -167,12 +167,15 @@ class absphot(object):
         metadata = {}
 
         filt = self.convert_filter_name(filt)
-        if log:
-            log.info(f'Downloading {catalog} catalog in {filt}')
+        if input_catalog is not None:
+            cat = input_catalog
         else:
-            print(f'Downloading {catalog} catalog in {filt}')
+            if log:
+                log.info(f'Downloading {catalog} catalog in {filt}')
+            else:
+                print(f'Downloading {catalog} catalog in {filt}')
 
-        cat = self.get_catalog(coords, catalog, filt, log=log)
+            cat = self.get_catalog(coords, catalog, filt, log=log)
 
         min_mag = self.get_minmag(filt)
         cat = cat[cat['mag']>min_mag]
