@@ -59,9 +59,9 @@ def run_sextractor(img_file, log=None):
 
     hdu = fits.open(img_file)
 
-    data = hdu[0].data
+    data = hdu['SCI'].data
 
-    saturate = hdu[0].header['SATURATE']
+    saturate = hdu['SCI'].header['SATURATE']
 
     paramfile = img_file.replace('.fits','.param')
     convfile = img_file.replace('.fits','.conv')
@@ -73,7 +73,7 @@ def run_sextractor(img_file, log=None):
 
     datahdu = fits.PrimaryHDU()
     datahdu.data = data
-    datahdu.header = hdu[0].header
+    datahdu.header = hdu['SCI'].header
     datahdu.writeto(tmpfile, overwrite=True)
 
     if log:
