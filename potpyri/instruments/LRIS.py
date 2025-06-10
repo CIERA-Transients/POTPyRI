@@ -46,7 +46,7 @@ class LRIS(instrument.Instrument):
         self.cr_bias = True 
 
         # Extend header to first file extension for purposes of sort_files
-        self.extend_header = False
+        self.extend_header = True
 
         # How to combine images during stacking
         self.stack_method = 'median'
@@ -100,11 +100,11 @@ class LRIS(instrument.Instrument):
     def raw_format(self, proc):
 
         if str(proc)=='archive':
-            return('*.fits')
+            return('*.fits*')
         elif str(proc)=='raw':
             return('*[b,r]*.fits')
         else:
-            return('*.fits.gz')
+            return('*.fits*')
 
     def get_instrument_name(self, hdr):
         instrument = hdr['INSTRUME']
@@ -249,15 +249,26 @@ class LRIS(instrument.Instrument):
 
     def import_image(self, filename, amp, log=None):
 
-        with fits.open(filename) as hdr:
-            header = hdr[0].header
+        with fits.open(filename) as file_open:
+            header = file_open[0].header
+            if len(file_open)>1:
+                extra_hdr = file_open[1].header
+                for key in extra_hdr.keys():
+                    if key not in header.keys():
+                        header[key] = extra_hdr[key]
 
         gains = self.get_gain(header)
         readnoises = self.get_rdnoise(header)
         oscan_reg = self.get_overscan(header)
 
         if amp=='1R_HSPLIT_VUP' or amp=='1R_HSPLIT_VSPLIT':
-            raw = [CCDData.read(filename, hdu=0, unit='adu')]
+            with fits.open(filename) as file_open:
+                if len(file_open)>1 and file_open[1].name=='COMPRESSED_IMAGE':
+                    use_hdu=1
+                else:
+                    use_hdu=0
+                    
+            raw = [CCDData.read(filename, hdu=use_hdu, unit='adu')]
             red = [ccdproc.ccd_process(x, oscan=oscan_reg, 
                 oscan_model=models.Chebyshev1D(3), 
                 gain=gains[j]*u.electron/u.adu, 

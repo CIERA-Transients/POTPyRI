@@ -364,7 +364,7 @@ class Instrument(object):
             'Version of telescope parameter file used.')
 
         bias_filename = self.get_mbias_name(paths, amp, binn)
-        mbias.write(bias_filename, overwrite=True)
+        mbias.write(bias_filename, overwrite=True, output_verify='silentfix')
         log.info(f'Master bias written to {bias_filename}')
         
         return
@@ -414,7 +414,7 @@ class Instrument(object):
         
         darkname = self.get_mdark_name(paths, amp, binn)
         if log: log.info(f'Writing master dark to {darkname}')
-        mdark.write(darkname, overwrite=True)
+        mdark.write(darkname, overwrite=True, output_verify='silentfix')
         
         return
 
@@ -491,7 +491,7 @@ class Instrument(object):
             'Version of telescope parameter file used.')
 
         flat_filename = self.get_mflat_name(paths, fil, amp, binn)
-        mflat.write(flat_filename, overwrite=True)
+        mflat.write(flat_filename, overwrite=True, output_verify='silentfix')
         log.info(f'Master flat written to {flat_filename}')
         
         return
@@ -549,7 +549,7 @@ class Instrument(object):
             'Version of telescope parameter file used.')
 
         sky_filename = self.get_msky_name(paths, fil, amp, binn)
-        msky.write(sky_filename, overwrite=True)
+        msky.write(sky_filename, overwrite=True, output_verify='silentfix')
         log.info(f'Master sky written to {sky_filename}')
         
         return
@@ -706,7 +706,7 @@ class Instrument(object):
                     del final_img.header[key]
 
             if log: log.info(f'Writing final file: {final_filename}')
-            final_img.write(final_filename, overwrite=True)
+            final_img.write(final_filename, overwrite=True, output_verify='silentfix')
             
             processed.append(final_img)
             processed_names.append(final_filename)
@@ -736,6 +736,6 @@ class Instrument(object):
                     paths['work'])
 
                 if log: log.info(f'Writing final file: {final_filename}')
-                processed[i].write(final_filename, overwrite=True)
+                processed[i].write(final_filename, overwrite=True, output_verify='silentfix')
 
         return(processed)

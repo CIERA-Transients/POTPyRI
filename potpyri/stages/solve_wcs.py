@@ -302,7 +302,7 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
         return(False)
 
 def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
-    log=None):
+    save_centroids=False, log=None):
 
     cat = get_gaia_catalog(file, log=log)
 
@@ -453,9 +453,11 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
 
     mask = (np.abs(ra_cent-med_ra)<3*std_ra) & (np.abs(de_cent-med_de)<3*std_de)
 
-    fig, ax = plt.subplots()
-    ax.scatter(ra_cent[mask], de_cent[mask])
-    plt.savefig(file.replace('.fits','_centroids.png'))
+    # Create a scatter plot of the centroid values to validate the astrometry
+    if save_centroids:
+        fig, ax = plt.subplots()
+        ax.scatter(ra_cent[mask], de_cent[mask])
+        plt.savefig(file.replace('.fits','_centroids.png'))
 
     header = w.to_header()
     header['CRPIX1']=central_pix[0]

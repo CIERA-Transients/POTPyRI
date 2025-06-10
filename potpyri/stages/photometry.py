@@ -161,7 +161,7 @@ def generate_epsf(img_file, x, y, size=11, oversampling=2, maxiters=11,
     stars_tbl['y'] = y
 
     img_hdu = fits.open(img_file)
-    ndimage = NDData(data=img_hdu[0].data)
+    ndimage = NDData(data=img_hdu['SCI'].data)
 
     stars = extract_stars(ndimage, stars_tbl, size=size)
 
@@ -182,7 +182,7 @@ def generate_epsf(img_file, x, y, size=11, oversampling=2, maxiters=11,
 def extract_fwhm_from_epsf(epsf, fwhm_init):
 
     # Get the raw data for the FWHM and size in x and y
-    data = epsf.normalized_data
+    data = epsf.data
     x = np.arange(data.shape[0])
     y = np.arange(data.shape[1])
     xx, yy = np.meshgrid(x, y) 
@@ -206,10 +206,10 @@ def extract_fwhm_from_epsf(epsf, fwhm_init):
 def run_photometry(img_file, epsf, fwhm, threshold, shape, stars):
 
     img_hdu = fits.open(img_file)
-    image = img_hdu[0].data
-    ndimage = NDData(data=img_hdu[0].data)
-    mask = img_hdu[1].data.astype(bool)
-    error = img_hdu[2].data
+    image = img_hdu['SCI'].data
+    ndimage = NDData(data=img_hdu['SCI'].data)
+    mask = img_hdu['MASK'].data.astype(bool)
+    error = img_hdu['ERROR'].data
 
     psf = copy.copy(epsf)
 
@@ -227,8 +227,8 @@ def run_photometry(img_file, epsf, fwhm, threshold, shape, stars):
         init_params=stars_tbl)
 
     # Also generate a residual image for quality control
-    residual_image = photometry.make_residual_image(image, (shape, shape),
-        include_localbkg=True)
+    residual_image = photometry.make_residual_image(image, 
+        psf_shape=(shape, shape), include_localbkg=True)
 
     # Mask results table for sources with bad flux error, fit flux, or centroid
     mask = ~np.isnan(result_tab['flux_err'])
@@ -276,14 +276,16 @@ def get_star_catalog(img_data, img_mask, img_error, fwhm_init=5.0,
 def do_phot(img_file,
     fwhm_scale_psf=4.5, oversampling=1,
     star_param={'snthresh_psf': 20.0, 'fwhm_init': 8.0, 'snthresh_final': 10.0},
+    save_psf_img=False,
+    save_residual_hdu=False,
     log=None):
 
     img_hdu = fits.open(img_file)
 
     # Get image statistics
-    data = img_hdu[0].data
-    mask = img_hdu[1].data.astype(bool)
-    error = img_hdu[2].data
+    data = img_hdu['SCI'].data
+    mask = img_hdu['MASK'].data.astype(bool)
+    error = img_hdu['ERROR'].data
 
     # Get sky statistics
     mean, median, std_sky = sigma_clipped_stats(data[~mask], sigma=5.0,
@@ -386,7 +388,7 @@ def do_phot(img_file,
         star_param['snthresh_final'], size, final_stars)
 
     # Format final stars table and add as APPPHOT to img_hdu
-    w = WCS(img_hdu[0].header)
+    w = WCS(img_hdu['SCI'].header)
     coords = w.pixel_to_world(final_stars['Xpos'], final_stars['Ypos'])
     final_stars['flux'] = final_stars['flux_best']
     final_stars['flux_err'] = final_stars['flux_best_err']
@@ -429,7 +431,7 @@ def do_phot(img_file,
         print(f'Final catalog is {len(photometry)} stars')
 
     # Get RA/Dec from final positions
-    w = WCS(img_hdu[0].header)
+    w = WCS(img_hdu['SCI'].header)
     coords = w.pixel_to_world(photometry['x_fit'], photometry['y_fit'])
 
     # Join the photometry and all star catalogs and rename columns
@@ -482,21 +484,26 @@ def do_phot(img_file,
         img_hdu.append(newhdu)
 
     # Write out a EPSF quality image and add raw data to img_hdu
-    norm = simple_norm(epsf.data, 'log', percent=99.)
-    plt.imshow(epsf.data, norm=norm, origin='lower', cmap='viridis')
-    plt.colorbar()
-    outname = img_file.replace('.fits','.epsf.png')
-    plt.savefig(outname)
-    plt.clf()
+    # Useful for validating the photometry methods
+    if save_psf_img:
+        norm = simple_norm(epsf.data, 'log', percent=99.)
+        plt.imshow(epsf.data, norm=norm, origin='lower', cmap='viridis')
+        plt.colorbar()
+        outname = img_file.replace('.fits','.epsf.png')
+        plt.savefig(outname)
+        plt.clf()
 
     # Add the residual image to img_hdu
-    newhdu = fits.ImageHDU(residual_image)
-    newhdu.name = 'RESIDUAL'
-    if newhdu.name in [h.name for h in img_hdu]:
-        img_hdu[newhdu.name] = newhdu
-    else:
-        img_hdu.append(newhdu)
+    # Can be used to validate the quality of PSF fitting to point sources
+    if save_residual_hdu:
+        newhdu = fits.ImageHDU(residual_image)
+        newhdu.name = 'RESIDUAL'
+        if newhdu.name in [h.name for h in img_hdu]:
+            img_hdu[newhdu.name] = newhdu
+        else:
+            img_hdu.append(newhdu)
 
+    # Always add the PSF to the image as an extension
     newhdu = fits.ImageHDU(epsf.data)
     newhdu.name='PSF'
     if newhdu.name in [h.name for h in img_hdu]:
@@ -527,7 +534,7 @@ def photloop(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
 if __name__=="__main__":
 
     # Pick image you want to test on
-    test = '/Users/ckilpatrick/FRB241005/red/workspace/FRB20241005_r.r.ut241007.2.11.1412743557.fits'
+    test = '/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/GMOS/red/sGRB240615A-GRB.i.ut240618.12.22.stk.fits'
 
     # For testing - give different names so the module doesn't consider them
     # global variables that override the values in methods
@@ -535,6 +542,5 @@ if __name__=="__main__":
     s={'snthresh_psf': f*2.0, 'fwhm_init': 5.0, 'snthresh_final': f}
 
     # Run methods
-    #do_phot(test, star_param=s)
-    table = run_sextractor(test)
-    print(table)
+    do_phot(test, star_param=s)
+    #table = run_sextractor(test)
