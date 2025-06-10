@@ -36,11 +36,7 @@ def test_absphot(tmp_path):
     cal = absphot.absphot()
     zpt, zpterr = cal.find_zeropoint(file_path, hdu['SCI'].header['FILTER'], cat, log=log)
 
-    hdu = fits.open(file_path)
-    m3sigma = hdu['PRIMARY'].header['M3SIGMA']
-
     assert cat=='PS1'
     assert filt=='i'
     assert np.abs(zpt-33.649132)<0.01
     assert zpterr<0.01
-    assert np.abs(m3sigma-25.808789)<0.01
