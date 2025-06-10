@@ -133,7 +133,6 @@ def add_paths(data_path, tel):
     paths = {'data': os.path.abspath(data_path)}
     paths['abspath']=os.path.abspath(__file__)
     paths['code']=os.path.split(paths['abspath'])[0]
-    paths['config']=os.path.join(paths['code'], 'config')
     paths['caldb']=os.path.join(paths['code'], 'data', 'cal', tel.name.upper())
     paths['raw']=os.path.join(paths['data'], 'raw') #path containing the raw data
     paths['bad']=os.path.join(paths['data'], 'bad') #path containing the unused data
@@ -147,10 +146,6 @@ def add_paths(data_path, tel):
 
     p=subprocess.run(['which','sex'], capture_output=True)
     paths['source_extractor']=p.stdout.decode().strip()
-
-    # Copy config directory to data path
-    if not os.path.exists(os.path.join(paths['data'], 'config')):
-        shutil.copytree(paths['config'], os.path.join(paths['data'], 'config'))
 
     return(paths)
 

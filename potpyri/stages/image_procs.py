@@ -1,4 +1,4 @@
-"Functions for processing, masking, creating error images, and stacking images."
+"Functions for calibrating, masking, creating error images, and stacking images."
 "Authors: Charlie Kilpatrick"
 
 # Last updated on 09/29/2024

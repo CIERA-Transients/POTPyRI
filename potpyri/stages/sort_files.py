@@ -207,6 +207,13 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
     dark_num = 0
     flat_num = 0
 
+    target = ""
+    fil = ""
+    amp = ""
+    binn = ""
+    exp = ""
+    file_time = 0.0
+
     params = ('File','Target','TargType','Filter','Amp','Binning','Exp','Type',
         'CalType','Time')
     dtypes = ('S','S','S','S','S','S','S','S','S','float64')
