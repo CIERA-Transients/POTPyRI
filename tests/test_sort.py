@@ -1,16 +1,12 @@
-from potpyri.scripts import main_pipeline
 from potpyri.utils import options
 from potpyri.utils import logger
 from potpyri.stages import sort_files
 
-import numpy as np
-import astropy.utils.data
-import importlib
 import os
 
 from tests.utils import download_gdrive_file
 
-def test_potpyri_sort(tmp_path):
+def test_sort(tmp_path):
 
     instrument = 'BINOSPEC'
 

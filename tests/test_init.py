@@ -8,7 +8,7 @@ import astropy.utils.data
 import importlib
 import os
 
-def test_potpyri_initialize(tmp_path):
+def test_init(tmp_path):
 
     # Parse allowed instruments directly from options so this test matches
     # to values that the argument parser allows as input
