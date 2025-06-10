@@ -19,6 +19,8 @@ def test_absphot(tmp_path):
 
     # Raw science file
     file_path = download_gdrive_file('LRISr/red/R155_host.R.ut240629.1R.11.stk.fits.fz', use_cached=True)
+    cat_path = download_gdrive_file('LRISr/red/test_catalog.dat', use_cached=True)
+    input_catalog = ascii.read(cat_path)
 
     data_path, basefile = os.path.split(file_path)
     paths, tel = options.initialize_telescope(instrument, data_path)
@@ -33,7 +35,7 @@ def test_absphot(tmp_path):
     filt = hdu['SCI'].header['FILTER']
 
     zpt, zpterr = cal.find_zeropoint(file_path, hdu['SCI'].header['FILTER'], 
-        cat, log=log)
+        cat, input_catalog=input_catalog, log=log)
 
     assert cat=='PS1'
     assert filt=='R'
