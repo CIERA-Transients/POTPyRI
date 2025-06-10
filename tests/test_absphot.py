@@ -16,14 +16,6 @@ def test_absphot(tmp_path):
     # Raw science file
     file_path = download_gdrive_file('LRISr/red/R155_host.R.ut240629.1R.11.stk.fits.fz', use_cached=True)
 
-    # Strip out extensions added by photometry loop if they exist
-    hdu = fits.open(file_path)
-    for key in ['APPHOT','PSFPHOT','PSFSTARS','RESIDUAL','PSF']:
-        if key in [h.name for h in hdu]:
-            del hdu[key]
-
-    hdu.writeto(file_path, overwrite=True)
-
     data_path, basefile = os.path.split(file_path)
     paths, tel = options.initialize_telescope(instrument, data_path)
 
