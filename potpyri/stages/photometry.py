@@ -161,7 +161,7 @@ def generate_epsf(img_file, x, y, size=11, oversampling=2, maxiters=11,
     stars_tbl['y'] = y
 
     img_hdu = fits.open(img_file)
-    ndimage = NDData(data=img_hdu[0].data)
+    ndimage = NDData(data=img_hdu['SCI'].data)
 
     stars = extract_stars(ndimage, stars_tbl, size=size)
 
@@ -206,10 +206,10 @@ def extract_fwhm_from_epsf(epsf, fwhm_init):
 def run_photometry(img_file, epsf, fwhm, threshold, shape, stars):
 
     img_hdu = fits.open(img_file)
-    image = img_hdu[0].data
-    ndimage = NDData(data=img_hdu[0].data)
-    mask = img_hdu[1].data.astype(bool)
-    error = img_hdu[2].data
+    image = img_hdu['SCI'].data
+    ndimage = NDData(data=img_hdu['SCI'].data)
+    mask = img_hdu['MASK'].data.astype(bool)
+    error = img_hdu['ERROR'].data
 
     psf = copy.copy(epsf)
 
@@ -283,9 +283,9 @@ def do_phot(img_file,
     img_hdu = fits.open(img_file)
 
     # Get image statistics
-    data = img_hdu[0].data
-    mask = img_hdu[1].data.astype(bool)
-    error = img_hdu[2].data
+    data = img_hdu['SCI'].data
+    mask = img_hdu['MASK'].data.astype(bool)
+    error = img_hdu['ERROR'].data
 
     # Get sky statistics
     mean, median, std_sky = sigma_clipped_stats(data[~mask], sigma=5.0,
@@ -388,7 +388,7 @@ def do_phot(img_file,
         star_param['snthresh_final'], size, final_stars)
 
     # Format final stars table and add as APPPHOT to img_hdu
-    w = WCS(img_hdu[0].header)
+    w = WCS(img_hdu['SCI'].header)
     coords = w.pixel_to_world(final_stars['Xpos'], final_stars['Ypos'])
     final_stars['flux'] = final_stars['flux_best']
     final_stars['flux_err'] = final_stars['flux_best_err']
@@ -431,7 +431,7 @@ def do_phot(img_file,
         print(f'Final catalog is {len(photometry)} stars')
 
     # Get RA/Dec from final positions
-    w = WCS(img_hdu[0].header)
+    w = WCS(img_hdu['SCI'].header)
     coords = w.pixel_to_world(photometry['x_fit'], photometry['y_fit'])
 
     # Join the photometry and all star catalogs and rename columns
