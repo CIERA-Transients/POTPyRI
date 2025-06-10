@@ -44,7 +44,7 @@ def download_gdrive_file(
     Returns:
         str | None: Path to the downloaded file or None if download failed.
     """
-    shared_folder_url = "https://drive.google.com/drive/folders/1UMAC2U97TuE0VFmlBlopSZpew1cKItX_"
+    shared_folder_url = "https://drive.google.com/drive/folders/16gC62idNnVgkVVNHBYUnGRjbNAyabwuT"
 
     # Output dir
     if output_dir is None:
