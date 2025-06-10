@@ -36,8 +36,6 @@ def test_absphot(tmp_path):
     cal = absphot.absphot()
     zpt, zpterr = cal.find_zeropoint(file_path, hdu['SCI'].header['FILTER'], cat, log=log)
 
-    breakpoint()
-
     assert cat=='PS1'
     assert filt=='R'
     assert np.abs(zpt-27.576871)<0.01
