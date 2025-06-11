@@ -15,7 +15,7 @@ build-backend = "setuptools.build_meta"
 version_file = "potpyri/_version.py"
 
 [project]
-name = "POTPyRI"
+name = "potpyri"
 dynamic = ["version"]
 description = "Data reduction pipeline for imaging from large aperture telescopes."
 readme = "README.md"
