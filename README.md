@@ -23,8 +23,6 @@ conda activate potpyri
 pip install potpyri
 ```
 
-which will install the remaining dependencies from the requirements.txt file.
-
 ### Non-Python Dependencies
 
 POTPyRI has two non-python dependencies: `astrometry.net` and `source extractor`.  The package file will install these dependencies on `linux-64` and `osx-64` environments for which there are working conda repositories.  On newer Mac OS systems (`osx-arm64`), conda will not be able to install these packages and they must be built manually.  The recommended installation method is with Homebrew (https://brew.sh/) via:
