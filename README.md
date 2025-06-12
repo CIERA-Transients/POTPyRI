@@ -20,7 +20,7 @@ Then to install POTPyRI, run:
 
 ```
 conda activate potpyri
-pip install git+https://github.com/CIERA-Transients/POTPyRI.git
+pip install potpyri
 ```
 
 which will install the remaining dependencies from the requirements.txt file.
