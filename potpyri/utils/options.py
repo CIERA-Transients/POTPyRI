@@ -89,6 +89,10 @@ def init_options():
         default=False,
         action='store_true',
         help='Tell the pipeline to skip Gaia alignment during WCS.')
+    params.add_argument('--keep-all-astro',
+        default=False,
+        action='store_true',
+        help='Tell the pipeline to keep all images regardless of astrometric dispersion.')
 
     return(params)
 
