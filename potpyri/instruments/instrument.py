@@ -633,6 +633,8 @@ class Instrument(object):
             if log: log.info(f'Wavelength is {self.wavelength}')
             if not skip_skysub and not self.needs_sky_subtraction(fil):
                 if log: log.info('Calculating 2D background.')
+                approx_background=np.nanmedian(processed_data.data)
+                if log: log.info(f'Approximate background value: {approx_background}')
                 bkg = Background2D(processed_data, (64, 64), filter_size=(3, 3),
                     sigma_clip=SigmaClip(sigma=3), exclude_percentile=80,
                     bkg_estimator=MeanBackground(), mask=processed_data.mask, 
