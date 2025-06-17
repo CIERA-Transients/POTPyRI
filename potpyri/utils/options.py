@@ -137,7 +137,7 @@ def add_paths(data_path, tel):
     paths = {'data': os.path.abspath(data_path)}
     paths['abspath']=os.path.abspath(__file__)
     paths['code']=os.path.split(paths['abspath'])[0]
-    paths['caldb']=os.path.join(paths['code'], 'data', 'cal', tel.name.upper())
+    paths['caldb']=os.path.join(paths['code'], '..', 'data', 'cal', tel.name.upper())
     paths['raw']=os.path.join(paths['data'], 'raw') #path containing the raw data
     paths['bad']=os.path.join(paths['data'], 'bad') #path containing the unused data
     paths['red']=os.path.join(paths['data'], 'red') #path to write the reduced files
