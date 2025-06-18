@@ -94,7 +94,7 @@ def generate_wcs(tel, binn, fieldcenter, out_size):
     return(w)
 
 def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None,
-    out_size=None, skip_gaia=False, log=None):
+    out_size=None, skip_gaia=False, keep_all_astro=False, log=None):
 
     solved_images = []
     aligned_images = []
@@ -118,29 +118,34 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
         solved_images.append(file)
 
     # Reject images from stack where either RADISP or DEDISP is >5-sigma outlier
-    if len(solved_images)>2:
-        radisp = [] ; dedisp = []
-        for file in solved_images:
-            hdu = fits.open(file, mode='readonly')
-            radisp.append(hdu[0].header['RADISP'])
-            dedisp.append(hdu[0].header['DEDISP'])
+    if not keep_all_astro:
+        if len(solved_images)>2:
+            radisp = [] ; dedisp = []
+            for file in solved_images:
+                hdu = fits.open(file, mode='readonly')
+                radisp.append(hdu[0].header['RADISP'])
+                dedisp.append(hdu[0].header['DEDISP'])
 
-        radisp = np.array(radisp) ; dedisp = np.array(dedisp)
-        ramean, ramedian, rastddev = sigma_clipped_stats(radisp)
-        demean, demedian, destddev = sigma_clipped_stats(dedisp)
+            radisp = np.array(radisp) ; dedisp = np.array(dedisp)
+            ramean, ramedian, rastddev = sigma_clipped_stats(radisp)
+            demean, demedian, destddev = sigma_clipped_stats(dedisp)
 
-        if log: log.info(f'Median dispersion in R.A.={ramedian}')
-        if log: log.info(f'Median dispersion in Decl.={demedian}')
+            if log: log.info(f'Median dispersion in R.A.={ramedian}')
+            if log: log.info(f'Median dispersion in Decl.={demedian}')
 
-        mask = (radisp-ramedian <= 5 * rastddev) &\
-               (dedisp-demedian <= 5 * destddev)
+            mask = (radisp-ramedian <= 5 * rastddev) &\
+                   (dedisp-demedian <= 5 * destddev)
 
+            if log:
+                log.info('Rejecting the following images for high astrometric dispersion:')
+                for i,m in enumerate(mask):
+                    if not m: log.info(solved_images[i])
+
+            solved_images = np.array(solved_images)[mask]
+    else:
         if log:
-            log.info('Rejecting the following images for high astrometric dispersion:')
-            for i,m in enumerate(mask):
-                if not m: log.info(solved_images[i])
-
-        solved_images = np.array(solved_images)[mask]
+            log.info('Keeping all images (even poorly aligned).')
+        solved_images = np.array(solved_images)
 
 
     if len(solved_images)==0:
@@ -185,7 +190,7 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
 
 def image_proc(image_data, tel, paths, skip_skysub=False, 
     fieldcenter=None, out_size=None, satellites=True, cosmic_ray=True,
-    skip_gaia=False, log=None):
+    skip_gaia=False, keep_all_astro=False, log=None):
 
     wavelength = tel.wavelength
 
@@ -282,7 +287,7 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
 
     aligned_images, aligned_data = align_images(reduced_files, paths, tel, binn,
         use_wcs=use_wcs, fieldcenter=fieldcenter, out_size=out_size, 
-        skip_gaia=skip_gaia, log=log)
+        skip_gaia=skip_gaia, keep_all_astro=keep_all_astro, log=log)
 
     if aligned_images is None or aligned_data is None:
         return(None)
