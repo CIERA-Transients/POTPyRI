@@ -646,8 +646,8 @@ class Instrument(object):
                 if np.isnan(med_background.value):
                     final_img = processed_data.subtract(approx_background)
                     final_img.header = processed_data.header
-                    final_img.header['SATURATE'] -= med_background.value
-                    final_img.header['SKYBKG'] = med_background.value
+                    final_img.header['SATURATE'] -= approx_background.value
+                    final_img.header['SKYBKG'] = approx_background.value
                 else:
                     bkg_filename = self.get_bkg_name(processed_data.header, paths['work'])
                     if log: log.info(f'Writing background file: {bkg_filename}')
