@@ -162,7 +162,7 @@ class Instrument(object):
         instname = self.get_instrument_name(hdr)
         binn = self.get_binning(hdr)
 
-        mask_file = os.path.join(paths['code'], 'data', 'staticmasks', 
+        mask_file = os.path.join(paths['code'], '..', 'data', 'staticmasks', 
             f'{instname}.{binn}.staticmask.fits.fz')
 
         if os.path.exists(mask_file):
