@@ -644,8 +644,8 @@ class Instrument(object):
                 if log: log.info(f'Median background: {med_background}')
 
                 if np.isnan(med_background.value):
-                    final_img = processed_data.subtract(approx_background,
-                        handle_meta='first_round', propagate_uncertainties=True)
+                    final_img = processed_data.subtract(approx_background)
+                    final_img.header = processed_data.header
                     final_img.header['SATURATE'] -= med_background.value
                     final_img.header['SKYBKG'] = med_background.value
                 else:
