@@ -633,7 +633,7 @@ class Instrument(object):
             if log: log.info(f'Wavelength is {self.wavelength}')
             if not skip_skysub and not self.needs_sky_subtraction(fil):
                 if log: log.info('Calculating 2D background.')
-                approx_background=np.nanmedian(processed_data.data)
+                approx_background=np.nanmedian(processed_data.data) * u.electron
                 if log: log.info(f'Approximate background value: {approx_background}')
                 bkg = Background2D(processed_data, (64, 64), filter_size=(3, 3),
                     sigma_clip=SigmaClip(sigma=3), exclude_percentile=80,
@@ -643,18 +643,23 @@ class Instrument(object):
                 med_background = np.nanmedian(bkg.background)
                 if log: log.info(f'Median background: {med_background}')
 
-                bkg_filename = self.get_bkg_name(processed_data.header, paths['work'])
-                if log: log.info(f'Writing background file: {bkg_filename}')
-                bkg_hdu = fits.PrimaryHDU(bkg.background.value)
-                bkg_hdu.header = processed_data.header
-                bkg_hdu.writeto(bkg_filename, overwrite=True,
-                    output_verify='silentfix')
+                if np.isnan(med_background.value):
+                    final_img = processed_data.subtract(approx_background)
+                    final_img.header['SATURATE'] -= approx_background.value
+                    final_img.header['SKYBKG'] -= approx_background.value
+                else:
+                    bkg_filename = self.get_bkg_name(processed_data.header, paths['work'])
+                    if log: log.info(f'Writing background file: {bkg_filename}')
+                    bkg_hdu = fits.PrimaryHDU(bkg.background.value)
+                    bkg_hdu.header = processed_data.header
+                    bkg_hdu.writeto(bkg_filename, overwrite=True,
+                        output_verify='silentfix')
 
-                final_img = processed_data.subtract(CCDData(bkg.background,
-                    unit=u.electron), propagate_uncertainties=True, 
-                    handle_meta='first_found')
-                final_img.header['SATURATE'] -= med_background.value
-                final_img.header['SKYBKG'] = med_background.value
+                    final_img = processed_data.subtract(CCDData(bkg.background,
+                        unit=u.electron), propagate_uncertainties=True, 
+                        handle_meta='first_found')
+                    final_img.header['SATURATE'] -= med_background.value
+                    final_img.header['SKYBKG'] = med_background.value
                 if log: log.info('Updating background and saturation values.')
             else:
                 final_img = processed_data
