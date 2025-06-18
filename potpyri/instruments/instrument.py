@@ -588,7 +588,7 @@ class Instrument(object):
         return(input_mask)
 
     def process_science(self, sci_list, fil, amp, binn, paths, mbias=None,
-        mflat=None, mdark=None, skip_skysub=False, log=None):
+        mflat=None, mdark=None, skip_skysub=False, save_bkg=False, log=None):
 
         processed = []
         processed_names = []
@@ -644,15 +644,18 @@ class Instrument(object):
                 if log: log.info(f'Median background: {med_background}')
 
                 if np.isnan(med_background.value):
-                    final_img = processed_data.subtract(approx_background)
-                    final_img.header['SKYBKG'] = approx_background.value
+                    final_img = processed_data.subtract(approx_background,
+                        handle_meta='first_round', propagate_uncertainties=True)
+                    final_img.header['SATURATE'] -= med_background.value
+                    final_img.header['SKYBKG'] = med_background.value
                 else:
                     bkg_filename = self.get_bkg_name(processed_data.header, paths['work'])
                     if log: log.info(f'Writing background file: {bkg_filename}')
                     bkg_hdu = fits.PrimaryHDU(bkg.background.value)
                     bkg_hdu.header = processed_data.header
-                    bkg_hdu.writeto(bkg_filename, overwrite=True,
-                        output_verify='silentfix')
+                    if save_bkg:
+                        bkg_hdu.writeto(bkg_filename, overwrite=True,
+                            output_verify='silentfix')
 
                     final_img = processed_data.subtract(CCDData(bkg.background,
                         unit=u.electron), propagate_uncertainties=True, 
