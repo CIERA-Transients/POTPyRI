@@ -359,6 +359,7 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
 
     bar = progressbar.ProgressBar(maxval=10)
     bar.start()
+    succeeded = False
     for i in np.arange(10):
         bar.update(i+1)
 
@@ -388,8 +389,21 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
             cat_coords_match['DE_ICRS'], unit=(u.deg, u.deg))
 
         central_coo = w.pixel_to_world(*central_pix)
-        w = fit_wcs_from_points(xy, coords, proj_point=central_coo,
-            sip_degree=sip_degree)
+        try:
+            w = fit_wcs_from_points(xy, coords, proj_point=central_coo,
+                sip_degree=sip_degree)
+            succeeded = True
+        except ValueError:
+            # Try with next iteration
+            pass
+
+    if not succeeded:
+        if log: 
+            log.error(f'Could not converge on fine WCS solution for: {file}')
+        else:
+            print(f'Could not converge on fine WCS solution for: {file}')
+        return(False)
+
 
     bar.finish()
 
