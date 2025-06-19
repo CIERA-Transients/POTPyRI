@@ -539,7 +539,7 @@ def add_stack_mask(stack, stacking_data):
     mask[bp_mask] = 1
 
     # Add saturation to mask
-    sat = np.min([d.header['SATURATE'] for d in stacking_data])
+    sat = np.median([d.header['SATURATE'] for d in stacking_data])
     stack[0].header['SATURATE'] = sat
     sat_mask = data >= sat
     mask[sat_mask] = 4
@@ -749,44 +749,3 @@ def create_error(science_data, mask_data, rdnoise):
     error_hdu.header['BUNIT'] = ('ELECTRONS', 'Units of the error array.')
 
     return(error_hdu)
-
-
-if __name__=="__main__":
-
-    t = ascii.read('/Users/ckilpatrick/Downloads/FRB20250316A/2025.0323/file_list.txt',
-        format='fixed_width')
-    mask = t['TargType']=='FRB20250316A_r_2_11'
-    t = t[mask]
-
-    t.sort('File')
-
-    global tel
-    import importlib
-    module = importlib.import_module('instruments.BINOSPEC')
-    tel = getattr(module, 'BINOSPEC')()
-
-    paths={}
-    paths['red']='/Users/ckilpatrick/Downloads/FRB20250316A/2025.032/red'
-    paths['work']='/Users/ckilpatrick/Downloads/FRB20250316A/2025.032/workspace'
-    paths['cal']='/Users/ckilpatrick/Downloads/FRB20250316A/2025.032/red/cals'
-    paths['code']=os.path.dirname(sys.argv[0])
-
-    import glob
-    files = glob.glob('/Users/ckilpatrick/Downloads/FRB20250316A/2025.0323/red/workspace/*_data.fits')
-    aligned_data=[]
-    masks=[]
-    errors=[]
-    for file in files:
-        hdu = fits.open(file)
-        wcs = WCS(hdu[0].header)
-        image = CCDData(hdu[0].data, meta=hdu[0].header, wcs=wcs, 
-            unit=u.electron)
-        aligned_data.append(image)
-        masks.append(hdu['MASK'])
-        errors.append(hdu['ERROR'])
-
-    sci_med = stack_data(aligned_data, tel, masks, errors, log=None)
-
-    #image_proc(t, tel, paths, fieldcenter=None,
-    #    out_size=4200, cosmic_ray=False, log=None)
-
