@@ -519,14 +519,3 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
     hdu.writeto(file, overwrite=True, output_verify='silentfix')
 
     return(True)
-
-if __name__ == "__main__":
-    file='/Users/ckilpatrick/FRB241005/red/workspace/FRB20241005_r.r.ut241007.2.11.1412746860.fits'
-
-    import importlib
-    global tel
-    tel = importlib.import_module('instruments.BINOSPEC')
-    tel = tel.BINOSPEC()
-
-    solve_astrometry(file, tel, radius=0.5)
-    align_to_gaia(file, tel, radius=0.5, log=None)
