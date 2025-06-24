@@ -369,28 +369,3 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
     if log: log.info(f'sort_files ran in {t_end-t_start} sec')
 
     return(file_table)
-
-def test_sort_files(instrument, data_path):
-
-    global tel
-    import importlib
-    from potpyri import options
-
-    # import telescope parameter file
-    module = importlib.import_module(f'potpyri.instruments.{instrument.upper()}')
-    tel = getattr(module, instrument.upper())()
-
-    # Generate code and data paths based on input path
-    paths = options.add_paths(data_path, tel)
-
-    # This contains all of the file data
-    file_list = os.path.join(paths['data'], 'file_list.txt')
-    file_table = handle_files(file_list, tel, paths)
-
-
-if __name__=="__main__":
-    instrument=sys.argv[1]
-    data_path=sys.argv[2]
-
-    # Test basic method with command-line input instrument and data path
-    test_sort_files(instrument, data_path)
