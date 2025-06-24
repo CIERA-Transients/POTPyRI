@@ -295,10 +295,3 @@ class absphot(object):
             return 15.0
         else:
             return 16.0
-
-if __name__=="__main__":
-    zp_cal = absphot()
-
-    zp, zp_err = zp_cal.find_zeropoint(
-        '/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/MMIRS/red/GRB231117A_J.J.ut231204.32.11.stk.fits', 
-        'J', '2MASS', log=None)
