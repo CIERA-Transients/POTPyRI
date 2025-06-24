@@ -4,7 +4,7 @@
 [![Docs](https://img.shields.io/badge/docs-latest-blue)](https://ciera-transients.github.io/POTPyRI/)
 
 
-Data reduction pipeline for imaging from large aperture telescopes
+Data reduction pipeline for imaging from large aperture telescopes.
 
 ## Usage
 
