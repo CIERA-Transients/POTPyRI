@@ -9,4 +9,4 @@ from . import MMIRS
 from . import MOSFIRE
 
 # New instruments need to be added here
-__all__ = ["BINOSPEC","DEIMOS","FOURSTAR","GMOS","IMACS","LRIS","MMIRS","MOSFIRE"]
+__all__ = ["BINOSPEC","DEIMOS","F2","FOURSTAR","GMOS","IMACS","LRIS","MMIRS","MOSFIRE"]
