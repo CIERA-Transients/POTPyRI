@@ -530,17 +530,3 @@ def photloop(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
             signal_to_noise = signal_to_noise / 2.0
             continue
         break
-
-if __name__=="__main__":
-
-    # Pick image you want to test on
-    test = '/Users/ckilpatrick/Dropbox/Data/POTPyRI/test/GMOS/red/sGRB240615A-GRB.i.ut240618.12.22.stk.fits'
-
-    # For testing - give different names so the module doesn't consider them
-    # global variables that override the values in methods
-    f = 50.0
-    s={'snthresh_psf': f*2.0, 'fwhm_init': 5.0, 'snthresh_final': f}
-
-    # Run methods
-    do_phot(test, star_param=s)
-    #table = run_sextractor(test)
