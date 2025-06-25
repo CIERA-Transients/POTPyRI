@@ -11,9 +11,9 @@ def login(cookie=None):
     if cookie and os.path.isfile(cookie):
         Koa.login(cookie)
 
-def date_query(date, instr, form='ipac', cookie=None):
+def date_query(date, instr, form='ipac', base_outdir='.', cookie=None):
     t = Time(date)
-    outdir = t.datetime.strftime('%Y%m%d')
+    outdir = os.path.join(base_outdir, t.datetime.strftime('%Y%m%d'))
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
@@ -38,6 +38,8 @@ def add_options():
         help='''Keck instrument to query in archive.''')
     params.add_argument('--cookie-file', default=None,
         help='''Provide a cookie file if you are downloading proprietary data.''')
+    params.add_argument('--base-outdir', default=None,
+        help='''The base output directory where the data will be stored.''')
 
     args = params.parse_args()
     return(args)
@@ -48,7 +50,8 @@ def main():
     if args.cookie_file is not None:
         login(args.cookie_file)
 
-    outfile, outdir = date_query(args.date, args.instrument, cookie=args.cookie_file)
+    outfile, outdir = date_query(args.date, args.instrument, cookie=args.cookie_file,
+        base_outdir=args.base_outdir)
     if outfile is not None:
         download_data(outfile, outdir, cookie=args.cookie_file)
 

@@ -87,6 +87,7 @@ potpyri = ["data/staticmasks/*.fz", "data/cal/*/*.fz"]
 main_pipeline = "potpyri.scripts.main_pipeline:main"
 download_anet_index = "potpyri.scripts.archives.download_anet_index:main"
 download_keck_data = "potpyri.scripts.archives.download_keck_data:main"
+download_gemini_data = "potpyri.scripts.archives.download_gemini_data:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
