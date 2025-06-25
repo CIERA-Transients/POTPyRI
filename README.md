@@ -38,6 +38,10 @@ Finally, note that for `astrometry.net`, index files are required.  There is a u
 download_anet_index
 ```
 
+## Required Disk Space
+
+The POTPyRI repository itself has a size of: [https://img.shields.io/github/repo-size/CIERA-Transients/POTPyRI].
+
 ## Supported Instruments
 
 - BINOSPEC (MMT)
