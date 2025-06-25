@@ -40,7 +40,7 @@ download_anet_index
 
 ## Required Disk Space
 
-The POTPyRI repository itself has a size of: (https://img.shields.io/github/repo-size/CIERA-Transients/POTPyRI).
+The POTPyRI repository itself has a size of: [![Size](https://img.shields.io/github/repo-size/CIERA-Transients/POTPyRI)].
 
 ## Supported Instruments
 
