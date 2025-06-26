@@ -22,7 +22,7 @@ def parse_astrometry_config(config_file):
 
     return(data_path)
 
-def download_index_files(outdir=None):
+def download_index_files(outdir=None, max_tries=4):
 
     # Define outdir based on where solve-field is located in path
     if outdir is None:
@@ -43,7 +43,6 @@ def download_index_files(outdir=None):
         os.makedirs(outdir)
 
     from bs4 import BeautifulSoup
-
     import requests
 
     baseurl = "https://portal.nersc.gov/project/cosmo/temp/dstn/index-5200/LITE/"
@@ -59,12 +58,22 @@ def download_index_files(outdir=None):
             if os.path.exists(outfile):
                 continue
             print(f'Downloading outfile {outfile}')
-            data = download_file(fileurl, show_progress=True)
-            shutil.move(data, outfile)
+            tries = 0
+            while tries<max_tries:
+                try:
+                    print(f'Attempting to download (try #{tries+1}/{max_tries}): {fileurl}')
+                    data = download_file(fileurl, show_progress=True)
+                    shutil.move(data, outfile)
+                    break
+                except:
+                    tries += 1
+
+            if not os.path.exists(outfile):
+                print(f'WARNING: could not download {outfile}.  Try download_anet_index again...')
 
 def add_options():
     params = argparse.ArgumentParser(description='Path of data.')
-    params.add_argument('--data_path', default=None, 
+    params.add_argument('--data-path', default=None, 
         help='''Path for downloading data.''')
 
     args = params.parse_args()
