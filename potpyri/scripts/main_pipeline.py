@@ -7,12 +7,13 @@ photometry is performed with photutils, and flux calibration with astroquery
 and numpy.
 
 Authors: Kerry Paterson, Charlie Kilpatrick
-This project was funded by AST 
+This project was funded with support by the National Science Foundation under
+grant Nos. AST-1814782, AST-1909358 and CAREER grant No. AST-2047919.
 If you use this code for your work, please consider citing the package release.
 """
 
-# Last updated 09/29/2024
-__version__ = "2.1"
+# Last updated 26/06/2025
+__version__ = "2.2"
 
 import sys
 import os
@@ -135,14 +136,6 @@ def main_pipeline(instrument:str,
         if stack is None:
             if log: log.error(f'Could not generate a stack for {tar}')
             continue
-
-        # Auto-WCS solution - only run if we have not already pre-aligned to
-        # a specific input coordinate
-        if fieldcenter is None and out_size is None:
-            if log: log.info('Solving WCS.')
-            with fits.open(stack) as f:
-                binn = tel.get_binning(f[0].header)
-            solve_wcs.solve_astrometry(stack, tel, binn, paths, log=log)
 
         # Photometry and flux calibration
         if log: log.info('Running psf photometry loop for zero point.')
