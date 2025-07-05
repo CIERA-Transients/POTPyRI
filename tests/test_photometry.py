@@ -18,7 +18,7 @@ def test_photometry(tmp_path):
 
     # Strip out extensions added by photometry loop if they exist
     hdu = fits.open(file_path)
-    for key in ['APPHOT','PSFPHOT','PSFSTARS','RESIDUAL','PSF']:
+    for key in ['APPPHOT','PSFPHOT','PSFSTARS','RESIDUAL','PSF']:
         if key in [h.name for h in hdu]:
             del hdu[key]
 

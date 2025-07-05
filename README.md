@@ -25,7 +25,14 @@ pip install potpyri
 
 ### Non-Python Dependencies
 
-POTPyRI has two non-python dependencies: `astrometry.net` and `source extractor`.  The package file will install these dependencies on `linux-64` and `osx-64` environments for which there are working conda repositories.  On newer Mac OS systems (`osx-arm64`), conda will not be able to install these packages and they must be built manually.  The recommended installation method is with Homebrew (https://brew.sh/) via:
+POTPyRI has two non-python dependencies: `astrometry.net` and `source extractor`.  The package file will try to install these dependencies on `linux-64` and `osx-64` environments for which there are working conda repositories. If these do not install, manually run the commands with:
+
+```
+conda install conda-forge::astromatic-source-extractor
+conda install conda-forge::astrometry
+```
+
+On newer Mac OS systems (`osx-arm64`), conda will not be able to install these packages and they must be built manually.  The recommended installation method is with Homebrew (https://brew.sh/) via:
 
 ```
 brew install sextractor
@@ -36,6 +43,14 @@ Finally, note that for `astrometry.net`, index files are required.  There is a u
 
 ```
 download_anet_index
+```
+
+## Testing
+
+If you have downloaded POTPyRI directly from GitHub (or through git pull/clone), you can test the installation using pytest by running the following inside the POTPyRI folder:
+
+```
+pytest tests
 ```
 
 ## Required Disk Space
