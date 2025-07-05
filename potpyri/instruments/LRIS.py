@@ -202,11 +202,12 @@ class LRIS(instrument.Instrument):
             b2=int(2170./binn)
             b3=np.max([int(1./binn),1])
             b4=int(4248./binn)
-            oscan_reg = f'[{b1}:{b2},{b3}:{b4}]'
 
             # Correct for image size
             if b4 < imsize[1]:
                 b4 = imsize[1]
+            
+            oscan_reg = f'[{b1}:{b2},{b3}:{b4}]'
         
         return(oscan_reg)
 
