@@ -79,7 +79,7 @@ def get_gaia_catalog(input_file, log=None):
     else:
         return(None)
 
-    mask = (cat['PSS'] > 0.99) & (cat['Plx'] < 20) & (cat['PM']<10)
+    mask = (cat['PSS'] > 0.99) & (cat['Plx']<20) & (cat['PM']<10)
     cat = cat[mask]
 
     return(cat)
@@ -345,6 +345,21 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
         log.info(f'Found {len(cat)} stars in the image')
     else:
         print(f'Found {len(cat)} stars in the image')
+
+    if len(cat)<7:
+        if log:
+            log.info(f'Too few stars in {file}.  Skipping Gaia alignment...')
+        else:
+            print(f'Too few stars in {file}.  Skipping Gaia alignment...')
+
+        # Set these values to some default so pipeline won't break
+        hdu[0].header['RADISP']=(1.0, 'Dispersion in R.A. of WCS [Arcsec]')
+        hdu[0].header['DEDISP']=(1.0, 'Dispersion in Decl. of WCS [Arcsec]')
+
+        hdu.writeto(file, overwrite=True, output_verify='silentfix')
+
+        return(True)
+
 
     sky_cat = photometry.run_sextractor(file, log=log)
 
