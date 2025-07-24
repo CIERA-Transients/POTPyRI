@@ -99,10 +99,10 @@ class absphot(object):
 
         if log: log.info(f'Searching for catalog {catalog}')
         
-        catalog, cat_ID, cat_ra, cat_dec, cat_mag, cat_err = utilities.find_catalog(catalog, filt)
-        
         coord_ra = np.median([c.ra.degree for c in coords])
         coord_dec = np.median([c.dec.degree for c in coords])
+
+        catalog, cat_ID, cat_ra, cat_dec, cat_mag, cat_err = utilities.find_catalog(catalog, filt, coord_ra, coord_dec)
         
         med_coord = SkyCoord(coord_ra, coord_dec, unit='deg')
 
@@ -139,7 +139,7 @@ class absphot(object):
                 cat['mag'], cat['mag_err'] = self.Y_band(cat['mag'], 
                     cat['mag_err'], cat['Kmag'], cat['e_Kmag'])
 
-            return(cat)
+            return(cat, catalog, cat_ID)
 
         else:
             m='ERROR: cat {0}, ra {1}, dec {2} did not return a catalog'
@@ -148,7 +148,7 @@ class absphot(object):
                 log.error(m)
             else:
                 print(m)
-            return(None)
+            return(None, None, None)
 
     def find_zeropoint(self, cmpfile, filt, catalog, match_radius=2.5*u.arcsec,
         phottable='APPPHOT', input_catalog=None, log=None):
@@ -175,7 +175,7 @@ class absphot(object):
             else:
                 print(f'Downloading {catalog} catalog in {filt}')
 
-            cat = self.get_catalog(coords, catalog, filt, log=log)
+            cat, catalog, cat_ID = self.get_catalog(coords, catalog, filt, log=log)
 
         min_mag = self.get_minmag(filt)
         cat = cat[cat['mag']>min_mag]
@@ -296,3 +296,12 @@ class absphot(object):
             return 15.0
         else:
             return 16.0
+
+if __name__=="__main__":
+    cal = absphot()
+    stack = '/Users/ckilpatrick/LRIS_20250624_sGRB250128B/red/sGRB250128B.U.ut250625.4B_SINGLE_A.11.stk.fits'
+    filt = 'U'
+    cat = 'PS1'
+    log = None
+
+    cal.find_zeropoint(stack, filt, cat, log=log)
