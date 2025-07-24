@@ -166,6 +166,8 @@ class absphot(object):
         # New metadata to update
         metadata = {}
 
+        cat = None ; cat_ID = None
+
         filt = self.convert_filter_name(filt)
         if input_catalog is not None:
             cat = input_catalog
@@ -296,12 +298,3 @@ class absphot(object):
             return 15.0
         else:
             return 16.0
-
-if __name__=="__main__":
-    cal = absphot()
-    stack = '/Users/ckilpatrick/LRIS_20250624_sGRB250128B/red/sGRB250128B.U.ut250625.4B_SINGLE_A.11.stk.fits'
-    filt = 'U'
-    cat = 'PS1'
-    log = None
-
-    cal.find_zeropoint(stack, filt, cat, log=log)
