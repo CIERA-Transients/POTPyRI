@@ -99,7 +99,7 @@ class absphot(object):
 
         if log: log.info(f'Searching for catalog {catalog}')
         
-        cat_ID, cat_ra, cat_dec, cat_mag, cat_err = utilities.find_catalog(catalog, filt)
+        catalog, cat_ID, cat_ra, cat_dec, cat_mag, cat_err = utilities.find_catalog(catalog, filt)
         
         coord_ra = np.median([c.ra.degree for c in coords])
         coord_dec = np.median([c.dec.degree for c in coords])
@@ -228,6 +228,7 @@ class absphot(object):
             metadata['ZPTMAG']=zpt
             metadata['ZPTMUCER']=zpterr
             metadata['ZPTCAT']=catalog
+            metadata['ZPTCATID']=cat_ID
             metadata['ZPTPHOT']=phottable
 
             # Add limiting magnitudes
