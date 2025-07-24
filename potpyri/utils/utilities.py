@@ -35,8 +35,7 @@ viziercat = {
 }
 
 # Sort the calibration files:
-def find_catalog(catalog, fil):
-
+def find_catalog(catalog, fil, coord_ra, coord_dec):
     '''
 
     Function to return catalog ID for Vizier query.
@@ -58,7 +57,7 @@ def find_catalog(catalog, fil):
     catalog_ID, ra, dec, mag, err = None, None, None, None, None
 
     # If declination is less than 0 and filter is u-band, use SkyMapper
-    if dec < 0 and fil.lower()=='u':
+    if coord_dec < 0 and fil.lower()=='u':
         catalog = 'skymapper'
 
     # If these catalogs are to be updated in the future, select mag columns that correspond to the
