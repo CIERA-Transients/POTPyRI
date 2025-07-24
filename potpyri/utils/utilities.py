@@ -27,11 +27,15 @@ viziercat = {
     'des': {'name':'II/357',
         'columns': ['RAJ2000', 'DEJ2000', 'S/Gg', 'S/Gr', 'S/Gi', 'S/Gz',
             'gmag','e_gmag', 'rmag','e_rmag', 'imag','e_imag', 'zmag','e_zmag']
-    }
+    },
+    'skymapper': {'name': 'II/379/smssdr4',
+        'columns': ['RAICRS', 'DEICRS', 'uPSF', 'e_uPSF', 'gPSF', 'e_gPSF',
+            'rPSF', 'e_rPSF','iPSF', 'e_iPSF','zPSF', 'e_zPSF']
+    },
 }
 
 # Sort the calibration files:
-def find_catalog(catalog,fil):
+def find_catalog(catalog, fil):
 
     '''
 
@@ -53,6 +57,10 @@ def find_catalog(catalog,fil):
 
     catalog_ID, ra, dec, mag, err = None, None, None, None, None
 
+    # If declination is less than 0 and filter is u-band, use SkyMapper
+    if dec < 0 and fil.lower()=='u':
+        catalog = 'skymapper'
+
     # If these catalogs are to be updated in the future, select mag columns that correspond to the
     # PSF mags.
     if catalog.upper() == 'SDSS':
@@ -69,9 +77,9 @@ def find_catalog(catalog,fil):
         catalog_ID, ra, dec, mag, err = 'II/349', 'RAJ2000', 'DEJ2000', fil.lower()+'mag', 'e_'+fil.lower()+'mag'
     elif catalog.upper() == 'SKYMAPPER':
         if fil.lower() not in ['u','v','g','r','i','z']: return(catalog_ID, ra, dec, mag, err)
-        catalog_ID, ra, dec, mag, err = 'II/379', 'RAICRS', 'DEICRS', fil.lower()+'PSF', 'e_'+fil.lower()+'PSF'
+        catalog_ID, ra, dec, mag, err = 'II/379/smssdr4', 'RAICRS', 'DEICRS', fil.lower()+'PSF', 'e_'+fil.lower()+'PSF'
 
-    return(catalog_ID, ra, dec, mag, err)
+    return(catalog, catalog_ID, ra, dec, mag, err)
 
 def is_number(num):
     try:
