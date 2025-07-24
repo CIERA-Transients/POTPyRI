@@ -99,6 +99,17 @@ class Instrument(object):
         # Default final image size for binning of 1x1
         self.out_size = 5000
 
+    # Match file type keywords to file table
+    def match_type_keywords(self, kwds, file_table):
+        masks = []
+        for kwd in kwds.split(','):
+            masks.append(file_table['Type']==kwd)
+        masks = np.array(masks)
+        mask = np.any(masks, axis=0)
+
+        return(mask)
+
+
     # Determine whether sky subtraction is needed for the current reduction
     def needs_sky_subtraction(self, filt):
         # Default is to do sky subtraction for all NIR cameras
