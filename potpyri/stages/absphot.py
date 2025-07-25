@@ -283,7 +283,7 @@ class absphot(object):
         if filt=='zG0304' or filt=='zG0328' or filt=='Z':
             return 'z'
         if filt=='RG850':
-            return 'r'
+            return 'z'
         if filt=='Y':
             return 'J'
         else:
