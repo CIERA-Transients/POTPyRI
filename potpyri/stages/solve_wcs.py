@@ -8,6 +8,7 @@ import numpy as np
 import subprocess
 import os
 import progressbar
+import requests
 
 import matplotlib.pyplot as plt
 
