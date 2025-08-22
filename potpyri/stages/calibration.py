@@ -42,6 +42,7 @@ def do_bias(bias_table, tel, paths, log=None):
         if os.path.exists(bias_name):
             if log: log.info(f'Master bias {bias_name} exists.')
         else:
+            if log: log.info(f'Master bias is being created...')
             t1 = time.time()
             if log: log.info('Processing bias files.')
             tel.create_bias(cal_table['File'], amp, binn, paths, 
@@ -82,6 +83,7 @@ def do_dark(dark_table, tel, paths, log=None):
         if os.path.exists(dark_name):
             if log: log.info(f'Master dark {dark_name} exists.')
         else:
+            if log: log.info(f'Master dark is being created...')
             mbias = None
             if tel.bias:
                 if log: log.info('Loading master bias.')
@@ -128,6 +130,7 @@ def do_flat(flat_table, tel, paths, log=None):
         if os.path.exists(flat_name):
             if log: log.info(f'Master flat {flat_name} exists.')
         else:
+            if log: log.info(f'Master flat is being created...')
             mbias = None
             mdark = None
             if tel.bias:
