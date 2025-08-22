@@ -139,6 +139,7 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
             ra = header[pair[0]]
             dec = header[pair[1]]
             coord = utilities.parse_coord(ra, dec)
+            if log: log.info(f'Got coord={coord} for RA key {pair[0]}, DEC key {pair[1]}')
             if coord:
                 break
 
