@@ -76,7 +76,7 @@ class LRIS(instrument.Instrument):
         # File sorting keywords
         self.science_keywords = ['KOAIMTYP','SLITNAME','GRANAME','TRAPDOOR']
         self.science_values = ['object','direct','mirror','open']
-        self.flat_keywords = ['OBJECT']
+        self.flat_keywords = ['KOAIMTYP']
         self.flat_values = ['flat']
         self.bias_keywords = ['KOAIMTYP']
         self.bias_values = ['bias']
