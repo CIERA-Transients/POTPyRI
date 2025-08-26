@@ -27,6 +27,11 @@ def do_bias(bias_table, tel, paths, nmin_images=3, log=None):
         else:
             print('No bias images were provided for this setup.')
         return(None)
+    else:
+        if log: 
+            log.info(f'Generating bias image with {len(bias_table)} images.')
+        else:
+            print(f'Generating bias image with {len(bias_table)} images.')
 
     bias_num = 0
     for cal_type in np.unique(bias_table['CalType']):
@@ -69,6 +74,11 @@ def do_dark(dark_table, tel, paths, nmin_images=3, log=None):
         else:
             print('No dark images were provided for this setup.')
         return(None)
+    else:
+        if log: 
+            log.info(f'Generating bias image with {len(dark_table)} images.')
+        else:
+            print(f'Generating bias image with {len(dark_table)} images.')
 
     for cal_type in np.unique(dark_table['CalType']):
         mask = dark_table['CalType']==cal_type
@@ -114,6 +124,11 @@ def do_flat(flat_table, tel, paths, nmin_images=3, log=None):
         else:
             print('No flat images were provided for this setup.')
         return(None)
+    else:
+        if log: 
+            log.info(f'Generating bias image with {len(flat_table)} images.')
+        else:
+            print(f'Generating bias image with {len(flat_table)} images.')
 
     for cal_type in np.unique(flat_table['CalType']):
         mask = flat_table['CalType']==cal_type
