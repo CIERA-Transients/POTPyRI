@@ -8,6 +8,7 @@ import numpy as np
 import subprocess
 import os
 import progressbar
+import requests
 
 import matplotlib.pyplot as plt
 
@@ -138,6 +139,8 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
             ra = header[pair[0]]
             dec = header[pair[1]]
             coord = utilities.parse_coord(ra, dec)
+            if log: log.info(f'Got coord={coord} for RA key {pair[0]}, DEC key {pair[1]}')
+            if log: log.info(f'RA value is {ra}, DEC value is {dec}')
             if coord:
                 break
 
