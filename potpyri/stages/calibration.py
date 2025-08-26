@@ -20,23 +20,23 @@ def do_bias(bias_table, tel, paths, nmin_images=3, log=None):
             print('No bias is required.')
         return(None)
 
-    # Exit if bias_table has no images
-    if len(bias_table)<nmin_images:
-        if log:
-            log.info('No bias images were provided for this setup.')
-        else:
-            print('No bias images were provided for this setup.')
-        return(None)
-    else:
-        if log: 
-            log.info(f'Generating bias image with {len(bias_table)} images.')
-        else:
-            print(f'Generating bias image with {len(bias_table)} images.')
-
     bias_num = 0
     for cal_type in np.unique(bias_table['CalType']):
         mask = bias_table['CalType']==cal_type
         cal_table = bias_table[mask]
+
+        # Skip if cal_table does not have enough images
+        if len(cal_table)<nmin_images:
+            if log:
+                log.info('No bias images were provided for this setup.')
+            else:
+                print('No bias images were provided for this setup.')
+            continue
+        else:
+            if log: 
+                log.info(f'Generating bias image with {len(cal_table)} images.')
+            else:
+                print(f'Generating bias image with {len(cal_table)} images.')
         
         bias_num += 1
         amp = cal_table['Amp'][0]
@@ -67,22 +67,22 @@ def do_dark(dark_table, tel, paths, nmin_images=3, log=None):
     if not tel.dark:
         return(None)
 
-    # Exit if dark_table has no images
-    if len(dark_table)<nmin_images:
-        if log:
-            log.info('No dark images were provided for this setup.')
-        else:
-            print('No dark images were provided for this setup.')
-        return(None)
-    else:
-        if log: 
-            log.info(f'Generating bias image with {len(dark_table)} images.')
-        else:
-            print(f'Generating bias image with {len(dark_table)} images.')
-
     for cal_type in np.unique(dark_table['CalType']):
         mask = dark_table['CalType']==cal_type
         cal_table = dark_table[mask]
+
+        # Skip if cal_table does not have enough images
+        if len(cal_table)<nmin_images:
+            if log:
+                log.info('No dark images were provided for this setup.')
+            else:
+                print('No dark images were provided for this setup.')
+            continue
+        else:
+            if log: 
+                log.info(f'Generating dark image with {len(cal_table)} images.')
+            else:
+                print(f'Generating dark image with {len(cal_table)} images.')
             
         exp = cal_table['Exp'][0]
         amp = cal_table['Amp'][0]
@@ -117,22 +117,22 @@ def do_flat(flat_table, tel, paths, nmin_images=3, log=None):
     if not tel.flat:
         return(None)
 
-    # Exit if flat_table has no images
-    if len(flat_table)<nmin_images:
-        if log:
-            log.info('No flat images were provided for this setup.')
-        else:
-            print('No flat images were provided for this setup.')
-        return(None)
-    else:
-        if log: 
-            log.info(f'Generating bias image with {len(flat_table)} images.')
-        else:
-            print(f'Generating bias image with {len(flat_table)} images.')
-
     for cal_type in np.unique(flat_table['CalType']):
         mask = flat_table['CalType']==cal_type
         cal_table = flat_table[mask]
+
+        # Skip if cal_table does not have enough images
+        if len(cal_table)<nmin_images:
+            if log:
+                log.info('No flat images were provided for this setup.')
+            else:
+                print('No flat images were provided for this setup.')
+            continue
+        else:
+            if log: 
+                log.info(f'Generating flat image with {len(cal_table)} images.')
+            else:
+                print(f'Generating flat image with {len(cal_table)} images.')
 
         fil = cal_table['Filter'][0]
         amp = cal_table['Amp'][0]
