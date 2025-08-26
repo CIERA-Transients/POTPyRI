@@ -10,7 +10,7 @@ import logging
 import numpy as np
 import sys
 
-def do_bias(bias_table, tel, paths, log=None):
+def do_bias(bias_table, tel, paths, nmin_images=3, log=None):
 
     # Exit if telescope does not require bias
     if not tel.bias:
@@ -21,7 +21,7 @@ def do_bias(bias_table, tel, paths, log=None):
         return(None)
 
     # Exit if bias_table has no images
-    if len(bias_table)==0:
+    if len(bias_table)<nmin_images:
         if log:
             log.info('No bias images were provided for this setup.')
         else:
@@ -56,14 +56,14 @@ def do_bias(bias_table, tel, paths, log=None):
         logging.shutdown()
         sys.exit(-1)
 
-def do_dark(dark_table, tel, paths, log=None):
+def do_dark(dark_table, tel, paths, nmin_images=3, log=None):
 
     # Exit if telescope does not require dark
     if not tel.dark:
         return(None)
 
     # Exit if dark_table has no images
-    if len(dark_table)==0:
+    if len(dark_table)<nmin_images:
         if log:
             log.info('No dark images were provided for this setup.')
         else:
@@ -101,14 +101,14 @@ def do_dark(dark_table, tel, paths, log=None):
             t2 = time.time()
             if log: log.info(f'Master dark creation completed in {t2-t1} sec.')
 
-def do_flat(flat_table, tel, paths, log=None):
+def do_flat(flat_table, tel, paths, nmin_images=3, log=None):
 
     # Exit if telescope does not require dark
     if not tel.flat:
         return(None)
 
     # Exit if flat_table has no images
-    if len(flat_table)==0:
+    if len(flat_table)<nmin_images:
         if log:
             log.info('No flat images were provided for this setup.')
         else:
