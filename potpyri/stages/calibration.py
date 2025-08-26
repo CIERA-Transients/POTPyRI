@@ -10,7 +10,7 @@ import logging
 import numpy as np
 import sys
 
-def do_bias(bias_table, tel, paths, log=None):
+def do_bias(bias_table, tel, paths, nmin_images=3, log=None):
 
     # Exit if telescope does not require bias
     if not tel.bias:
@@ -20,18 +20,23 @@ def do_bias(bias_table, tel, paths, log=None):
             print('No bias is required.')
         return(None)
 
-    # Exit if bias_table has no images
-    if len(bias_table)==0:
-        if log:
-            log.info('No bias images were provided for this setup.')
-        else:
-            print('No bias images were provided for this setup.')
-        return(None)
-
     bias_num = 0
     for cal_type in np.unique(bias_table['CalType']):
         mask = bias_table['CalType']==cal_type
         cal_table = bias_table[mask]
+
+        # Skip if cal_table does not have enough images
+        if len(cal_table)<nmin_images:
+            if log:
+                log.info('No bias images were provided for this setup.')
+            else:
+                print('No bias images were provided for this setup.')
+            continue
+        else:
+            if log: 
+                log.info(f'Generating bias image with {len(cal_table)} images.')
+            else:
+                print(f'Generating bias image with {len(cal_table)} images.')
         
         bias_num += 1
         amp = cal_table['Amp'][0]
@@ -42,6 +47,7 @@ def do_bias(bias_table, tel, paths, log=None):
         if os.path.exists(bias_name):
             if log: log.info(f'Master bias {bias_name} exists.')
         else:
+            if log: log.info(f'Master bias is being created...')
             t1 = time.time()
             if log: log.info('Processing bias files.')
             tel.create_bias(cal_table['File'], amp, binn, paths, 
@@ -55,23 +61,28 @@ def do_bias(bias_table, tel, paths, log=None):
         logging.shutdown()
         sys.exit(-1)
 
-def do_dark(dark_table, tel, paths, log=None):
+def do_dark(dark_table, tel, paths, nmin_images=3, log=None):
 
     # Exit if telescope does not require dark
     if not tel.dark:
         return(None)
 
-    # Exit if dark_table has no images
-    if len(dark_table)==0:
-        if log:
-            log.info('No dark images were provided for this setup.')
-        else:
-            print('No dark images were provided for this setup.')
-        return(None)
-
     for cal_type in np.unique(dark_table['CalType']):
         mask = dark_table['CalType']==cal_type
         cal_table = dark_table[mask]
+
+        # Skip if cal_table does not have enough images
+        if len(cal_table)<nmin_images:
+            if log:
+                log.info('No dark images were provided for this setup.')
+            else:
+                print('No dark images were provided for this setup.')
+            continue
+        else:
+            if log: 
+                log.info(f'Generating dark image with {len(cal_table)} images.')
+            else:
+                print(f'Generating dark image with {len(cal_table)} images.')
             
         exp = cal_table['Exp'][0]
         amp = cal_table['Amp'][0]
@@ -82,6 +93,7 @@ def do_dark(dark_table, tel, paths, log=None):
         if os.path.exists(dark_name):
             if log: log.info(f'Master dark {dark_name} exists.')
         else:
+            if log: log.info(f'Master dark is being created...')
             mbias = None
             if tel.bias:
                 if log: log.info('Loading master bias.')
@@ -99,23 +111,28 @@ def do_dark(dark_table, tel, paths, log=None):
             t2 = time.time()
             if log: log.info(f'Master dark creation completed in {t2-t1} sec.')
 
-def do_flat(flat_table, tel, paths, log=None):
+def do_flat(flat_table, tel, paths, nmin_images=3, log=None):
 
     # Exit if telescope does not require dark
     if not tel.flat:
         return(None)
 
-    # Exit if flat_table has no images
-    if len(flat_table)==0:
-        if log:
-            log.info('No flat images were provided for this setup.')
-        else:
-            print('No flat images were provided for this setup.')
-        return(None)
-
     for cal_type in np.unique(flat_table['CalType']):
         mask = flat_table['CalType']==cal_type
         cal_table = flat_table[mask]
+
+        # Skip if cal_table does not have enough images
+        if len(cal_table)<nmin_images:
+            if log:
+                log.info('No flat images were provided for this setup.')
+            else:
+                print('No flat images were provided for this setup.')
+            continue
+        else:
+            if log: 
+                log.info(f'Generating flat image with {len(cal_table)} images.')
+            else:
+                print(f'Generating flat image with {len(cal_table)} images.')
 
         fil = cal_table['Filter'][0]
         amp = cal_table['Amp'][0]
@@ -128,6 +145,7 @@ def do_flat(flat_table, tel, paths, log=None):
         if os.path.exists(flat_name):
             if log: log.info(f'Master flat {flat_name} exists.')
         else:
+            if log: log.info(f'Master flat is being created...')
             mbias = None
             mdark = None
             if tel.bias:
