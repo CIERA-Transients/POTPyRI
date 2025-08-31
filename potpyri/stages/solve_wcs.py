@@ -101,7 +101,7 @@ def clean_up_astrometry(directory, file, exten):
             os.remove(f)
 
 def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True, 
-    shift_only=False, log=None):
+    shift_only=False, index=None, log=None):
 
     # Starting solve, print file and directory for reference
     fullfile = os.path.abspath(file)
@@ -173,6 +173,12 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
     args += f'--ra {ra} --dec {dec} '
     args += f' --radius {radius} --no-plots -T '
     args += f'--overwrite -N {newfile} --dir {directory} '
+
+    if index and os.path.exists(index):
+        if os.path.isfile(index):
+            args += f'--index-file {index} '
+        elif os.path.isdir(index):
+            args += f'--index-dir {index} '
 
     # Test for --use-source-extractor flag
     p = subprocess.run(['solve-field','-h'],capture_output=True)

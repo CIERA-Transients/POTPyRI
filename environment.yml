@@ -1,0 +1,9 @@
+name: potpyri_test
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - pip-tools
+  - astromatic-source-extractor
+  - astrometry
