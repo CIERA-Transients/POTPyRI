@@ -1,4 +1,4 @@
-name: my_test_env
+name: potpyri_test
 channels:
   - conda-forge
   - defaults
