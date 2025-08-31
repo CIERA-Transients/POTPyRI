@@ -33,11 +33,14 @@ jobs:
 
     - name: Install the Package and Remaining Dependencies
       run: |
+          conda init
+          conda activate potpyri_test
           python -m pip install --upgrade pip setuptools wheel
           pip install .
           
     - name: Run tests
       run: |
+          conda init
           conda activate potpyri_test
           pip install .[test]
           pytest
