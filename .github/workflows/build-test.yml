@@ -38,5 +38,6 @@ jobs:
           
     - name: Run tests
       run: |
+          conda activate potpyri_test
           pip install .[test]
           pytest
