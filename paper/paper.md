@@ -10,7 +10,7 @@ tags:
 authors:
   - name: K. Paterson^[corresponding author]
     orcid: 0000-0001-8340-3486
-    affiliation: "1" #
+    affiliation: "1, 2" #
   - name: C. D. Kilpatrick
     affiliation: 1
   - name: O. Eskandar
@@ -21,6 +21,8 @@ authors:
 affiliations:
  - name: Center for Interdisciplinary Exploration and Research in Astrophysics and Department of Physics and Astronomy, Northwestern University, 1800 Sherman Ave, Evanston, IL 60201, USA
    index: 1
+ - name: Max-Planck-Institut für Astronomie, Königstuhl 17, 69117 Heidelberg, Germany
+   index: 2
 
 date: 2 Sep 2025
 
