@@ -45,9 +45,9 @@ Currently available instruments (as of June 2025 - see the GitHub for the most r
  - GMOS (Gemini-N and Gemini-S) [@Davies1997]
  - Flamingos2 (Gemini) [@Eikenberry2012]
  - FourStar (Magellan) [@Persson2013]
- -  IMACS (Magellan) [@Bigelow2003]
+ - IMACS (Magellan) [@Bigelow2003]
 
-Since the pipeline is meant to provide the community with a way to reduce imaging data from these instruments, one science application has been the rapid reduction and identification of Gamma-Ray Burst (GRB) afterglows, as well as the reduction and stacking of follow-up observations to identify potential host galaxies for associated and in depth study (see [@Paterson2020,@Rastinejad2021,@Fong2021]).
+Since the pipeline is meant to provide the community with a way to reduce imaging data from these instruments; science applications include the rapid reduction and identification of transients, such as Gamma-Ray Burst (GRB) afterglows, as well as the reduction and stacking of follow-up observations of transients to identify potential host galaxies for associated and in depth study (see [@Paterson2020,@Rastinejad2021,@Fong2021,@Rastinejad2025,@Caleb2025]).
 
 # Method
 
