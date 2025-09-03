@@ -1,8 +1,6 @@
 name: Paper Draft
 
 on:
-  workflow_dispatch:
-    branches: [KerryPaterson-patch-1]
   push:
     branches: [main]
   pull_request:
