@@ -631,14 +631,15 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
         else:
             print('Setting sky background to 2000.0')
 
+    # This needs to be done before data is modified to preserve bad pixels
+    mask_bp = (data==0.0) | np.isnan(data)
+
     # Set data background to skybkg
     data = data + skybkg
     # Also need to adjust the saturation level by SKYBKG for saturated pixels
     saturation += skybkg
     
     if log: log.info('Masking saturated pixels.')
-
-    mask_bp = (data==0.0) | np.isnan(data)
 
     mask_sat = np.zeros(data.shape).astype(bool) # create empty mask
     mask_sat = mask_sat.astype(np.uint8) #set saturated star mask type
