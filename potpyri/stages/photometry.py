@@ -526,7 +526,8 @@ def photloop(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
                       'snthresh_final': signal_to_noise}
         try:
             do_phot(stack, star_param=star_param) 
-        except:
+        except as e:
+            log.error(e)
             signal_to_noise = signal_to_noise / 2.0
             continue
         break
