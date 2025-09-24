@@ -22,6 +22,15 @@ def test_photometry(tmp_path):
         if key in [h.name for h in hdu]:
             del hdu[key]
 
+    # Sanitize error array
+    mask = np.isnan(hdu['ERROR'].data)
+    hdu['ERROR'].data[mask] = np.nanmedian(hdu['ERROR'].data)
+    mask = hdu['ERROR'].data < 0.0
+    hdu['ERROR'].data[mask] = np.nanmedian(hdu['ERROR'].data)
+    maxval = np.max(hdu['SCI'].data)
+    mask = np.isinf(hdu['ERROR'].data)
+    hdu['ERROR'].data[mask] = maxval
+
     hdu.writeto(file_path, overwrite=True)
 
     data_path, basefile = os.path.split(file_path)
