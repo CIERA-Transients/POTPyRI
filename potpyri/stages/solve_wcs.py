@@ -20,10 +20,10 @@ from astroquery.vizier import Vizier
 import astropy.units as u
 from astropy.stats import sigma_clipped_stats
 from astropy.io import fits
-from astropy.io import ascii
 from astropy.coordinates import SkyCoord
 from astropy.coordinates import match_coordinates_sky
-from astropy.table import Table, Column
+from astropy.table import Column
+from astropy.table import Table
 from astropy.utils.exceptions import AstropyWarning
 from astropy.wcs import WCS
 from astropy.wcs.utils import fit_wcs_from_points
@@ -67,7 +67,10 @@ def get_gaia_catalog(input_file, log=None):
         try:
             cat = vizier.query_region(coord, width=20 * u.arcmin, 
                 catalog='I/355/gaiadr3')
-            break
+            if cat is None:
+                if log: log.error(f'Gaia did not return catalog.  Try #{tries+1}')
+            else:
+                break
         except requests.exceptions.ReadTimeout:
             if log: log.error(f'Gaia catalog timeout.  Try #{tries+1}')
             tries += 1
@@ -195,7 +198,7 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
 
     tries = 1
     good = False
-    while tries < 4 and not good:
+    while tries < 5 and not good:
         input_args = args + extra_opts
 
         if log: 
@@ -225,6 +228,13 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
             if tries==2:
                 extra_opts='--objs 15'
             elif tries==3:
+                extra_opts=''
+            elif tries==4:
+                # Try with no constraint on RA/Dec
+                args = '--scale-units arcsecperpix '
+                args += f'--scale-low {scale_low} --scale-high {scale_high} '
+                args += f'--no-plots -T '
+                args += f'--overwrite -N {newfile} --dir {directory} '
                 extra_opts=''
 
 
