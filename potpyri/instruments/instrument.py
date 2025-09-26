@@ -490,6 +490,12 @@ class Instrument(object):
         mask = mflat.data > median + 10 * stddev
         mflat.data[mask]=np.nan
 
+        # Mask the flat for numerical under/overflows
+        logflat = np.log10(mflat.data)
+        mean, median, stddev = sigma_clipped_stats(logflat)
+        mask = np.abs(logflat - median) > 10 * stddev
+        mflat.data[mask]=np.nan
+
         # Remove all nan values from flat
         mask = np.isnan(mflat.data)
         mflat.mask = mask
