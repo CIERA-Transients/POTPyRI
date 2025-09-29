@@ -39,15 +39,15 @@ This pipeline was developed for the reduction and stacking of imaging data for a
 The pipeline is written in Python (currently deployed and tested on Python 3.12) and uses packages from Astropy [@astropy:2013;@astropy:2018], ccdproc, astroquery [@Ginsburg2019] and photutils [@photutils:2024]; with the additional use of external dependencies including SExtractor [@Bertin1996] and Astrometry.net [@Lang2010]. The code is available on GitHub at https://github.com/CIERA-Transients/POTPyRI, where instructions on the installation and detailed use can be found. The code is also installable with pip and is release at PyPI at https://pypi.org/p/potpyri.
 
 Currently available instruments (as of June 2025 - see the GitHub for the most recent list) include:
- - MMIRS (MMT) [@McLeod2012]
- - Binospec (MMT) [@Fabricant2019]
- - MOSFIRE (Keck) [@McLean2008]
- - DEIMOS (Keck) [@Cowley1997]
- - LRIS (Keck) [@Oke1995]
- - GMOS (Gemini-N and Gemini-S) [@Davies1997]
- - Flamingos2 (Gemini) [@Eikenberry2012]
- - FourStar (Magellan) [@Persson2013]
- - IMACS (Magellan) [@Bigelow2003]
+- MMIRS (MMT) [@McLeod2012]
+- Binospec (MMT) [@Fabricant2019]
+- MOSFIRE (Keck) [@McLean2008]
+- DEIMOS (Keck) [@Cowley1997]
+- LRIS (Keck) [@Oke1995]
+- GMOS (Gemini-N and Gemini-S) [@Davies1997]
+- Flamingos2 (Gemini) [@Eikenberry2012]
+- FourStar (Magellan) [@Persson2013]
+- IMACS (Magellan) [@Bigelow2003]
 
 Since the pipeline is meant to provide the community with a way to reduce imaging data from these instruments; science applications include the rapid reduction and identification of transients, such as Gamma-Ray Burst (GRB) afterglows, as well as the reduction and stacking of follow-up observations of transients to identify potential host galaxies for associated and in depth study (see [@Paterson2020;@Rastinejad2021;@Fong2021;@Rastinejad2025;@Caleb2025]).
 
