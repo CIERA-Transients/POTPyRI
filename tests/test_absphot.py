@@ -31,9 +31,6 @@ def test_absphot(tmp_path):
     hdu = fits.open(file_path)
 
     cal = absphot.absphot()
-    cat = tel.get_catalog(hdu['SCI'].header)
-    filt = hdu['SCI'].header['FILTER']
-
     zpt, zpterr = cal.find_zeropoint(file_path, tel, input_catalog=input_catalog, log=log)
 
     assert cat=='PS1'
