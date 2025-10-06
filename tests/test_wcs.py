@@ -45,6 +45,3 @@ def test_wcs(tmp_path):
 
     assert ra_disp/tel.pixscale<1
     assert dec_disp/tel.pixscale<1
-
-if __name__=="__main__":
-    test_wcs('.')

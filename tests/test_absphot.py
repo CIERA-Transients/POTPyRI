@@ -34,8 +34,7 @@ def test_absphot(tmp_path):
     cat = tel.get_catalog(hdu['SCI'].header)
     filt = hdu['SCI'].header['FILTER']
 
-    zpt, zpterr = cal.find_zeropoint(file_path, hdu['SCI'].header['FILTER'], 
-        cat, input_catalog=input_catalog, log=log)
+    zpt, zpterr = cal.find_zeropoint(file_path, tel, input_catalog=input_catalog, log=log)
 
     assert cat=='PS1'
     assert filt=='R'
