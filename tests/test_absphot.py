@@ -34,7 +34,7 @@ def test_absphot(tmp_path):
     cal.find_zeropoint(file_path, tel, input_catalog=input_catalog, log=log)
 
     hdu = fits.open(file_path)
-    header = hdu['SCI'].header
+    header = hdu['PRIMARY'].header
 
     assert header['ZPTCAT']=='PS1'
     assert header['FILTER']=='R'
