@@ -36,7 +36,12 @@ def test_absphot(tmp_path):
     hdu = fits.open(file_path)
     header = hdu['PRIMARY'].header
 
+    print(header)
+
     assert header['ZPTCAT']=='PS1'
     assert header['FILTER']=='R'
-    assert np.abs(zpt-header['ZPTMAG'])<0.01
+    assert np.abs(27.576871-header['ZPTMAG'])<0.01
     assert header['ZPTMUCER']<0.01
+
+if __name__=="__main__":
+    test_absphot('.')

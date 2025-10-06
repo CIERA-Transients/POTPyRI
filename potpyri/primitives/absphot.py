@@ -159,7 +159,7 @@ class absphot(object):
 
         hdu = fits.open(cmpfile)
         header = hdu['SCI'].header
-        filt = header['FILTER']
+        filtorig = header['FILTER']
         catalog = tel.get_catalog(header)
 
 
@@ -171,7 +171,7 @@ class absphot(object):
 
         cat = None ; cat_ID = None
 
-        filt = self.convert_filter_name(filt)
+        filt = self.convert_filter_name(filtorig)
         if input_catalog is not None:
             cat = input_catalog
         else:
@@ -235,6 +235,7 @@ class absphot(object):
             metadata['ZPTCAT']=catalog
             metadata['ZPTCATID']=cat_ID
             metadata['ZPTPHOT']=phottable
+            metadata['FILTER']=filtorig
 
             # Add limiting magnitudes
             if 'FWHM' in header.keys() and 'SKYSIG' in header.keys():
@@ -257,6 +258,7 @@ class absphot(object):
                     print(f'3-sigma limiting mag of image is {m3sigma}')
 
             hdu['PRIMARY'].header.update(metadata)
+            hdu['SCI'].header.update(metadata)
             hdu[phottable].header.update(metadata)
 
             hdu.writeto(cmpfile, overwrite=True)
