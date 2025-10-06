@@ -261,11 +261,8 @@ class absphot(object):
 
             hdu.writeto(cmpfile, overwrite=True)
             
-            return(zpt, zpterr)
-        else:
-            if log:
-                log.info('No zeropoint calculated.')
-            return(None, None)
+        elif log:
+            log.info('No zeropoint calculated.')
 
     def Y_band(self, J, J_err, K, K_err):
         Y = J+0.46*(J-K)

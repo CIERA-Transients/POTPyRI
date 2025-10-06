@@ -31,9 +31,12 @@ def test_absphot(tmp_path):
     hdu = fits.open(file_path)
 
     cal = absphot.absphot()
-    zpt, zpterr = cal.find_zeropoint(file_path, tel, input_catalog=input_catalog, log=log)
+    cal.find_zeropoint(file_path, tel, input_catalog=input_catalog, log=log)
 
-    assert cat=='PS1'
-    assert filt=='R'
-    assert np.abs(zpt-27.576871)<0.01
-    assert zpterr<0.01
+    hdu = fits.open(file_path)
+    header = hdu['SCI'].header
+
+    assert header['ZPTCAT']=='PS1'
+    assert header['FILTER']=='R'
+    assert np.abs(zpt-header['ZPTMAG'])<0.01
+    assert header['ZPTMUCER']<0.01
