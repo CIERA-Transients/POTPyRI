@@ -1,6 +1,6 @@
 from potpyri.utils import options
 from potpyri.utils import logger
-from potpyri.stages import image_procs
+from potpyri.primitives import image_procs
 
 import os
 import numpy as np

@@ -1,6 +1,6 @@
 from potpyri.utils import options
 from potpyri.utils import logger
-from potpyri.stages import absphot
+from potpyri.primitives import absphot
 
 from astropy.io import ascii
 from astropy.table import Table
