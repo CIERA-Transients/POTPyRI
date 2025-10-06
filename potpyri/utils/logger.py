@@ -28,17 +28,6 @@ def get_log(log_dir):
 
     return(log)
 
-def logprint(log, message, method='info'):
-    if log: 
-        if method=='info':
-            log.info(message)
-        elif method=='error':
-            log.error(message)
-        elif method=='critical':
-            log.critical(message)
-        else:
-            raise Exception(f'Unknown method {method}')
-
 def formatter_message(message, use_color = True):
     # Bold face some text only when rich text/color is requested.
     if use_color:
@@ -102,4 +91,8 @@ class ColoredLogger(logging.Logger):
         # Add both handlers
         self.addHandler(streamhandler)
         self.addHandler(filehandler)
+        return
+
+    def shutdown(self):
+        logging.shutdown()
         return

@@ -1,6 +1,6 @@
 from potpyri.utils import options
 from potpyri.utils import logger
-from potpyri.stages import sort_files
+from potpyri.primitives import sort_files
 
 import os
 

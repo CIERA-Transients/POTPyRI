@@ -1,6 +1,6 @@
 from potpyri.utils import options
 from potpyri.utils import logger
-from potpyri.stages import photometry
+from potpyri.primitives import photometry
 
 import os
 import numpy as np

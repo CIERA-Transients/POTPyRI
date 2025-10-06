@@ -1,6 +1,6 @@
 from potpyri.utils import options
 from potpyri.utils import logger
-from potpyri.stages import solve_wcs
+from potpyri.primitives import solve_wcs
 
 import os
 import numpy as np
