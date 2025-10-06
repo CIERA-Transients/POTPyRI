@@ -158,7 +158,7 @@ class absphot(object):
             print(f'Importing catalog from file: {cmpfile}')
 
         hdu = fits.open(cmpfile)
-        header = hdu['PRIMARY'].header
+        header = hdu['SCI'].header
         filt = header['FILTER']
         catalog = tel.get_catalog(header)
 
