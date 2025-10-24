@@ -15,12 +15,8 @@ If you use this code for your work, please consider citing the package release.
 __version__ = "2.2" # Last updated 03/10/2025
 
 import sys
-import os
 import time
-import re
 import numpy as np
-
-from astropy.io import fits
 
 # Internal dependenciess
 from potpyri.instruments import instrument_getter
@@ -63,7 +59,7 @@ def main_pipeline(instrument:str,
     if skip_flatten: tel.flat=False
 
     # Generate code and data paths based on input path
-    paths = options.add_paths(data_path, tel)
+    paths = options.add_paths(data_path, file_list_name, tel)
 
     # Generate log file in corresponding directory for log
     log = logger.get_log(paths['log'])
@@ -71,14 +67,8 @@ def main_pipeline(instrument:str,
     log.info(f'Running instrument paramater file version {tel.version}')
 
     # This contains all of the file data
-    file_list = os.path.join(paths['data'], file_list_name)
-    file_table = sort_files.handle_files(file_list, tel, paths, 
+    file_table = sort_files.handle_files(paths['filelist'], paths, tel,
         incl_bad=incl_bad, proc=proc, no_redo=no_redo_sort, log=log)
-
-    if not file_table or len(file_table)==0:
-        log.critical('Could not generate file table.  Check file paths.')
-        log.shutdown()
-        sys.exit(-1)
 
     # Calibrations
     ##############
@@ -86,32 +76,17 @@ def main_pipeline(instrument:str,
     calibration.do_dark(file_table, tel, paths, log=log)
     calibration.do_flat(flat_files, tel, paths, log=log)
 
-    # Science images
-    ################
-    kwds = tel.filetype_keywords
-    science_match = tel.match_type_keywords(kwds['SCIENCE'], file_table)
-    science_data = file_table[science_match]
-    if len(science_data)==0:
-        log.info('No science files were found, exiting.')
-        log.shutdown()
-        sys.exit(-1)
-
     # Begin processing
     ##################
-    for tar in np.unique(science_data['TargType']):
-        if target is not None and tar!=target:
-            continue
+    for tar in np.unique(file_table[tel.match_type_keywords(kwds['SCIENCE'], file_table)]['TargType']):
 
         # Image pixel calibration, WCS, and stacking procedures
         #######################################################
-        stack = image_procs.image_proc(science_data[science_data['TargType']==tar], tel, paths,
+        log.info(f'Generating stack for {tar}')
+        stack = image_procs.image_proc(file_table[file_table['TargType']==tar], tel, paths,
             skip_skysub=skip_skysub, fieldcenter=fieldcenter, out_size=out_size,
             cosmic_ray=not skip_cr, skip_gaia=skip_gaia, keep_all_astro=keep_all_astro,
             log=log)
-
-        if stack is None:
-            log.error(f'Could not generate a stack for {tar}')
-            continue
 
         # Photometry step
         #################
@@ -127,6 +102,7 @@ def main_pipeline(instrument:str,
     t2 = time.time()
     log.info('Pipeline finshed.')
     log.info(f'Total runtime: {t2-t1} sec')
+    log.shutdown()
 
 def main():
     options.test_for_dependencies()

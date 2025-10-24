@@ -124,7 +124,7 @@ def test_for_dependencies():
             apt-get, or directly from the source code:
             https://github.com/astromatic/sextractor.''')
 
-def add_paths(data_path, tel):
+def add_paths(data_path, file_list_name, tel):
 
     if not os.path.exists(data_path):
         raise Exception(f'Data path does not exist: {data_path}')
@@ -140,6 +140,7 @@ def add_paths(data_path, tel):
     paths['log']=os.path.join(paths['data'], 'red', 'log')
     paths['cal']=os.path.join(paths['data'], 'red', 'cals')
     paths['work']=os.path.join(paths['data'], 'red', 'workspace')
+    paths['filelist']=os.path.join(paths['data'], file_list_name)
     for key in paths.keys():
         if key in ['caldb']: continue
         if not os.path.exists(paths[key]): os.makedirs(paths[key])

@@ -199,7 +199,7 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
     tries = 1
     good = False
     while tries < 5 and not good:
-        input_args = args + extra_opts
+        input_args = f'{args} {extra_opts}'
 
         if log: 
             log.info(f'Try #{tries} with astrometry.net...')
@@ -226,16 +226,16 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
         else:
             tries += 1
             if tries==2:
-                extra_opts='--objs 15'
+                extra_opts='--objs 15 --no-verify'
             elif tries==3:
-                extra_opts=''
+                extra_opts='--no-verify'
             elif tries==4:
                 # Try with no constraint on RA/Dec
                 args = '--scale-units arcsecperpix '
                 args += f'--scale-low {scale_low} --scale-high {scale_high} '
                 args += f'--no-plots -T '
                 args += f'--overwrite -N {newfile} --dir {directory} '
-                extra_opts=''
+                extra_opts='--no-verify'
 
 
     file_exists=os.path.exists(newfile)
