@@ -74,7 +74,7 @@ def main_pipeline(instrument:str,
     ##############
     calibration.do_bias(file_table, tel, paths, log=log)
     calibration.do_dark(file_table, tel, paths, log=log)
-    calibration.do_flat(flat_files, tel, paths, log=log)
+    calibration.do_flat(file_table, tel, paths, log=log)
 
     # Begin processing
     ##################
