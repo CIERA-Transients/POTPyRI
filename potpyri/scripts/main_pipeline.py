@@ -78,7 +78,7 @@ def main_pipeline(instrument:str,
 
     # Begin processing
     ##################
-    for tar in np.unique(file_table[tel.match_type_keywords(kwds['SCIENCE'], file_table)]['TargType']):
+    for tar in np.unique(file_table[tel.match_type_keywords(tel.filetype_keywords['SCIENCE'], file_table)]['TargType']):
 
         # Image pixel calibration, WCS, and stacking procedures
         #######################################################
