@@ -119,7 +119,7 @@ def is_science(hdr, tel):
     return(science)
 
 # Overall method to handle files:
-def handle_files(file_list, tel, paths, incl_bad=False, proc=None, 
+def handle_files(file_list, paths, tel, incl_bad=False, proc=None, 
     no_redo=False, log=None):
 
     file_table = None
@@ -156,6 +156,11 @@ def handle_files(file_list, tel, paths, incl_bad=False, proc=None,
             log=log)
     else:
         if log: log.critical('No files found, please check data path and rerun.')
+        logging.shutdown()
+        sys.exit(-1)
+
+    if file_table is None or len(file_table)==0:
+        if log: log.critical('No good files found, please check files and rerun.')
         logging.shutdown()
         sys.exit(-1)
 
