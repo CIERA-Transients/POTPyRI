@@ -27,7 +27,7 @@ from ccdproc import combine
 from ccdproc import cosmicray_lacosmic
 
 # Internal dependencies
-from potpyri.stages import solve_wcs
+from potpyri.primitives import solve_wcs
 from potpyri.utils import utilities
 
 def remove_pv_distortion(header):
@@ -742,6 +742,15 @@ def create_error(science_data, mask_data, rdnoise):
     poisson = img_data
     poisson[poisson<0.]=0.
     error = np.sqrt(poisson + rms**2 + rdnoise)
+
+    # Sanitize error array
+    mask = np.isnan(error)
+    error[mask] = np.nanmedian(error)
+    mask = error < 0.0
+    error = np.nanmedian(error)
+    maxval = np.max(img_data)
+    mask = np.isinf(error)
+    error[mask] = maxval
 
     error_hdu = fits.PrimaryHDU(error) #create mask Primary HDU
     error_hdu.header['VER'] = (__version__, 

@@ -1,8 +1,7 @@
 "Function for calculating zero points during flux calibration."
 "Authors: Kerry Paterson, Charlie Kilpatrick"
 
-# Initial version tracking on 09/21/2024
-__version__ = "1.0"
+__version__ = "1.0" # Last updated on 03/10/2025
 
 import numpy as np
 
@@ -150,7 +149,7 @@ class absphot(object):
                 print(m)
             return(None, None, None)
 
-    def find_zeropoint(self, cmpfile, filt, catalog, match_radius=2.5*u.arcsec,
+    def find_zeropoint(self, cmpfile, tel, match_radius=2.5*u.arcsec,
         phottable='APPPHOT', input_catalog=None, log=None):
 
         if log:
@@ -159,7 +158,11 @@ class absphot(object):
             print(f'Importing catalog from file: {cmpfile}')
 
         hdu = fits.open(cmpfile)
-        header = hdu['PRIMARY'].header
+        header = hdu['SCI'].header
+        filtorig = header['FILTER']
+        catalog = tel.get_catalog(header)
+
+
         table = Table(hdu[phottable].data, meta=hdu[phottable].header)
         coords = SkyCoord(table['RA'], table['Dec'], unit='deg')
 
@@ -168,7 +171,7 @@ class absphot(object):
 
         cat = None ; cat_ID = None
 
-        filt = self.convert_filter_name(filt)
+        filt = self.convert_filter_name(filtorig)
         if input_catalog is not None:
             cat = input_catalog
         else:
@@ -232,6 +235,7 @@ class absphot(object):
             metadata['ZPTCAT']=catalog
             metadata['ZPTCATID']=cat_ID
             metadata['ZPTPHOT']=phottable
+            metadata['FILTER']=filtorig
 
             # Add limiting magnitudes
             if 'FWHM' in header.keys() and 'SKYSIG' in header.keys():
@@ -254,15 +258,13 @@ class absphot(object):
                     print(f'3-sigma limiting mag of image is {m3sigma}')
 
             hdu['PRIMARY'].header.update(metadata)
+            hdu['SCI'].header.update(metadata)
             hdu[phottable].header.update(metadata)
 
             hdu.writeto(cmpfile, overwrite=True)
             
-            return(zpt, zpterr)
-        else:
-            if log:
-                log.info('No zeropoint calculated.')
-            return(None, None)
+        elif log:
+            log.info('No zeropoint calculated.')
 
     def Y_band(self, J, J_err, K, K_err):
         Y = J+0.46*(J-K)
@@ -298,3 +300,7 @@ class absphot(object):
             return 15.0
         else:
             return 16.0
+
+def find_zeropoint(stack, tel, log=None):
+    cal = absphot()
+    cal.find_zeropoint(stack, tel, log=log)

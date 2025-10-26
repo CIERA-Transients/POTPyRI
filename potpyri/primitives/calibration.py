@@ -10,15 +10,15 @@ import logging
 import numpy as np
 import sys
 
-def do_bias(bias_table, tel, paths, nmin_images=3, log=None):
+def do_bias(file_table, tel, paths, nmin_images=3, log=None):
 
     # Exit if telescope does not require bias
     if not tel.bias:
-        if log:
-            log.info('No bias is required.')
-        else:
-            print('No bias is required.')
         return(None)
+
+    kwds = tel.filetype_keywords
+    bias_match = tel.match_type_keywords(kwds['BIAS'], file_table)
+    bias_table = file_table[bias_match]
 
     bias_num = 0
     for cal_type in np.unique(bias_table['CalType']):
@@ -61,11 +61,15 @@ def do_bias(bias_table, tel, paths, nmin_images=3, log=None):
         logging.shutdown()
         sys.exit(-1)
 
-def do_dark(dark_table, tel, paths, nmin_images=3, log=None):
+def do_dark(file_table, tel, paths, nmin_images=3, log=None):
 
     # Exit if telescope does not require dark
     if not tel.dark:
         return(None)
+
+    kwds = tel.filetype_keywords
+    dark_match = tel.match_type_keywords(kwds['DARK'], file_table)
+    dark_table = file_table[dark_match]
 
     for cal_type in np.unique(dark_table['CalType']):
         mask = dark_table['CalType']==cal_type
@@ -111,10 +115,19 @@ def do_dark(dark_table, tel, paths, nmin_images=3, log=None):
             t2 = time.time()
             if log: log.info(f'Master dark creation completed in {t2-t1} sec.')
 
-def do_flat(flat_table, tel, paths, nmin_images=3, log=None):
+def do_flat(file_table, tel, paths, nmin_images=3, log=None):
 
     # Exit if telescope does not require dark
     if not tel.flat:
+        return(None)
+
+    kwds = tel.filetype_keywords
+    flat_match = tel.match_type_keywords(kwds['FLAT'], file_table)
+    flat_table = file_table[flat_match]
+
+    # If there are no files for flats, then return without doing anything
+    if tel.flat and len(flat_table)==0:
+        paths['cal'] = paths['caldb']
         return(None)
 
     for cal_type in np.unique(flat_table['CalType']):

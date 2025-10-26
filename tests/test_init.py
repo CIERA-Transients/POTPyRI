@@ -1,12 +1,5 @@
-from potpyri.scripts import main_pipeline
 from potpyri.utils import options
-from potpyri.utils import logger
-from potpyri.stages import sort_files
-
-import numpy as np
-import astropy.utils.data
-import importlib
-import os
+from potpyri.instruments import instrument_getter
 
 def test_init(tmp_path):
 
@@ -20,5 +13,5 @@ def test_init(tmp_path):
 
     # Test initialization of each POTPyRI instrument
     for instrument in instruments:
-        paths, tel = options.initialize_telescope(instrument, tmp_path)
+        tel = instrument_getter(instrument)
         assert tel.name.upper()==instrument.upper()

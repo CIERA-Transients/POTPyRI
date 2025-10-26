@@ -1,17 +1,16 @@
 from potpyri.utils import options
 from potpyri.utils import logger
-from potpyri.stages import image_procs
+from potpyri.instruments import instrument_getter
 
 import os
 import numpy as np
-
-from astropy.io import fits
 
 from tests.utils import download_gdrive_file
 
 def test_cal(tmp_path):
 
     instrument = 'GMOS'
+    file_list_name = 'files.txt'
 
     # Raw science file plus calibration files
     file_path = download_gdrive_file('GMOS/raw/N20240618S0015.fits.bz2', use_cached=True)
@@ -19,7 +18,9 @@ def test_cal(tmp_path):
     download_gdrive_file('GMOS/red/cals/mflat_i_12_22.fits.fz', use_cached=True)
 
     data_path, basefile = os.path.split(file_path)
-    paths, tel = options.initialize_telescope(instrument, data_path[0:-4])
+    data_path, _ = os.path.split(data_path)
+    tel = instrument_getter(instrument)
+    paths = options.add_paths(data_path, file_list_name, tel)
 
     # Generate log file in corresponding directory for log
     log = logger.get_log(paths['log'])

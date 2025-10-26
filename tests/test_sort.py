@@ -1,6 +1,7 @@
 from potpyri.utils import options
 from potpyri.utils import logger
-from potpyri.stages import sort_files
+from potpyri.primitives import sort_files
+from potpyri.instruments import instrument_getter
 
 import os
 
@@ -9,19 +10,21 @@ from tests.utils import download_gdrive_file
 def test_sort(tmp_path):
 
     instrument = 'BINOSPEC'
+    file_list_name = 'files.txt'
 
     # Raw science file
     file_path = download_gdrive_file('Binospec/raw/sci_img_2024.0812.034220_proc.fits.fz', use_cached=True)
 
     data_path, basefile = os.path.split(file_path)
-    paths, tel = options.initialize_telescope(instrument, data_path)
+    data_path, _ = os.path.split(data_path)
+    tel = instrument_getter(instrument)
+    paths = options.add_paths(data_path, file_list_name, tel)
 
     # Generate log file in corresponding directory for log
     log = logger.get_log(paths['log'])
 
     # This contains all of the file data
-    file_list = os.path.join(paths['data'], 'file_list.txt')
-    file_table = sort_files.handle_files(file_list, tel, paths, 
+    file_table = sort_files.handle_files(paths['filelist'], paths, tel,
         incl_bad=True, proc='proc', no_redo=False, log=log)
 
     # Run validation checks on file_table
@@ -36,7 +39,7 @@ def test_sort(tmp_path):
     assert file_table[0]['Amp']=="2"
 
     # Test the no_redo flag
-    new_file_table = sort_files.handle_files(file_list, tel, paths, 
+    new_file_table = sort_files.handle_files(paths['filelist'], paths, tel,
         incl_bad=True, proc='proc', no_redo=True, log=log)
 
     assert len(new_file_table)==1
