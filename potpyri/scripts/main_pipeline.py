@@ -14,7 +14,6 @@ If you use this code for your work, please consider citing the package release.
 
 __version__ = "2.2" # Last updated 03/10/2025
 
-import sys
 import time
 import numpy as np
 

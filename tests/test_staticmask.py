@@ -1,14 +1,9 @@
-from potpyri.scripts import main_pipeline
 from potpyri.utils import options
-from potpyri.utils import logger
-from potpyri.primitives import sort_files
-
-import numpy as np
-import astropy.utils.data
-import importlib
-import os
+from potpyri.instruments import instrument_getter
 
 def test_staticmask(tmp_path):
+
+    file_list_name = 'files.txt'
 
     instruments = {
         'F2': {'INST': 'F2', 'INSTRUME': 'F2'},
@@ -22,7 +17,10 @@ def test_staticmask(tmp_path):
     for instrument in instruments.keys():
         hdr = instruments[instrument]
         instname = hdr['INST']
-        paths, tel = options.initialize_telescope(instname, tmp_path)
+
+        tel = instrument_getter(instname)
+        paths = options.add_paths(tmp_path, file_list_name, tel)
+
         assert tel.name.upper()==instname.upper()
 
         staticmask = tel.load_staticmask(hdr, paths)

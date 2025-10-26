@@ -141,8 +141,9 @@ def add_paths(data_path, file_list_name, tel):
     paths['cal']=os.path.join(paths['data'], 'red', 'cals')
     paths['work']=os.path.join(paths['data'], 'red', 'workspace')
     paths['filelist']=os.path.join(paths['data'], file_list_name)
+    
     for key in paths.keys():
-        if key in ['caldb']: continue
+        if key in ['caldb','filelist']: continue
         if not os.path.exists(paths[key]): os.makedirs(paths[key])
 
     p=subprocess.run(['which','sex'], capture_output=True)

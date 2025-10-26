@@ -1,6 +1,7 @@
 from potpyri.utils import options
 from potpyri.utils import logger
 from potpyri.primitives import photometry
+from potpyri.instruments import instrument_getter
 
 import os
 import numpy as np
@@ -12,6 +13,7 @@ from tests.utils import download_gdrive_file
 def test_photometry(tmp_path):
 
     instrument = 'GMOS'
+    file_list_name = 'files.txt'
 
     # Raw science file
     file_path = download_gdrive_file('GMOS/red/sGRB240615A-GRB.i.ut240618.12.22.stk.fits.fz', use_cached=True)
@@ -34,7 +36,8 @@ def test_photometry(tmp_path):
     hdu.writeto(file_path, overwrite=True)
 
     data_path, basefile = os.path.split(file_path)
-    paths, tel = options.initialize_telescope(instrument, data_path)
+    tel = instrument_getter(instrument)
+    paths = options.add_paths(data_path, file_list_name, tel)
 
     # Generate log file in corresponding directory for log
     log = logger.get_log(paths['log'])
