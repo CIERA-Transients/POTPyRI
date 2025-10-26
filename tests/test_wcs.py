@@ -1,9 +1,9 @@
 from potpyri.utils import options
 from potpyri.utils import logger
 from potpyri.primitives import solve_wcs
+from potpyri.instruments import instrument_getter
 
 import os
-import numpy as np
 
 from astropy.io import fits
 
@@ -12,13 +12,17 @@ from tests.utils import download_gdrive_file
 def test_wcs(tmp_path):
 
     instrument = 'GMOS'
+    file_list_name = 'files.txt'
 
     # Download science file
     file_path = download_gdrive_file('GMOS/red/workspace/sGRB240615A-GRB.i.ut240618.12.22.1403185114.fits.fz', use_cached=True)
     astm_path = download_gdrive_file('astrometry/index-52m1-14.fits')
 
     data_path, basefile = os.path.split(file_path)
-    paths, tel = options.initialize_telescope(instrument, data_path[0:-14])
+    data_path, _ = os.path.split(data_path)
+
+    tel = instrument_getter(instrument)
+    paths = options.add_paths(data_path, file_list_name, tel)
 
     # Generate log file in corresponding directory for log
     log = logger.get_log(paths['log'])

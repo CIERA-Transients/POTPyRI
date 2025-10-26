@@ -141,7 +141,7 @@ def handle_files(file_list, paths, tel, incl_bad=False, proc=None,
             file_table['Time'] = file_table['Time'].astype(np.float64)
 
             return(file_table)
-        else:
+        elif os.path.exists(file_list):
             os.remove(file_list)
 
     files = glob.glob(os.path.join(paths['raw'], tel.raw_format(proc)))+\

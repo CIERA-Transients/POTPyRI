@@ -1,6 +1,7 @@
 from potpyri.utils import options
 from potpyri.utils import logger
 from potpyri.primitives import image_procs
+from potpyri.instruments import instrument_getter
 
 import numpy as np
 import os
@@ -16,10 +17,12 @@ from . import utils
 def test_stack(tmp_path):
 
     instrument = 'MMIRS'
+    file_list_name = 'files.txt'
     nims = 5
 
     # Science file (just tellurics)
-    paths, tel = options.initialize_telescope(instrument, tmp_path)
+    tel = instrument_getter(instrument)
+    paths = options.add_paths(tmp_path, file_list_name, tel)
 
     # Generate log file in corresponding directory for log
     log = logger.get_log(paths['log'])

@@ -43,7 +43,7 @@ def get_gaia_catalog(input_file, log=None):
     header = hdu[0].header
     hkeys = list(header.keys())
 
-    check_pairs = [('RA','DEC'),('CRVAL1','CRVAL2'),('OBJCTRA','OBJCTDEC')]
+    check_pairs = [('CRVAL1','CRVAL2'),('RA','DEC'),('OBJCTRA','OBJCTDEC')]
     coord = None
 
     for pair in check_pairs:
@@ -134,7 +134,7 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
 
     exten = '.'+file.split('.')[-1]
 
-    check_pairs = [('RA','DEC'),('CRVAL1','CRVAL2'),('OBJCTRA','OBJCTDEC')]
+    check_pairs = [('CRVAL1','CRVAL2'),('RA','DEC'),('OBJCTRA','OBJCTDEC')]
     coord = None
 
     for pair in check_pairs:
