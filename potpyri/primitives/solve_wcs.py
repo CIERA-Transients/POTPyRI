@@ -134,7 +134,12 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
 
     exten = '.'+file.split('.')[-1]
 
-    check_pairs = [('CRVAL1','CRVAL2'),('RA','DEC'),('OBJCTRA','OBJCTDEC')]
+    if tel.name.upper=='BINOSPEC':
+        check_pairs = [('CRVAL1','CRVAL2'),('RA','DEC'),('OBJCTRA','OBJCTDEC')]
+    else:
+        check_pairs = [('RA','DEC'),('OBJCTRA','OBJCTDEC'),('TARGRA','TARGDEC'),
+            ('CRVAL1','CRVAL2')]
+
     coord = None
 
     for pair in check_pairs:
@@ -198,7 +203,7 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
 
     tries = 1
     good = False
-    while tries < 5 and not good:
+    while tries < 6 and not good:
         input_args = f'{args} {extra_opts}'
 
         if log: 
@@ -230,6 +235,15 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
             elif tries==3:
                 extra_opts='--no-verify'
             elif tries==4:
+                # Try without source extractor
+                extra_opts='--no-verify'
+                args = '--scale-units arcsecperpix '
+                args += f'--scale-low {scale_low} --scale-high {scale_high} '
+                args += f'--no-plots -T '
+                args += f'--overwrite -N {newfile} --dir {directory} '
+                args += f'--ra {ra} --dec {dec} '
+                args += f' --radius {radius} '
+            elif tries==5:
                 # Try with no constraint on RA/Dec
                 args = '--scale-units arcsecperpix '
                 args += f'--scale-low {scale_low} --scale-high {scale_high} '

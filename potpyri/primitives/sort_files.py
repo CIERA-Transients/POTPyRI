@@ -248,7 +248,7 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
             moved_path = paths['bad']
             if os.path.dirname(f)!=moved_path: shutil.move(f, paths['bad'])
             continue
-        except (TypeError, gzip.BadGzipFile, zlib.error):
+        except (TypeError, gzip.BadGzipFile, zlib.error, OSError):
             if log: 
                 log.error(f'Moving file {f} to bad due to corrupted data.')
             else:
