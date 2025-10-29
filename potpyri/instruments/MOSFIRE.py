@@ -117,7 +117,13 @@ class MOSFIRE(instrument.Instrument):
 
     def import_image(self, filename, amp, log=None):
 
-        raw = CCDData.read(filename, unit=u.adu)
+        with fits.open(filename) as hdr:
+            header = hdr['SCI'].header
+            data = hdr['SCI'].data
+
+        del header['BUNIT']
+
+        raw = CCDData(data, header=header, unit=u.adu)
         red = ccdproc.ccd_process(raw, 
             gain=self.get_gain(raw.header)*u.electron/u.adu, 
             readnoise=self.get_rdnoise(raw.header)*u.electron)
