@@ -134,7 +134,12 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
 
     exten = '.'+file.split('.')[-1]
 
-    check_pairs = [('CRVAL1','CRVAL2'),('RA','DEC'),('OBJCTRA','OBJCTDEC')]
+    if tel.name.upper=='BINOSPEC':
+        check_pairs = [('CRVAL1','CRVAL2'),('RA','DEC'),('OBJCTRA','OBJCTDEC')]
+    else:
+        check_pairs = [('RA','DEC'),('OBJCTRA','OBJCTDEC'),('TARGRA','TARGDEC'),
+            ('CRVAL1','CRVAL2')]
+            
     coord = None
 
     for pair in check_pairs:
