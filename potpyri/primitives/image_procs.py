@@ -748,7 +748,7 @@ def create_error(science_data, mask_data, rdnoise):
     error[mask] = np.nanmedian(error)
     mask = error < 0.0
     error = np.nanmedian(error)
-    maxval = np.max(img_data)
+    maxval = np.float32(hdu[0].header['SATURATE'])
     mask = np.isinf(error)
     error[mask] = maxval
 
