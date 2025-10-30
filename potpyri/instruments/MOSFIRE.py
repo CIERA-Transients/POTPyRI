@@ -33,7 +33,7 @@ class MOSFIRE(instrument.Instrument):
         self.min_exptime = 1.0
 
         # Run dark/bias/flat calibration?
-        self.dark = False
+        self.dark = True
         self.bias = False
         self.flat = True
 
