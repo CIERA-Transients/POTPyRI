@@ -520,10 +520,10 @@ def photloop(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
     epsf = None ; fwhm = None
     while signal_to_noise > phot_sn_min:
 
-        if log: log.info(f'Trying photometry with final S/N={signal_to_noise}')
+        if log: log.info(f'Trying PSF generation with S/N={signal_to_noise}')
         star_param = {'snthresh_psf': signal_to_noise*2.0,
                       'fwhm_init': fwhm_init,
-                      'snthresh_final': signal_to_noise}
+                      'snthresh_final': 5.0}
         try:
             do_phot(stack, star_param=star_param) 
         except Exception as e:
