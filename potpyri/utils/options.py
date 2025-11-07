@@ -53,7 +53,7 @@ def init_options():
         help='''Minimum signal-to-noise to try in photometry loop.''')
     params.add_argument('--phot-sn-max',
         type=float,
-        default=40.0,
+        default=20.0,
         help='''Maximum signal-to-noise to try in photometry loop.''')
     params.add_argument('--fwhm-init',
         type=float,
