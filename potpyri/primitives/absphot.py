@@ -113,7 +113,9 @@ class absphot(object):
         if log: 
             log.info(f'Getting {catalog} catalog with ID {cat_ID} in filt {filt}')
             log.info(f'Querying around {coord_ra}, {coord_dec} deg')
-        cat = vizier.query_region(med_coord, width=1.2*max_sep*u.degree, 
+        Vizier.clear_cache()
+        width = np.max([2.0 * max_sep, 0.5])
+        cat = vizier.query_region(med_coord, width=width*u.degree, 
             catalog=cat_ID)
 
         if len(cat)>0:
@@ -182,10 +184,10 @@ class absphot(object):
 
             cat, catalog, cat_ID = self.get_catalog(coords, catalog, filt, log=log)
 
-        min_mag = self.get_minmag(filt)
-        cat = cat[cat['mag']>min_mag]
-
         if cat:
+            min_mag = self.get_minmag(filt)
+            cat = cat[cat['mag']>min_mag]
+
             coords_cat = SkyCoord(cat['ra'], cat['dec'], unit='deg')
 
             idx, d2, d3 = coords_cat.match_to_catalog_sky(coords)
