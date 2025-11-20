@@ -29,6 +29,7 @@ from ccdproc import cosmicray_lacosmic
 # Internal dependencies
 from potpyri.primitives import solve_wcs
 from potpyri.utils import utilities
+from potpyri.photometry import run_sextractor
 
 def remove_pv_distortion(header):
 
@@ -616,6 +617,14 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
     hdu = fits.open(science_data)
     data = np.ascontiguousarray(hdu[0].data.astype(np.float32))
 
+    # Estimate FWHM size for LACosmic
+    table = run_sextractor(science_data)
+    if table is not None:
+        # Clip fwhm_stars by fwhm
+        fwhm, meanfwhm, stdfwhm = sigma_clipped_stats(table['FWHM_IMAGE'])
+    else:
+        fwhm = 3.5
+
     # Astroscrappy requires added sky background, so add this value back
     # Set the sky background to some nominal value if it is too low for CR rej
     skybkg = hdu[0].header['SKYBKG']
@@ -659,7 +668,8 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
     if cosmic_ray:
         newdata, mask_cr = cosmicray_lacosmic(data,
             readnoise=rdnoise, satlevel=saturation, verbose=True,
-            sigclip=sigclip, sigfrac=sigfrac, objlim=objlim, niter=niter)
+            sigclip=sigclip, sigfrac=sigfrac, objlim=objlim, niter=niter,
+            psffwhm=fwhm)
 
         mask_cr = mask_cr.astype(np.uint8) #set cosmic ray mask type
     else:
