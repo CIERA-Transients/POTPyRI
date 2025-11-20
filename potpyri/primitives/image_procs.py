@@ -27,9 +27,9 @@ from ccdproc import combine
 from ccdproc import cosmicray_lacosmic
 
 # Internal dependencies
+from potpyri.primitives import photometry
 from potpyri.primitives import solve_wcs
 from potpyri.utils import utilities
-from potpyri.photometry import run_sextractor
 
 def remove_pv_distortion(header):
 
@@ -618,7 +618,7 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
     data = np.ascontiguousarray(hdu[0].data.astype(np.float32))
 
     # Estimate FWHM size for LACosmic
-    table = run_sextractor(science_data)
+    table = photometry.run_sextractor(science_data)
     if table is not None:
         # Clip fwhm_stars by fwhm
         fwhm, meanfwhm, stdfwhm = sigma_clipped_stats(table['FWHM_IMAGE'])
