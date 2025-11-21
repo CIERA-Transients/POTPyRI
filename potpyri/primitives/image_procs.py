@@ -489,7 +489,7 @@ def stack_data(stacking_data, tel, masks, errors, mem_limit=8.0e9, log=None):
         print(f'Image size is {size}')
 
     # Get maximum size of chunk
-    max_chunk = int(np.floor(mem_limit / 4.0 / (size)))
+    max_chunk = int(np.floor(mem_limit / 2.0 / (size)))
     if max_chunk==0: max_chunk=1
 
     if len(stacking_data)<=max_chunk:
