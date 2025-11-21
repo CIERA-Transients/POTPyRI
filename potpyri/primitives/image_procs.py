@@ -606,7 +606,7 @@ def mask_satellites(images, filenames, log=None):
 
         os.remove(tmpfile)
 
-def create_mask(science_data, saturation, rdnoise, sigclip=3.5, 
+def create_mask(science_data, saturation, rdnoise, sigclip=3.0, 
     sigfrac=0.2, objlim=4.5, niter=6, outpath='', grow=0, satellites=True,
     cosmic_ray=True, log=None):
 
