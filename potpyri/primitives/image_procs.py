@@ -608,7 +608,7 @@ def mask_satellites(images, filenames, log=None):
 
 def create_mask(science_data, saturation, rdnoise, sigclip=3.0, 
     sigfrac=0.15, objlim=4.5, niter=6, outpath='', grow=0, cosmic_ray=True, 
-    fsmode='convolve', cleantype='meanmask', log=None):
+    fsmode='convolve', cleantype='medmask', log=None):
 
     t_start = time.time()
     
@@ -625,7 +625,10 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.0,
     if table is not None:
         # Clip fwhm_stars by fwhm
         fwhm, meanfwhm, stdfwhm = sigma_clipped_stats(table['FWHM_IMAGE'])
-        if log: log.info(f'Using FWHM for cosmic rays: {fwhm}')
+        if log: 
+            log.info(f'Using FWHM for cosmic rays: {fwhm}')
+        else:
+            print(f'Using FWHM for cosmic rays: {fwhm}')
     else:
         fwhm = 3.5
 
@@ -677,7 +680,7 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.0,
             readnoise=rdnoise, satlevel=saturation, verbose=True,
             sigclip=sigclip, sigfrac=sigfrac, objlim=objlim, niter=niter,
             psffwhm=fwhm, psfsize=psfsize, fsmode=fsmode,
-            cleantype=cleantype, sepmed=False)
+            cleantype=cleantype)
 
         mask_cr = mask_cr.astype(np.uint8) #set cosmic ray mask type
     else:
