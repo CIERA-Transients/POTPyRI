@@ -139,8 +139,11 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
 
             if log:
                 log.info('Rejecting the following images for high astrometric dispersion:')
-                for i,m in enumerate(mask):
-                    if not m: log.info(solved_images[i])
+                if np.all(mask):
+                    log.info('No images rejected')
+                else:
+                    for i,m in enumerate(mask):
+                        if not m: log.info(solved_images[i])
 
             solved_images = np.array(solved_images)[mask]
     else:
@@ -618,10 +621,11 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
     data = np.ascontiguousarray(hdu[0].data.astype(np.float32))
 
     # Estimate FWHM size for LACosmic
-    table = photometry.run_sextractor(science_data)
+    table = photometry.run_sextractor(science_data, log=log)
     if table is not None:
         # Clip fwhm_stars by fwhm
         fwhm, meanfwhm, stdfwhm = sigma_clipped_stats(table['FWHM_IMAGE'])
+        if log: log.info(f'Using FWHM for cosmic rays: {fwhm}')
     else:
         fwhm = 3.5
 
@@ -665,11 +669,14 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
     mask_cr = np.zeros(data.shape)
     mask_cr = mask_cr.astype(np.uint8)
 
+    psfsize = int(np.round(2.5*fwhm))
+    if psfsize%2==0: psfsize+=1
+
     if cosmic_ray:
         newdata, mask_cr = cosmicray_lacosmic(data,
             readnoise=rdnoise, satlevel=saturation, verbose=True,
             sigclip=sigclip, sigfrac=sigfrac, objlim=objlim, niter=niter,
-            psffwhm=fwhm)
+            psffwhm=fwhm, psfsize=psfsize)
 
         mask_cr = mask_cr.astype(np.uint8) #set cosmic ray mask type
     else:
