@@ -709,7 +709,7 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
     nsat = np.sum(mask & 4 == 4)
     ngrow = np.sum(mask & 8 == 8)
     
-    mask_hdu = fits.PrimaryHDU(mask) #create mask Primary HDU
+    mask_hdu = fits.ImageHDU(mask) #create mask Primary HDU
     mask_hdu.header['VER'] = (__version__, 
         'Version of image procedures used.') #name of log file
     mask_hdu.header['USE'] = 'Complex mask using additive flags.'#header comment
