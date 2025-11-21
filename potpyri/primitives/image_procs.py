@@ -607,7 +607,7 @@ def mask_satellites(images, filenames, log=None):
         os.remove(tmpfile)
 
 def create_mask(science_data, saturation, rdnoise, sigclip=3.0, 
-    sigfrac=0.15, objlim=4.5, niter=6, outpath='', grow=0, cosmic_ray=True, 
+    sigfrac=0.10, objlim=4.0, niter=6, outpath='', grow=0, cosmic_ray=True, 
     fsmode='convolve', cleantype='medmask', log=None):
 
     t_start = time.time()
