@@ -608,7 +608,7 @@ def mask_satellites(images, filenames, log=None):
 
 def create_mask(science_data, saturation, rdnoise, sigclip=3.0, 
     sigfrac=0.2, objlim=4.5, niter=6, outpath='', grow=0, cosmic_ray=True, 
-    fsmode='convolve', log=None):
+    fsmode='convolve', cleanmask='medmask', log=None):
 
     t_start = time.time()
     
@@ -676,7 +676,8 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.0,
         newdata, mask_cr = cosmicray_lacosmic(data,
             readnoise=rdnoise, satlevel=saturation, verbose=True,
             sigclip=sigclip, sigfrac=sigfrac, objlim=objlim, niter=niter,
-            psffwhm=fwhm, psfsize=psfsize, fsmode=fsmode)
+            psffwhm=fwhm, psfsize=psfsize, fsmode=fsmode,
+            cleanmask=cleanmask)
 
         mask_cr = mask_cr.astype(np.uint8) #set cosmic ray mask type
     else:
