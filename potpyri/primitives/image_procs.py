@@ -494,7 +494,7 @@ def stack_data(stacking_data, tel, masks, errors, mem_limit=8.0e9, log=None):
 
     if len(stacking_data)<=max_chunk:
         sci_med = combine(stacking_data, weights=weights, scale=scale,
-            method=stack_method, mem_limit=mem_limit)
+            method=stack_method, mem_limit=2*mem_limit)
     else:
         nimgs = len(stacking_data) * 1.0
         nchunks = int(np.ceil(nimgs/(1.0*max_chunk)))
