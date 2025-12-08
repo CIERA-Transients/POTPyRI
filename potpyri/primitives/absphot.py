@@ -107,8 +107,13 @@ class absphot(object):
 
         seps = med_coord.separation(coords)
         max_sep = np.max(seps.to(u.deg).value)
+
+        cols = [cat_ra, cat_dec, cat_mag, cat_err]
+        # Add Kron mag if the catalog is PS1
+        if cat_ID=='II/349':
+            cols.append(f'{filt}Kmag')
         
-        vizier = Vizier(columns=[cat_ra, cat_dec, cat_mag, cat_err])
+        vizier = Vizier(columns=cols)
         vizier.ROW_LIMIT = -1
         if log: 
             log.info(f'Getting {catalog} catalog with ID {cat_ID} in filt {filt}')
@@ -122,6 +127,23 @@ class absphot(object):
             cat = cat[0]
             cat = cat[~np.isnan(cat[cat_mag])]
             cat = cat[cat[cat_err]>0.]
+
+            if cat_ID=='II/349':
+                if log:
+                    log.info('Cutting on Kron magnitudes')
+                else:
+                    print('Cutting on Kron magnitudes')
+
+                nsources = len(cat)
+                cat_kron = f'{filt}Kmag'
+                mask = cat[cat_mag]-cat[cat_kron] < 0.1
+                cat = cat[mask]
+                nkron = len(cat)
+
+                if log:
+                    log.info(f'Cut catalog from {nsources} to {nkron}')
+                else:
+                    print(f'Cut catalog from {nsources} to {nkron}')
 
             cat.rename_column(cat_ra, 'ra')
             cat.rename_column(cat_dec, 'dec')
@@ -306,3 +328,10 @@ class absphot(object):
 def find_zeropoint(stack, tel, log=None):
     cal = absphot()
     cal.find_zeropoint(stack, tel, log=log)
+
+if __name__=="__main__":
+    from potpyri.instruments import instrument_getter
+    tel = instrument_getter('GMOS')
+
+    cal = absphot()
+    cal.find_zeropoint('/Users/ckilpatrick/FRB20250428A/red/FRB20250428A.r.ut251129.12.22.stk.fits', tel)
