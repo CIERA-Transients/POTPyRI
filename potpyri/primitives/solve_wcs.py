@@ -335,7 +335,7 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
         return(False)
 
 def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
-    save_centroids=False, log=None):
+    save_centroids=False, min_gaia_match=5, log=None):
 
     cat = get_gaia_catalog(file, log=log)
 
@@ -379,7 +379,7 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
     else:
         print(f'Found {len(cat)} stars in the image')
 
-    if len(cat)<7:
+    if len(cat)<min_gaia_match:
         if log:
             log.info(f'Too few stars in {file}.  Skipping Gaia alignment...')
         else:
@@ -471,6 +471,20 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
             log.info(f'Matched to {len(cat_coords_match)} coordinates')
         else:
             print(f'Matched to {len(cat_coords_match)} coordinates')
+
+    if len(cat_coords_match)<min_gaia_match:
+        if log:
+            log.info(f'Too few matched stars in {file}.  Skipping Gaia alignment...')
+        else:
+            print(f'Too few matched stars in {file}.  Skipping Gaia alignment...')
+
+        # Set these values to some default so pipeline won't break
+        hdu[0].header['RADISP']=(1.0, 'Dispersion in R.A. of WCS [Arcsec]')
+        hdu[0].header['DEDISP']=(1.0, 'Dispersion in Decl. of WCS [Arcsec]')
+
+        hdu.writeto(file, overwrite=True, output_verify='silentfix')
+
+        return(True)
 
     # Bootstrap WCS solution and get center pixel
     ra_cent = [] ; de_cent = []

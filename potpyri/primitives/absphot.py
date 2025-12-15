@@ -328,10 +328,3 @@ class absphot(object):
 def find_zeropoint(stack, tel, log=None):
     cal = absphot()
     cal.find_zeropoint(stack, tel, log=log)
-
-if __name__=="__main__":
-    from potpyri.instruments import instrument_getter
-    tel = instrument_getter('GMOS')
-
-    cal = absphot()
-    cal.find_zeropoint('/Users/ckilpatrick/FRB20250428A/red/FRB20250428A.r.ut251129.12.22.stk.fits', tel)
