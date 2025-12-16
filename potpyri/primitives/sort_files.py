@@ -282,14 +282,14 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
                 file_type = 'BIAS'
                 moved_path = paths['raw']
                 bias_num += 1
-            elif is_science(hdr, tel):
-                file_type = 'SCIENCE'
-                moved_path = paths['raw']
-                sci_num += 1
             elif is_dark(hdr, tel):
                 file_type = 'DARK'
                 moved_path = paths['raw']
                 dark_num += 1
+            elif is_science(hdr, tel):
+                file_type = 'SCIENCE'
+                moved_path = paths['raw']
+                sci_num += 1
             else:
                 file_type = 'BAD'
                 moved_path = paths['bad']

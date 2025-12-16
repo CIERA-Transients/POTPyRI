@@ -107,19 +107,43 @@ class absphot(object):
 
         seps = med_coord.separation(coords)
         max_sep = np.max(seps.to(u.deg).value)
+
+        cols = [cat_ra, cat_dec, cat_mag, cat_err]
+        # Add Kron mag if the catalog is PS1
+        if cat_ID=='II/349':
+            cols.append(f'{filt}Kmag')
         
-        vizier = Vizier(columns=[cat_ra, cat_dec, cat_mag, cat_err])
+        vizier = Vizier(columns=cols)
         vizier.ROW_LIMIT = -1
         if log: 
             log.info(f'Getting {catalog} catalog with ID {cat_ID} in filt {filt}')
             log.info(f'Querying around {coord_ra}, {coord_dec} deg')
-        cat = vizier.query_region(med_coord, width=1.2*max_sep*u.degree, 
+        Vizier.clear_cache()
+        width = np.max([2.0 * max_sep, 0.5])
+        cat = vizier.query_region(med_coord, width=width*u.degree, 
             catalog=cat_ID)
 
         if len(cat)>0:
             cat = cat[0]
             cat = cat[~np.isnan(cat[cat_mag])]
             cat = cat[cat[cat_err]>0.]
+
+            if cat_ID=='II/349':
+                if log:
+                    log.info('Cutting on Kron magnitudes')
+                else:
+                    print('Cutting on Kron magnitudes')
+
+                nsources = len(cat)
+                cat_kron = f'{filt}Kmag'
+                mask = cat[cat_mag]-cat[cat_kron] < 0.1
+                cat = cat[mask]
+                nkron = len(cat)
+
+                if log:
+                    log.info(f'Cut catalog from {nsources} to {nkron}')
+                else:
+                    print(f'Cut catalog from {nsources} to {nkron}')
 
             cat.rename_column(cat_ra, 'ra')
             cat.rename_column(cat_dec, 'dec')
@@ -182,10 +206,10 @@ class absphot(object):
 
             cat, catalog, cat_ID = self.get_catalog(coords, catalog, filt, log=log)
 
-        min_mag = self.get_minmag(filt)
-        cat = cat[cat['mag']>min_mag]
-
         if cat:
+            min_mag = self.get_minmag(filt)
+            cat = cat[cat['mag']>min_mag]
+
             coords_cat = SkyCoord(cat['ra'], cat['dec'], unit='deg')
 
             idx, d2, d3 = coords_cat.match_to_catalog_sky(coords)

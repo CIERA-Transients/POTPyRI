@@ -27,6 +27,7 @@ from ccdproc import combine
 from ccdproc import cosmicray_lacosmic
 
 # Internal dependencies
+from potpyri.primitives import photometry
 from potpyri.primitives import solve_wcs
 from potpyri.utils import utilities
 
@@ -138,8 +139,11 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
 
             if log:
                 log.info('Rejecting the following images for high astrometric dispersion:')
-                for i,m in enumerate(mask):
-                    if not m: log.info(solved_images[i])
+                if np.all(mask):
+                    log.info('No images rejected')
+                else:
+                    for i,m in enumerate(mask):
+                        if not m: log.info(solved_images[i])
 
             solved_images = np.array(solved_images)[mask]
     else:
@@ -451,72 +455,20 @@ def stack_data(stacking_data, tel, masks, errors, mem_limit=8.0e9, log=None):
         else:
             raise Exception('Could not get stacking method for these images')
 
-    weights = []
-    for i,error in enumerate(errors):
-        ivar = 1./error.data**2
-        mask = masks[i]
-        ivar[mask.data.astype(bool)]=0.
-        weights.append(ivar)
-    weights=np.array(weights)
-
-    new_data = []
     exptimes = []
     for i,stk in enumerate(stacking_data):
         mask = masks[i].data.astype(bool)
         stacking_data[i].data[mask] = np.nan
         exptimes.append(float(tel.get_exptime(stk.header)))
-
+    
     exptimes = np.array(exptimes)
     scale = 1./exptimes
-
-    all_data = np.array([s.data for s in stacking_data])
 
     if len(scale)==1:
         stack_method='average'
 
-    # Determine if intermediate stacks are needed
-    # Get size of individual frame, account for data, noise, and mask
-    exdata = stacking_data[0].data
-    size = 64.0/8.0 * exdata.shape[0]*exdata.shape[1] * 2 + exdata.shape[0]*exdata.shape[1]
-
-    if log:
-        log.info(f'Image size is {size}')
-    else:
-        print(f'Image size is {size}')
-
-    # Get maximum size of chunk
-    max_chunk = int(np.floor(mem_limit / 4.0 / (size)))
-    if max_chunk==0: max_chunk=1
-
-    if len(stacking_data)<=max_chunk:
-        sci_med = combine(stacking_data, weights=weights, scale=scale,
+    sci_med = combine(stacking_data, scale=scale,
             method=stack_method, mem_limit=mem_limit)
-    else:
-        nimgs = len(stacking_data) * 1.0
-        nchunks = int(np.ceil(nimgs/(1.0*max_chunk)))
-
-        if log:
-            log.info(f'Splitting stacking into {nchunks} chunks')
-        else:
-            print(f'Splitting stacking into {nchunks} chunks')
-
-        inter_med = []
-        for i in np.arange(nchunks):
-            if log:
-                log.info(f'Stacking chunk {i+1}/{nchunks}')
-            else:
-                print(f'Stacking chunk {i+1}/{nchunks}')
-            start = i*max_chunk
-            end = (i+1)*max_chunk
-            if end>len(stacking_data): end=None
-
-            sci_med = combine(stacking_data[start:end], 
-                weights=weights[start:end], scale=scale[start:end],
-                method=stack_method, mem_limit=mem_limit)
-
-            inter_med.append(sci_med)
-
-        sci_med = combine(inter_med, method=stack_method)
 
     sci_med = sci_med.to_hdu()
 
@@ -602,9 +554,9 @@ def mask_satellites(images, filenames, log=None):
 
         os.remove(tmpfile)
 
-def create_mask(science_data, saturation, rdnoise, sigclip=3.5, 
-    sigfrac=0.2, objlim=4.5, niter=6, outpath='', grow=0, satellites=True,
-    cosmic_ray=True, log=None):
+def create_mask(science_data, saturation, rdnoise, sigclip=3.0, 
+    sigfrac=0.10, objlim=4.0, niter=6, outpath='', grow=0, cosmic_ray=True, 
+    fsmode='convolve', cleantype='medmask', log=None):
 
     t_start = time.time()
     
@@ -615,6 +567,18 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
 
     hdu = fits.open(science_data)
     data = np.ascontiguousarray(hdu[0].data.astype(np.float32))
+
+    # Estimate FWHM size for LACosmic
+    table = photometry.run_sextractor(science_data, log=log)
+    if table is not None:
+        # Clip fwhm_stars by fwhm
+        fwhm, meanfwhm, stdfwhm = sigma_clipped_stats(table['FWHM_IMAGE'])
+        if log: 
+            log.info(f'Using FWHM for cosmic rays: {fwhm}')
+        else:
+            print(f'Using FWHM for cosmic rays: {fwhm}')
+    else:
+        fwhm = 3.5
 
     # Astroscrappy requires added sky background, so add this value back
     # Set the sky background to some nominal value if it is too low for CR rej
@@ -656,10 +620,15 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
     mask_cr = np.zeros(data.shape)
     mask_cr = mask_cr.astype(np.uint8)
 
+    psfsize = int(np.round(2.5*fwhm))
+    if psfsize%2==0: psfsize+=1
+
     if cosmic_ray:
         newdata, mask_cr = cosmicray_lacosmic(data,
             readnoise=rdnoise, satlevel=saturation, verbose=True,
-            sigclip=sigclip, sigfrac=sigfrac, objlim=objlim, niter=niter)
+            sigclip=sigclip, sigfrac=sigfrac, objlim=objlim, niter=niter,
+            psffwhm=fwhm, psfsize=psfsize, fsmode=fsmode,
+            cleantype=cleantype)
 
         mask_cr = mask_cr.astype(np.uint8) #set cosmic ray mask type
     else:
@@ -692,7 +661,7 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
     nsat = np.sum(mask & 4 == 4)
     ngrow = np.sum(mask & 8 == 8)
     
-    mask_hdu = fits.PrimaryHDU(mask) #create mask Primary HDU
+    mask_hdu = fits.ImageHDU(mask) #create mask Primary HDU
     mask_hdu.header['VER'] = (__version__, 
         'Version of image procedures used.') #name of log file
     mask_hdu.header['USE'] = 'Complex mask using additive flags.'#header comment
