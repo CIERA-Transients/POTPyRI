@@ -444,7 +444,7 @@ def detrend_stack(stack):
 
     return(stack)
 
-def stack_data(stacking_data, tel, masks, errors, mem_limit=8.0e9, log=None):
+def stack_data(stacking_data, tel, masks, errors, mem_limit=16.0e9, log=None):
 
     stack_method = tel.stack_method
     if not stack_method:
@@ -461,7 +461,7 @@ def stack_data(stacking_data, tel, masks, errors, mem_limit=8.0e9, log=None):
         mask = masks[i]
         ivar[mask.data.astype(bool)]=0.
         weights.append(ivar)
-    weights=np.array(weights)
+    #weights=np.array(weights)
 
     new_data = []
     exptimes = []
@@ -481,23 +481,32 @@ def stack_data(stacking_data, tel, masks, errors, mem_limit=8.0e9, log=None):
     # Determine if intermediate stacks are needed
     # Get size of individual frame, account for data, noise, and mask
     exdata = stacking_data[0].data
-    size = 64.0/8.0 * exdata.shape[0]*exdata.shape[1] * 2 + exdata.shape[0]*exdata.shape[1]
+    size_of_image = exdata.data.nbytes
+    size_of_image += exdata.mask.nbytes
+    size_of_image += exdata.flags.nbytes
 
     if log:
-        log.info(f'Image size is {size}')
+        log.info(f'Image size is {size_of_image}')
     else:
-        print(f'Image size is {size}')
+        print(f'Image size is {size_of_image}')
 
-    # Get maximum size of chunk
-    max_chunk = int(np.floor(mem_limit / 2.0 / (size)))
-    if max_chunk==0: max_chunk=1
+    no_of_img = len(stacking_data)
 
-    if len(stacking_data)<=max_chunk:
+    if stack_method=='median':
+        memory_factor = 3
+    else:
+        memory_factor = 2
+
+    memory_factor *= 1.3
+
+    # Get number of chunks
+    nchunks = int((memory_factor * size_of_an_img * no_of_img) / mem_limit) + 1
+
+    if nchunks==1:
         sci_med = combine(stacking_data, weights=weights, scale=scale,
-            method=stack_method, mem_limit=2*mem_limit)
+            method=stack_method, mem_limit=mem_limit)
     else:
         nimgs = len(stacking_data) * 1.0
-        nchunks = int(np.ceil(nimgs/(1.0*max_chunk)))
 
         if log:
             log.info(f'Splitting stacking into {nchunks} chunks')
