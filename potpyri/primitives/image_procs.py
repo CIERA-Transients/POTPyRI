@@ -444,7 +444,7 @@ def detrend_stack(stack):
 
     return(stack)
 
-def stack_data(stacking_data, tel, masks, errors, mem_limit=16.0e9, log=None):
+def stack_data(stacking_data, tel, masks, errors, mem_limit=8.0e9, log=None):
 
     stack_method = tel.stack_method
     if not stack_method:
@@ -461,24 +461,24 @@ def stack_data(stacking_data, tel, masks, errors, mem_limit=16.0e9, log=None):
         mask = masks[i]
         ivar[mask.data.astype(bool)]=0.
         weights.append(ivar)
-    #weights=np.array(weights)
+    weights=np.array(weights)
 
-    new_data = []
+    all_data = []
     exptimes = []
     for i,stk in enumerate(stacking_data):
         mask = masks[i].data.astype(bool)
         stacking_data[i].data[mask] = np.nan
         exptimes.append(float(tel.get_exptime(stk.header)))
-
+        all_data.append(stacking_data[i].data)
+    
+    all_data=np.array(new_data)
     exptimes = np.array(exptimes)
     scale = 1./exptimes
-
-    all_data = np.array([s.data for s in stacking_data])
 
     if len(scale)==1:
         stack_method='average'
 
-    sci_med = combine(stacking_data, weights=weights, scale=scale,
+    sci_med = combine(all_data, weights=weights, scale=scale,
             method=stack_method, mem_limit=mem_limit)
 
     sci_med = sci_med.to_hdu()
