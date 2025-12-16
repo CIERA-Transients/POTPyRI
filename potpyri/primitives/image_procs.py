@@ -478,58 +478,8 @@ def stack_data(stacking_data, tel, masks, errors, mem_limit=16.0e9, log=None):
     if len(scale)==1:
         stack_method='average'
 
-    # Determine if intermediate stacks are needed
-    # Get size of individual frame, account for data, noise, and mask
-    exdata = stacking_data[0].data
-    size_of_image = exdata.data.nbytes
-    size_of_image += exdata.mask.nbytes
-    size_of_image += exdata.flags.nbytes
-
-    if log:
-        log.info(f'Image size is {size_of_image}')
-    else:
-        print(f'Image size is {size_of_image}')
-
-    no_of_img = len(stacking_data)
-
-    if stack_method=='median':
-        memory_factor = 3
-    else:
-        memory_factor = 2
-
-    memory_factor *= 1.3
-
-    # Get number of chunks
-    nchunks = int((memory_factor * size_of_an_img * no_of_img) / mem_limit) + 1
-
-    if nchunks==1:
-        sci_med = combine(stacking_data, weights=weights, scale=scale,
+    sci_med = combine(stacking_data, weights=weights, scale=scale,
             method=stack_method, mem_limit=mem_limit)
-    else:
-        nimgs = len(stacking_data) * 1.0
-
-        if log:
-            log.info(f'Splitting stacking into {nchunks} chunks')
-        else:
-            print(f'Splitting stacking into {nchunks} chunks')
-
-        inter_med = []
-        for i in np.arange(nchunks):
-            if log:
-                log.info(f'Stacking chunk {i+1}/{nchunks}')
-            else:
-                print(f'Stacking chunk {i+1}/{nchunks}')
-            start = i*max_chunk
-            end = (i+1)*max_chunk
-            if end>len(stacking_data): end=None
-
-            sci_med = combine(stacking_data[start:end], 
-                weights=weights[start:end], scale=scale[start:end],
-                method=stack_method, mem_limit=mem_limit)
-
-            inter_med.append(sci_med)
-
-        sci_med = combine(inter_med, method=stack_method)
 
     sci_med = sci_med.to_hdu()
 
