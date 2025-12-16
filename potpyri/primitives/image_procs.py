@@ -471,7 +471,7 @@ def stack_data(stacking_data, tel, masks, errors, mem_limit=8.0e9, log=None):
         exptimes.append(float(tel.get_exptime(stk.header)))
         all_data.append(stacking_data[i].data)
     
-    all_data=np.array(new_data)
+    all_data=np.array(all_data)
     exptimes = np.array(exptimes)
     scale = 1./exptimes
 
