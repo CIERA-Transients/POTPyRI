@@ -455,30 +455,19 @@ def stack_data(stacking_data, tel, masks, errors, mem_limit=8.0e9, log=None):
         else:
             raise Exception('Could not get stacking method for these images')
 
-    weights = []
-    for i,error in enumerate(errors):
-        ivar = 1./error.data**2
-        mask = masks[i]
-        ivar[mask.data.astype(bool)]=0.
-        weights.append(ivar)
-    weights=np.array(weights)
-
-    all_data = []
     exptimes = []
     for i,stk in enumerate(stacking_data):
         mask = masks[i].data.astype(bool)
         stacking_data[i].data[mask] = np.nan
         exptimes.append(float(tel.get_exptime(stk.header)))
-        all_data.append(stacking_data[i].data)
     
-    all_data=np.array(all_data)
     exptimes = np.array(exptimes)
     scale = 1./exptimes
 
     if len(scale)==1:
         stack_method='average'
 
-    sci_med = combine(all_data, weights=weights, scale=scale,
+    sci_med = combine(stacking_data, scale=scale,
             method=stack_method, mem_limit=mem_limit)
 
     sci_med = sci_med.to_hdu()
