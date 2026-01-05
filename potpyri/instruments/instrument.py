@@ -525,14 +525,16 @@ class Instrument(object):
             if log: log.info(f'Importing {sky}')
             sky_full = self.import_sci_image(sky, log=log)
 
-            mean, med, stddev = sigma_clipped_stats(sky_full.data)
+            mean, med, stddev = sigma_clipped_stats(sky_full.data,
+                sigma_upper=2.5, sigma_lower=3.5)
 
             # Mask outliers
-            mask = sky_full.data > med + 5 * stddev
+            mask = sky_full.data > med + 2.5 * stddev
             sky_full.data[mask]=np.nan
 
             # Normalize by median sky background
-            mean, med, stddev = sigma_clipped_stats(sky_full.data)
+            mean, med, stddev = sigma_clipped_stats(sky_full.data,
+                sigma_upper=2.5, sigma_lower=3.5)
             norm = 1./med
             sky_full = sky_full.multiply(norm)
             
