@@ -83,7 +83,7 @@ class MMIRS(instrument.Instrument):
         self.bad_keywords = ['MOSID']
         self.bad_values = ['closed']
 
-        self.detrend = True
+        self.detrend = False
         self.catalog_zp = '2MASS'
 
         self.out_size = 2500

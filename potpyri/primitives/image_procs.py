@@ -357,7 +357,10 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
         sci_med = add_stack_mask(sci_med, aligned_data)
 
         if tel.detrend:
+            if log: log.info('Detrending stack')
             sci_med = detrend_stack(sci_med)
+        else:
+            if log: log.info('Skipping detrending')
 
     else:
         sci_med = fits.open(data_images[0])
@@ -426,12 +429,14 @@ def detrend_stack(stack):
     data = stack[0].data
     mask = stack[1].data.astype(bool)
 
-    mean, med, stddev = sigma_clipped_stats(data, mask=mask, axis=1)
+    mean, med, stddev = sigma_clipped_stats(data, mask=mask, axis=1,
+        sigma_upper=2.5)
     data = data - med[:,None]
 
     row_med = np.nanmedian(med)
 
-    mean, med, stddev = sigma_clipped_stats(data, mask=mask, axis=0)
+    mean, med, stddev = sigma_clipped_stats(data, mask=mask, axis=0,
+        sigma_upper=2.5)
     data = data - med[None,:]
 
     col_med = np.nanmedian(med)
