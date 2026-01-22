@@ -335,7 +335,7 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
         return(False)
 
 def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
-    save_centroids=False, min_gaia_match=5, log=None):
+    save_centroids=False, min_gaia_match=7, log=None):
 
     cat = get_gaia_catalog(file, log=log)
 
