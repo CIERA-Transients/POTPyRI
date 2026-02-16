@@ -236,7 +236,10 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
                     extra_hdr = file_open[ext+1].header
                     for key in extra_hdr.keys():
                         if key not in hdr.keys():
-                            hdr[key] = extra_hdr[key]
+                            value = extra_hdr[key]
+                            if isinstance(value, (str, int, float, complex,
+                                bool, np.floating, np.integer, np.bool_)):
+                                hdr[key] = value
 
             check_data = file_open[ext].data
             file_open._verify()
