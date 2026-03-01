@@ -1,6 +1,11 @@
-# Basic instrument class
+"""Base instrument class and shared reduction logic for POTPyRI.
 
-__version__ = "1.2" # Last edited 09/29/2024
+Defines detector keywords, calibration flags, file naming, and methods for
+importing/processing science frames, building master bias/dark/flat, and
+loading static masks. Subclasses (GMOS, LRIS, BINOSPEC, etc.) set
+instrument-specific attributes.
+"""
+from potpyri._version import __version__
 
 import os
 import astropy
@@ -20,9 +25,13 @@ from astropy.stats import sigma_clipped_stats
 from astropy.stats import SigmaClip
 from astropy.time import Time
 
-# Generic instrument class for POTPyRI
-
 class Instrument(object):
+    """Base class for all POTPyRI instruments.
+
+    Holds detector parameters (gain, rdnoise, pixscale, saturation), header
+    keyword names, file-sorting rules, and methods for calibration and
+    science processing. Subclasses override attributes as needed.
+    """
 
     def __init__(self):
 
@@ -99,8 +108,21 @@ class Instrument(object):
         # Default final image size for binning of 1x1
         self.out_size = 5000
 
-    # Match file type keywords to file table
     def match_type_keywords(self, kwds, file_table):
+        """Return a boolean mask of file_table rows whose Type is in kwds.
+
+        Parameters
+        ----------
+        kwds : str
+            Comma-separated type names (e.g. 'SCIENCE', 'FLAT').
+        file_table : astropy.table.Table
+            File list table with 'Type' column.
+
+        Returns
+        -------
+        np.ndarray
+            Boolean mask, True where file_table['Type'] is in kwds.
+        """
         masks = []
         for kwd in kwds.split(','):
             masks.append(file_table['Type']==kwd)
@@ -110,45 +132,88 @@ class Instrument(object):
         return(mask)
 
 
-    # Determine whether sky subtraction is needed for the current reduction
     def needs_sky_subtraction(self, filt):
-        # Default is to do sky subtraction for all NIR cameras
+        """Return True if sky subtraction should be run for this filter.
+
+        Parameters
+        ----------
+        filt : str
+            Filter name (e.g. 'r', 'J').
+
+        Returns
+        -------
+        bool
+            True for NIR wavelength instruments, False otherwise.
+        """
         if self.wavelength=='NIR':
             return(True)
         else:
             return(False)
 
-    # Get pixel scale for imagers with varying focal ratios (e.g., IMACS)
     def get_pixscale(self):
+        """Return pixel scale in arcsec/pixel.
+
+        Returns
+        -------
+        float or None
+            Pixel scale; may vary by mode in subclasses.
+        """
         return(self.pixscale)
 
-    # Use these if a single value is needed for gain, rdnoise, etc.
     def get_rdnoise(self, hdr):
+        """Return read noise value(s) for the detector/amplifier.
+
+        Parameters
+        ----------
+        hdr : astropy.io.fits.Header
+            FITS header (may be used in subclasses for amp-dependent values).
+
+        Returns
+        -------
+        float or list
+            Read noise in electrons.
+        """
         return(self.rdnoise)
 
     def get_gain(self, hdr):
+        """Return gain value(s) for the detector/amplifier.
+
+        Parameters
+        ----------
+        hdr : astropy.io.fits.Header
+            FITS header (may be used in subclasses for amp-dependent values).
+
+        Returns
+        -------
+        float or list
+            Gain in e-/ADU.
+        """
         return(self.gain)
 
-    # Get specific header keywords from file
     def get_target(self, hdr):
+        """Return target name from header (target_keyword), spaces stripped."""
         return(hdr[self.target_keyword].replace(' ',''))
 
     def get_filter(self, hdr):
+        """Return filter name from header; leading segment before underscore."""
         filt = hdr[self.filter_keyword]
         filt = filt.replace(' ','')
         filt = filt.split('_')[0]
         return(filt)
 
     def get_exptime(self, hdr):
+        """Return exposure time from header (exptime_keyword)."""
         return(hdr[self.exptime_keyword])
 
     def get_ampl(self, hdr):
+        """Return amplifier identifier from header as string."""
         if self.amp_keyword in hdr.keys():
             return(str(hdr[self.amp_keyword]))
         else:
             return(str(self.amp_keyword))
 
     def get_binning(self, hdr):
+        """Return binning string from header (e.g. '11', '22'), normalized and no 'x'."""
         if self.bin_keyword in hdr.keys():
             binn = str(hdr[self.bin_keyword]).lower().replace(' ','')
             binn = binn.replace('x','')
@@ -158,18 +223,34 @@ class Instrument(object):
             return(self.bin_keyword)
 
     def get_out_size(self, hdr):
+        """Return output image size (pixels) for this binning (out_size / binn)."""
         binn = int(str(self.get_binning(hdr))[0])
         out_size = int(self.out_size/binn)
         return(out_size)
 
     def get_time(self, hdr):
+        """Return MJD from header (mjd_keyword) as float."""
         return(float(hdr[self.mjd_keyword]))
 
     def get_instrument_name(self, hdr):
+        """Return instrument name (lowercase) for paths/filenames."""
         return(self.name.lower())
 
     def get_staticmask_filename(self, hdr, paths):
+        """Return path(s) to the static bad-pixel mask FITS for this instrument/binning.
 
+        Parameters
+        ----------
+        hdr : astropy.io.fits.Header
+            FITS header (for binning and instrument).
+        paths : dict
+            Paths dict with 'code' key (package root).
+
+        Returns
+        -------
+        list
+            One-element list with path to staticmask FITS, or [None] if not found.
+        """
         instname = self.get_instrument_name(hdr)
         binn = self.get_binning(hdr)
 
@@ -182,9 +263,24 @@ class Instrument(object):
             return([None])
 
     def get_catalog(self, hdr):
+        """Return catalog name for zeropoint (e.g. 'PS1')."""
         return(self.catalog_zp)
 
     def format_datasec(self, sec_string, binning=1):
+        """Convert datasec string to binned pixel bounds (e.g. '[1:100,1:200]').
+
+        Parameters
+        ----------
+        sec_string : str
+            Data section string like '[x1:x2,y1:y2]'.
+        binning : int, optional
+            Binning factor. Default is 1.
+
+        Returns
+        -------
+        str
+            Reformatted section string with binned limits.
+        """
         sec_string = sec_string.replace('[','').replace(']','')
         x,y = sec_string.split(',')
         x1,x2 = x.split(':')
@@ -202,13 +298,14 @@ class Instrument(object):
         return(sec_string)
 
     def raw_format(self, proc):
+        """Return glob pattern for raw files (e.g. 'sci_img_*.fits' or 'sci_img*[!proc].fits')."""
         if proc:
             return('sci_img_*.fits')
         else:
             return('sci_img*[!proc].fits')
 
     def get_stk_name(self, hdr, red_path):
-        
+        """Return full path for stacked output FITS (target.filter.utYYMMDD.amp.binn.stk.fits)."""
         target = self.get_target(hdr)
         fil = self.get_filter(hdr)
         amp = self.get_ampl(hdr)
@@ -222,7 +319,7 @@ class Instrument(object):
         return(fullfilename)
 
     def get_sci_name(self, hdr, red_path):
-
+        """Return full path for single-extension science FITS."""
         target = self.get_target(hdr)
         fil = self.get_filter(hdr)
         amp = self.get_ampl(hdr)
@@ -237,29 +334,54 @@ class Instrument(object):
         return(fullfilename)
 
     def get_bkg_name(self, hdr, red_path):
-
+        """Return full path for background FITS (sci name with _bkg.fits)."""
         sci_name = self.get_sci_name(hdr, red_path)
         bkg_filename = sci_name.replace('.fits','_bkg.fits')
 
         return(bkg_filename)
 
     def get_mbias_name(self, paths, amp, binn):
+        """Return path for master bias FITS (paths['cal']/mbias_amp_binn.fits)."""
         red_path = paths['cal']
         return(os.path.join(red_path, f'mbias_{amp}_{binn}.fits'))
 
     def get_mdark_name(self, paths, amp, binn):
+        """Return path for master dark FITS."""
         red_path = paths['cal']
         return(os.path.join(red_path, f'mdark_{amp}_{binn}.fits'))
 
     def get_mflat_name(self, paths, fil, amp, binn):
+        """Return path for master flat FITS (filter, amp, binning)."""
         red_path = paths['cal']
         return(os.path.join(red_path, f'mflat_{fil}_{amp}_{binn}.fits'))
 
     def get_msky_name(self, paths, fil, amp, binn):
+        """Return path for master sky FITS."""
         red_path = paths['cal']
         return(os.path.join(red_path, f'msky_{fil}_{amp}_{binn}.fits'))
 
     def load_bias(self, paths, amp, binn):
+        """Load master bias CCDData for given amp and binning.
+
+        Parameters
+        ----------
+        paths : dict
+            Paths dict (cal key).
+        amp : str
+            Amplifier identifier.
+        binn : str
+            Binning string.
+
+        Returns
+        -------
+        ccdproc.CCDData
+            Master bias in electrons.
+
+        Raises
+        ------
+        Exception
+            If master bias file not found.
+        """
         bias = self.get_mbias_name(paths, amp, binn)
         if os.path.exists(bias):
             mbias = CCDData.read(bias)
@@ -271,6 +393,27 @@ class Instrument(object):
         return(mbias)
 
     def load_dark(self, paths, amp, binn):
+        """Load master dark CCDData for given amp and binning.
+
+        Parameters
+        ----------
+        paths : dict
+            Paths dict (cal key).
+        amp : str
+            Amplifier identifier.
+        binn : str
+            Binning string.
+
+        Returns
+        -------
+        ccdproc.CCDData
+            Master dark in electrons.
+
+        Raises
+        ------
+        Exception
+            If master dark file not found.
+        """
         dark = self.get_mdark_name(paths, amp, binn)
         if os.path.exists(dark):
             mdark = CCDData.read(dark)
@@ -282,6 +425,29 @@ class Instrument(object):
         return(mdark)
 
     def load_flat(self, paths, fil, amp, binn):
+        """Load master flat CCDData for given filter, amp, and binning.
+
+        Parameters
+        ----------
+        paths : dict
+            Paths dict (cal key).
+        fil : str
+            Filter name.
+        amp : str
+            Amplifier identifier.
+        binn : str
+            Binning string.
+
+        Returns
+        -------
+        ccdproc.CCDData
+            Master flat (normalized).
+
+        Raises
+        ------
+        Exception
+            If master flat file not found.
+        """
         flat = self.get_mflat_name(paths, fil, amp, binn)
         if os.path.exists(flat):
             mflat = CCDData.read(flat)
@@ -293,6 +459,29 @@ class Instrument(object):
         return(mflat)
 
     def load_sky(self, paths, fil, amp, binn):
+        """Load master sky CCDData for given filter, amp, and binning.
+
+        Parameters
+        ----------
+        paths : dict
+            Paths dict (cal key).
+        fil : str
+            Filter name.
+        amp : str
+            Amplifier identifier.
+        binn : str
+            Binning string.
+
+        Returns
+        -------
+        ccdproc.CCDData
+            Master sky (normalized).
+
+        Raises
+        ------
+        Exception
+            If master sky file not found.
+        """
         sky = self.get_msky_name(paths, fil, amp, binn)
         if os.path.exists(sky):
             msky = CCDData.read(sky)
@@ -304,6 +493,22 @@ class Instrument(object):
         return(msky)
 
     def import_image(self, filename, amp, log=None):
+        """Load raw multi-extension FITS and return processed CCDData (bias/overscan/trim/gain).
+
+        Parameters
+        ----------
+        filename : str
+            Path to raw FITS file.
+        amp : str
+            Amplifier identifier (number of extensions).
+        log : ColoredLogger, optional
+            Logger for progress.
+
+        Returns
+        -------
+        ccdproc.CCDData
+            Processed frame in electrons (single combined image).
+        """
         filename = os.path.abspath(filename)
         if log: log.info(f'Loading file: {filename}')
 
@@ -326,6 +531,20 @@ class Instrument(object):
         return(frame_full)
 
     def import_sci_image(self, filename, log=None):
+        """Load a single science FITS as CCDData (no overscan/trim; already reduced).
+
+        Parameters
+        ----------
+        filename : str
+            Path to FITS file.
+        log : ColoredLogger, optional
+            Logger for progress.
+
+        Returns
+        -------
+        ccdproc.CCDData
+            Science frame.
+        """
         filename = os.path.abspath(filename)
         if log: log.info(f'Loading file: {filename}')
 
@@ -335,7 +554,28 @@ class Instrument(object):
 
     def create_bias(self, bias_list, amp, binn, paths,
         log=None, **kwargs):
-        
+        """Combine bias frames into master bias and write to paths['cal'].
+
+        Parameters
+        ----------
+        bias_list : list of str
+            Paths to bias FITS files.
+        amp : str
+            Amplifier identifier.
+        binn : str
+            Binning string.
+        paths : dict
+            Paths dict (cal key).
+        log : ColoredLogger, optional
+            Logger for progress.
+        **kwargs
+            Unused; for subclass compatibility.
+
+        Returns
+        -------
+        None
+            Master bias written via get_mbias_name.
+        """
         if log:
             log.info(f'Processing bias files with {amp} amps and {binn} binning.')
             log.info(f'{len(bias_list)} files found.')
@@ -381,7 +621,28 @@ class Instrument(object):
         return
 
     def create_dark(self, dark_list, amp, binn, paths, mbias=None, log=None):
+        """Combine dark frames (with optional bias subtraction) and write master dark.
 
+        Parameters
+        ----------
+        dark_list : list of str
+            Paths to dark FITS files.
+        amp : str
+            Amplifier identifier.
+        binn : str
+            Binning string.
+        paths : dict
+            Paths dict (cal key).
+        mbias : ccdproc.CCDData, optional
+            Master bias to subtract before combining.
+        log : ColoredLogger, optional
+            Logger for progress.
+
+        Returns
+        -------
+        None
+            Master dark written via get_mdark_name.
+        """
         if log:
             log.info(f'Processing dark files with {amp} amps and {binn} binning.')
             log.info(f'{len(dark_list)} files found.')
@@ -429,9 +690,38 @@ class Instrument(object):
         
         return
 
-    def create_flat(self, flat_list, fil, amp, binn, paths, mbias=None, 
+    def create_flat(self, flat_list, fil, amp, binn, paths, mbias=None,
         mdark=None, is_science=False, log=None, **kwargs):
+        """Combine flat frames (bias/dark subtract, normalize) and write master flat.
 
+        Parameters
+        ----------
+        flat_list : list of str
+            Paths to flat FITS files.
+        fil : str
+            Filter name.
+        amp : str
+            Amplifier identifier.
+        binn : str
+            Binning string.
+        paths : dict
+            Paths dict (cal key).
+        mbias : ccdproc.CCDData, optional
+            Master bias to subtract.
+        mdark : ccdproc.CCDData, optional
+            Master dark to subtract.
+        is_science : bool, optional
+            If True, mask high pixels as for science. Default is False.
+        log : ColoredLogger, optional
+            Logger for progress.
+        **kwargs
+            Unused; for subclass compatibility.
+
+        Returns
+        -------
+        None
+            Master flat written via get_mflat_name.
+        """
         if log:
             log.info(f'Processing files for filter: {fil}')
             log.info(f'{len(flat_list)} files found.')
@@ -514,7 +804,30 @@ class Instrument(object):
         return
 
     def create_sky(self, sky_list, fil, amp, binn, paths, log=None, **kwargs):
+        """Combine sky frames (normalize by median) and write master sky.
 
+        Parameters
+        ----------
+        sky_list : list of str
+            Paths to sky FITS files.
+        fil : str
+            Filter name.
+        amp : str
+            Amplifier identifier.
+        binn : str
+            Binning string.
+        paths : dict
+            Paths dict (cal key).
+        log : ColoredLogger, optional
+            Logger for progress.
+        **kwargs
+            Unused; for subclass compatibility.
+
+        Returns
+        -------
+        None
+            Master sky written via get_msky_name.
+        """
         if log:
             log.info(f'Processing files for filter: {fil}')
             log.info(f'{len(sky_list)} files found.')
@@ -574,22 +887,48 @@ class Instrument(object):
         return
 
     def load_staticmask(self, hdr, paths):
+        """Load the static mask array for this instrument and binning.
 
+        Parameters
+        ----------
+        hdr : astropy.io.fits.Header
+            FITS header (for binning and instrument name).
+        paths : dict
+            Paths dict with 'code' key.
+
+        Returns
+        -------
+        np.ndarray or None
+            Boolean mask from static mask FITS extension [1], or None if not found.
+        """
         satmask_filename = self.get_staticmask_filename(hdr, paths)
 
-        if (satmask_filename is not None and 
-            len(satmask_filename)>0 and
+        if (satmask_filename is not None and
+            len(satmask_filename) > 0 and
             satmask_filename[0] is not None and
             os.path.exists(satmask_filename[0])):
-            hdu = fits.open(satmask_filename[0])
-            satmask = hdu[1].data.astype(bool)
+            with fits.open(satmask_filename[0]) as hdu:
+                satmask = hdu[1].data.astype(bool)
         else:
             satmask = None
 
         return(satmask)
 
     def expand_mask(self, input_data, input_mask=None):
+        """Build combined mask from NaN, inf, zero pixels and optional input mask.
 
+        Parameters
+        ----------
+        input_data : ccdproc.CCDData
+            Image data (input_data.data used).
+        input_mask : np.ndarray, optional
+            Boolean mask to OR with bad-pixel mask.
+
+        Returns
+        -------
+        np.ndarray
+            Boolean mask (True = bad).
+        """
         # Get image statistics
         mean, median, stddev = sigma_clipped_stats(input_data.data)
         
@@ -608,7 +947,38 @@ class Instrument(object):
 
     def process_science(self, sci_list, fil, amp, binn, paths, mbias=None,
         mflat=None, mdark=None, skip_skysub=False, save_bkg=False, log=None):
+        """Reduce science frames: bias/dark/flat, optional sky subtraction; return CCDData list.
 
+        Parameters
+        ----------
+        sci_list : list of str
+            Paths to science FITS files.
+        fil : str
+            Filter name.
+        amp : str
+            Amplifier identifier.
+        binn : str
+            Binning string.
+        paths : dict
+            Paths dict (work, cal, etc.).
+        mbias : ccdproc.CCDData, optional
+            Master bias.
+        mflat : ccdproc.CCDData, optional
+            Master flat.
+        mdark : ccdproc.CCDData, optional
+            Master dark.
+        skip_skysub : bool, optional
+            If True, skip 2D background subtraction. Default is False.
+        save_bkg : bool, optional
+            If True, save background model. Default is False.
+        log : ColoredLogger, optional
+            Logger for progress.
+
+        Returns
+        -------
+        list of ccdproc.CCDData
+            Reduced science frames (each with FILENAME in header).
+        """
         processed = []
         processed_names = []
         for sci in sorted(sci_list):

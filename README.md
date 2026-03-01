@@ -3,55 +3,81 @@
 [![GitHub Actions](https://github.com/CIERA-Transients/POTPyRI/actions/workflows/build-test.yml/badge.svg)](https://github.com/CIERA-Transients/POTPyRI/actions/workflows/build-test.yml)
 [![Docs](https://img.shields.io/badge/docs-latest-blue)](https://ciera-transients.github.io/POTPyRI/)
 
-
-Data reduction pipeline for imaging from large aperture telescopes.
-
-## Usage
-
-If you use this code, please reference Paterson et al. (in prep.)
+Data reduction pipeline for imaging from large aperture telescopes. Supports automatic file ingestion, pixel calibration, astrometry (astrometry.net + Gaia DR3), stacking, aperture/PSF photometry, and flux calibration.
 
 ## Installation
 
-The recommended installation is via conda and pip.  First create a conda environment:
+**Requirements:** Python 3.11 or later.
 
-```conda create -n potpyri python=3.12 pip-tools```
+### From PyPI (recommended)
 
-Then to install POTPyRI, run:
-
+```bash
+pip install potpyri
 ```
+
+### With conda (recommended for managing Python and non-Python deps)
+
+```bash
+conda create -n potpyri python=3.12 pip
 conda activate potpyri
 pip install potpyri
 ```
 
-### Non-Python Dependencies
+### From source (development)
 
-POTPyRI has two non-python dependencies: `astrometry.net` and `source extractor`.  The package file will try to install these dependencies on `linux-64` and `osx-64` environments for which there are working conda repositories. If these do not install, manually run the commands with:
-
-```
-conda install conda-forge::astromatic-source-extractor
-conda install conda-forge::astrometry
-```
-
-On newer Mac OS systems (`osx-arm64`), conda will not be able to install these packages and they must be built manually.  The recommended installation method is with Homebrew (https://brew.sh/) via:
-
-```
-brew install sextractor
-brew install astrometry-net
+```bash
+git clone https://github.com/CIERA-Transients/POTPyRI
+cd POTPyRI
+pip install -e .                    # editable install
+pip install -e ".[test]"             # add pytest, pytest-cov
+pip install -e ".[docs]"             # optional: Sphinx docs
 ```
 
-Finally, note that for `astrometry.net`, index files are required.  There is a utility script in POTPyRI that will attempt to install the latest index files.  Once you have successfully installed `astrometry.net` in your path, run:
+### Non-Python dependencies
 
+The pipeline needs **astrometry.net** and **Source Extractor** (SExtractor):
+
+- **Conda** (linux-64 / osx-64):  
+  `conda install conda-forge::astromatic-source-extractor conda-forge::astrometry`
+- **macOS (Apple Silicon):**  
+  `brew install sextractor astrometry-net`
+- **Astrometry.net index files** (~59 GB): after `astrometry.net` is on your PATH, run  
+  `download_anet_index`  
+  (or use the script in the package to fetch indices).
+
+## Usage
+
+Run the full pipeline from the command line:
+
+```bash
+main_pipeline INSTRUMENT DATA_PATH
 ```
-download_anet_index
+
+- **INSTRUMENT:** One of the supported instrument names (e.g. `GMOS`, `LRIS`, `BINOSPEC`). See **Supported instruments** below.
+- **DATA_PATH:** Top-level directory containing your data (e.g. a `raw` folder with FITS files).
+
+Example:
+
+```bash
+main_pipeline GMOS /path/to/my/run
 ```
+
+All options: `main_pipeline --help`. Processed data are written under `DATA_PATH/red/`; logs go to `red/log/`.
+
+**Citation:** If you use this code, please cite Paterson et al. (in prep.).
 
 ## Testing
 
-If you have downloaded POTPyRI directly from GitHub (or through git pull/clone), you can test the installation using pytest by running the following inside the POTPyRI folder:
+From the project root (with test deps installed: `pip install -e ".[test]"`):
 
-```
+```bash
 pytest tests
 ```
+
+- **Offline (no network):**  
+  `pytest tests -m "not integration"`
+- **Verbose:**  
+  `pytest tests -v`
 
 ## Required Disk Space
 
@@ -59,7 +85,7 @@ The POTPyRI repository itself has a size of: ![Size](https://img.shields.io/gith
 
 In addition, the required index files installed by `download_anet_index` require a large footprint, currently about 59 GB of disk space.
 
-## Supported Instruments
+## Supported instruments
 
 - BINOSPEC (MMT)
 - DEIMOS (Keck)
@@ -71,56 +97,48 @@ In addition, the required index files installed by `download_anet_index` require
 - MMIRS (MMT)
 - MOSFIRE (Keck)
 
-## Running
+## Running and outputs
 
-Once POTPyRI and external dependencies are installed, the basic syntax to run the pipeline is:
+The pipeline runs non-interactively: file ingestion, pixel calibration, astrometry, stacking, photometry, and flux calibration. The log is printed to the terminal and saved under `data_path/red/log`.
 
-```main_pipeline instrument data_path```
+Directory layout under `data_path`:
 
-where `instrument` is the name of the instrument you wish to reduce data from (see **Supported Instruments**), and `data_path` is the full path of the data you wish you reduce. Both the `instrument` and `data_path` are required parameters. Optional parameters are discussed in **Pipeline parameters**.
+- **raw** — raw data
+- **bad** — files excluded from reduction
+- **red** — all processed outputs
+- **red/cals** — master bias, flat, dark
+- **red/log** — log files
+- **red/workspace** — intermediate per-frame images before stacking
 
-The pipeline is designed to run with no user input, including file ingestion, pixel calibration with provided calibration files, astrometry, image stacking, photometry, and flux calibration. The pipeline will display the log to the terminal (also saved as a file under `red/log`) to provide feedback and indicate when an error is encountered. For more details on each of these sections, including how the pipeline performs each task, read the sections below. 
-
-All processed data will be written out in the `data_path` under the `red` subdirectory.  Raw data are stored in `raw` and unused files are stored in `bad`.  Processed calibration files will be stored in `red/cals`, logs in `red/log`, and interstitial image files before stacking are stored in `log/workspace`. A description of each type of output file can be found in **Outputs**.
+Details of output file names and contents are in **Outputs**.
 
 ## Pipeline parameters
 
-In addition to the required parameters `instrument` and `data_path`, the following optional parameters can be passed to the pipeline (also viewable via `main_pipeline --help`):
+Required: `instrument`, `data_path`. All other options are optional. Run `main_pipeline --help` for the full list.
 
-```
-options:
-  -h, --help            show this help message and exit
-  --target TARGET       Option to only reduce a specific target. String used here must be contained within the target name in file headers. Optional
-                        parameter.
-  --proc PROC           Option to specify file processing for data ingestion.
-  --include-bad, --incl-bad
-                        Include files flagged as bad in the file list.
-  --no-redo-sort        Do not resort files and generate new file list.
-  --file-list-name FILE_LIST_NAME
-                        Change the name of the archive file list.
-  --phot-sn-min PHOT_SN_MIN
-                        Minimum signal-to-noise to try in photometry loop.
-  --phot-sn-max PHOT_SN_MAX
-                        Maximum signal-to-noise to try in photometry loop.
-  --fwhm-init FWHM_INIT
-                        Initial FWHM (in pixels) for photometry loop.
-  --skip-skysub         Do not perform sky subtraction during image processing.
-  --fieldcenter FIELDCENTER FIELDCENTER
-                        Align the output images to this center coordinate. This is useful for difference imaging where the frames need to be a common size,
-                        pixel scale, and set of coordinates.
-  --out-size OUT_SIZE   Output image size (image will be SIZE x SIZE pixels).
-  --stages STAGES [STAGES ...]
-                        Stages to execute if running the pipeline in a modular way.
-  --skip-flatten        Tell the pipeline to skip flattening.
-  --skip-cr             Tell the pipeline to skip cosmic ray detection.
-  --skip-gaia           Tell the pipeline to skip Gaia alignment during WCS.
-```
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--target TARGET` | — | Only reduce targets whose name contains this string. |
+| `--proc PROC` | — | File processing mode for data ingestion. |
+| `--include-bad` / `--incl-bad` | off | Include files flagged as bad in the file list. |
+| `--no-redo-sort` | off | Do not re-sort files or regenerate the file list. |
+| `--file-list-name NAME` | `file_list.txt` | Name of the generated file list. |
+| `--phot-sn-min N` | 3.0 | Minimum S/N to try in the photometry loop. |
+| `--phot-sn-max N` | 20.0 | Maximum S/N to try in the photometry loop. |
+| `--fwhm-init N` | 5.0 | Initial FWHM (pixels) for the photometry loop. |
+| `--skip-skysub` | off | Skip sky subtraction during image processing. |
+| `--fieldcenter RA DEC` | — | Align outputs to this center (e.g. for difference imaging). |
+| `--out-size N` | — | Output image size (N×N pixels). |
+| `--skip-flatten` | off | Skip flat-field correction. |
+| `--skip-cr` | off | Skip cosmic-ray detection. |
+| `--skip-gaia` | off | Skip Gaia alignment in the WCS step. |
+| `--keep-all-astro` | off | Keep all images regardless of astrometric dispersion (default: drop high-dispersion frames). |
 
 ## Outputs
 
 All outputs from the pipeline are written out to the `red` folder and various subdirectories. Calibration files such as the master bias, flat and dark are saved using `mbias`, `mflat` and `mdark` prefixes, along with additional information such as the filter, amplifiers and binning in the file names.  These calibration files are stored under `red/cals`.
 
-All processed science files are renamed with following the basic format: `{object}.{filter}.{ut_date}.{amplifier}.{binning}.{unique_number}*.fits`.  All data are processed together within a common `TargType`, defined as image frames with the same object, filter, amplifier setup, and binning.  This variable is defined in the `file_list.txt` located in `data_path` and that is generated from `potpyri/sort_files.py` during the initial file processing performed by POTPyRI.  A more detailed description of `file_list.txt` is provided below.
+All processed science files are renamed with following the basic format: `{object}.{filter}.{ut_date}.{amplifier}.{binning}.{unique_number}*.fits`.  All data are processed together within a common `TargType`, defined as image frames with the same object, filter, amplifier setup, and binning.  This variable is defined in the `file_list.txt` located in `data_path` and that is generated from `potpyri/primitives/sort_files.py` during the initial file processing performed by POTPyRI.  A more detailed description of `file_list.txt` is provided below.
 
 The following table provides a basic description of the naming format, location, and brief description for each science output file that POTPyRI will produce:
 
@@ -133,17 +151,17 @@ Filename         Location       Description
 *stk.fits        red            The stacked image data for the corresponding `TargType`, containing SCI (image data), MASK (mask), and ERR (error) extensions
 ```
 
-Once photometry is performed, additional extensions are added to each `*stk.fits` file containing fits-formatted tables with aperture phohotometry, PSF stars, and PSF photometry of identified sources in the image.  Currently, only the aperture photometry table is used by `potpyri/absphot.py` for flux calibration.
+Once photometry is performed, additional extensions are added to each `*stk.fits` file containing FITS-formatted tables with aperture photometry, PSF stars, and PSF photometry of identified sources in the image. Currently, only the aperture photometry table is used by `potpyri/primitives/absphot.py` for flux calibration.
 
 ## File list
 
 The pipeline will sort through all the fits with the correct format for a given instrument (given by the **raw_format** function in the setting file) and create a file list with the file type, target name, exposure time, observation time, and instrument setup such as number of amps and binning.
 
-This process is designed to be automatic and account for common observation or archiving errors by checking various header keywords to classify each file.  If you find your files are being misclassified for a POTPyRI-supported instrument, please contact us or submit a Github Issue with the instrument and specific error/problem indicated.
+This process is designed to be automatic and account for common observation or archiving errors by checking various header keywords to classify each file. Classification logic lives in `potpyri/primitives/sort_files.py`. If you find your files are being misclassified for a POTPyRI-supported instrument, please contact us or open a GitHub Issue with the instrument and specific error indicated.
 
 ## Image Calibration
 
-Bias, dark, and flat-field images are defined by the corresponding keywords in each `potpyri/instruments/*.py` file.  The methods for generating and applying each calibration frame are generic and defined entirely within the general instrument class in `potpyri/instruments/instrument.py`.  Combined with instrument-specific differences in overscan, trimming, and static masking, we find that these methods provide good quality initial processed images with few bad pixels and generally Gaussian noise for the typical calibration frames that are available by instrument.
+Bias, dark, and flat-field images are defined by the corresponding keywords in each instrument module under `potpyri/instruments/`. The methods for generating and applying each calibration frame are generic and defined in the base class in `potpyri/instruments/instrument.py`; calibration orchestration is in `potpyri/primitives/calibration.py`.  Combined with instrument-specific differences in overscan, trimming, and static masking, we find that these methods provide good quality initial processed images with few bad pixels and generally Gaussian noise for the typical calibration frames that are available by instrument.
 
 If you find that your initial processed images (see **Outputs**) are noisy, contain a large number of bad pixels, or contain other artifacts due to pixel-level processing, please contact us or submit a Github Issue with the instrument and specific error/problem indicated.
 
@@ -155,7 +173,7 @@ If you find that you have good quality images that consistently fail image align
 
 ## Image Masking and Stacking
 
-POTPyRI has been significantly updated to implement optimal masking for satellite trails, cosmic rays, bad pixels that can be statically masked or are introduced by the pixel-level calibration, and saturation/non-linear effects.  These pixels are tracked throughout the pipeline from calibration through image stacking and are stored within the `*.fits`, `*_data.fits`, and `*stk.fits` using a bitwise image mask.  In general, the following schema is used by `potpyri/image_procs.py` to flag bad pixels:
+POTPyRI has been significantly updated to implement optimal masking for satellite trails, cosmic rays, bad pixels that can be statically masked or are introduced by the pixel-level calibration, and saturation/non-linear effects.  These pixels are tracked throughout the pipeline from calibration through image stacking and are stored within the `*.fits`, `*_data.fits`, and `*stk.fits` using a bitwise image mask.  In general, the following schema is used by `potpyri/primitives/image_procs.py` to flag bad pixels:
 
 ```
 Bit     Value
@@ -165,15 +183,15 @@ Bit     Value
 8       Neighbor of a bad pixel set within a distance determined by "grow" parameter
 ```
 
-These pixels will be ignored during image stacking, and only pixels that are not flagged by these parameters will be used to generate the final stack.
+These pixels are ignored during image stacking; only pixels not flagged are used to generate the final stack.
 
-In addition, error/uncertainty images are generated for each frame, accounting for the expected read noise, Poisson noise, and an additional empirical noise term defined by the standard deviation in the sky background.  These error images set the `weight` term for each input frame when performing stacking.
+Error/uncertainty images are generated for each frame (read noise, Poisson noise, and empirical sky noise). These error images set the `weight` term for each input frame when stacking.
 
-Final image stacking is performed by `ccdproc.combine` with the individual image data, mask, and error frames for each science image.  The stacking method is generally `median`, but can be changed via the **stack_method** value in each `potpyri/instruments/*.py` parameter file.  Images are scaled by the exposure time within each header to account for variable depth between frames.
+Stacking is performed by `ccdproc.combine` in `potpyri/primitives/image_procs.py` with the individual image data, mask, and error frames for each science image.  The stacking method is generally `median`, but can be changed via the **stack_method** value in each `potpyri/instruments/*.py` parameter file.  Images are scaled by the exposure time within each header to account for variable depth between frames.
 
 ## Automatic Aperture and PSF photometry
 
-The pipeline will perform both automatic aperture and PSF photometry of sources in the stacked image using `potpyri/photometry.py`. Firstly, the pipeline will detect sources within the image and determine statistics within a fiducial aperture radius using `photutils.aperture.ApertureStats`.  This initial table of aperture photometry is saved within the `*stk.fits` image as the extension `APPPHOT`.
+The pipeline performs both automatic aperture and PSF photometry of sources in the stacked image using `potpyri/primitives/photometry.py`. Firstly, the pipeline will detect sources within the image and determine statistics within a fiducial aperture radius using `photutils.aperture.ApertureStats`.  This initial table of aperture photometry is saved within the `*stk.fits` image as the extension `APPPHOT`.
 
 Next, based on cuts on roundness, FWHM, and signal-to-noise, the pipeline will define a list of bright stars with which it calculates an empirical PSF model.  The final list of PSF stars is saved in the `*stk.fits` file as the `PSFSTARS` extension.  The PSF itself will be generated from the extracted data around these PSF stars using `photutils.psf.EPSFBuilder`.  A stamp of the final effective PSF is saved in the `*stk.fits` file as the `PSF` extension.  A final FWHM is empirically calculated from the effective PSF model using a `astropy.modeling.functional_models.Moffat2D` defined profile and saved to the `*stk.fits` header.
 
@@ -187,7 +205,7 @@ The zero point and associated uncertainty are saved in the `*stk.fits` files as 
 
 ## Quality checks
 
-The pipeline will automatically create a log file in the `red/log` folder named after the instrument, followed by the date and time at the start of the run (UTC). A lot of information is written to the log file about the various steps step in the pipeline and the reduction process. Since this log file can also contain the reduction of multiple targets, it is suggested to make a personal log for each target with key information that can be used for the data analysis. Before, during and after the pipeline the has run, there are some key aspect you should check in terms of quality control that should be noted in the target log. These steps are list and explained below:
+The pipeline will automatically create a log file in the `red/log` folder named after the instrument, followed by the date and time at the start of the run (UTC). A lot of information is written to the log file about the various steps step in the pipeline and the reduction process. Since this log file can also contain the reduction of multiple targets, it is suggested to make a personal log for each target with key information that can be used for the data analysis. Before, during, and after the pipeline has run, there are key quality-control checks you should perform and note in the target log. These steps are list and explained below:
 
 ### Data Processing Checks
 
@@ -195,16 +213,20 @@ The pipeline will automatically create a log file in the `red/log` folder named 
 
 - Check the stacks: After the pipeline has reduced and stacked the files for a target, it is recommended that you check your final stacked images to assess data quality. Check the fits image named after the target name. If the image is of poor quality with very few stars, WCS and flux calibration will be affected.  If you find your stack has a large number of image artifacts, please contact us or submit a Github Issue with the instrument and specific error/problem indicated.
 
-- Check WCS solution: In additional to individual image WCS solutions, the pipeline will calculate an automatic WCS solution on the final stack. The rms on the astromtery is typically $<$1 pixel and the stars aligned well near your target as well as across the image.  Check the image alignment quality via the `RADISP` and `DEDISP` keywords in each image header.  If the WCS is off by a large number of pixels, the zero point will not be calculated correctly and the reduction should be aborted. In this case, please contact us or submit a Github Issue with the instrument and specific error/problem indicated.
+- Check WCS solution: In addition to individual image WCS solutions, the pipeline calculates an automatic WCS solution on the final stack. The rms on the astrometry is typically $<$1 pixel and the stars aligned well near your target as well as across the image.  Check the image alignment quality via the `RADISP` and `DEDISP` keywords in each image header.  If the WCS is off by a large number of pixels, the zero point will not be calculated correctly and the reduction should be aborted. In this case, please contact us or submit a Github Issue with the instrument and specific error/problem indicated.
 
-- Check the PSF: The PSF calculated by the pipeline will determine if the PSF photometry, as well as the zero point can be trusted. The PSF is saved in the `*.epsf.png` file, and will usually look like a 2D Gaussian. The pipeline will also report the x and y sigma of a 2D Gaussian fitted to the PSF. If the PSF looks good and the x and y sigma values reeported are similar, the PSF photometry can be trusted. If the PSF doesn't look Gaussian-like or the reported x and y sigma values are very different or negative, then there was an issue determining the PSF. If there are a lot of good stars in the final stack that could have been used to determine the PSF, please contact us or submit a Github Issue with the instrument and specific error/problem indicated.
+- Check the PSF: The PSF calculated by the pipeline will determine if the PSF photometry, as well as the zero point can be trusted. The PSF is saved in the `*.epsf.png` file, and will usually look like a 2D Gaussian. The pipeline will also report the x and y sigma of a 2D Gaussian fitted to the PSF. If the PSF looks good and the x and y sigma values reported are similar, the PSF photometry can be trusted. If the PSF doesn't look Gaussian-like or the reported x and y sigma values are very different or negative, then there was an issue determining the PSF. If there are a lot of good stars in the final stack that could have been used to determine the PSF, please contact us or submit a Github Issue with the instrument and specific error/problem indicated.
 
 - Check the zero point calculation: If the PSF photometry is reliable, the zero point calculation should be good if a large number of stars is used to calculate it. In general, zero points calculated with $>$10 stars will provide relatively small (10$--$20 mmag level or smaller) zero point uncertainty. If there are more stars in the field that the pipeline should have used, or the pipeline reported that no stars were found but there is coverage in the corresponding catalog, please contact us or submit a Github Issue with the instrument and specific error/problem indicated.
 
 ### Data over multiple nights
 
-POTPyRI can stack data from multiple nights, although it will not use unique calibration frames for each stacked image.  To stack multiple nights of night, move all files to a single `raw` directory and run the pipeline.
+POTPyRI can stack data from multiple nights, although it will not use unique calibration frames for each stacked image.  To stack multiple nights, move all files to a single `raw` directory and run the pipeline.
 
-## Issues and error
+## Documentation
 
-Should you encounter an error in the pipeline, have a special data setup that doesn't run through the pipeline, or wish to add an additional instrument, please contact the developers at `ckilpatrick@northwestern.edu` or open an Issue on GitHub.
+Full API documentation (generated from docstrings) is available at [https://CIERA-Transients.github.io/POTPyRI/](https://CIERA-Transients.github.io/POTPyRI/). To build the docs locally, install with `pip install -e ".[docs]"` and run `cd docs && make html` (or use the Sphinx `make.bat` on Windows).
+
+## Issues and errors
+
+If you encounter an error in the pipeline, have a special data setup that does not run through the pipeline, or wish to add an instrument, please contact the developers at `ckilpatrick@northwestern.edu` or open an issue on GitHub.

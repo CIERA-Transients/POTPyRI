@@ -1,8 +1,10 @@
-"Functions for performing aperture and PSF photometry on pipeline images."
-"Authors: Kerry Paterson, Charlie Kilpatrick"
+"""Aperture and PSF photometry for pipeline stacks.
 
-# Initial version tracking on 09/21/2024
-__version__ = "1.0"
+Uses Source Extractor for initial catalogs, photutils for ePSF building
+and PSF fitting. Writes APPPHOT, PSFPHOT, PSFSTARS, PSF, and RESIDUAL
+extensions to the stack FITS. Authors: Kerry Paterson, Charlie Kilpatrick.
+"""
+from potpyri._version import __version__
 
 from photutils.aperture import ApertureStats
 from photutils.aperture import CircularAperture
@@ -36,6 +38,17 @@ warnings.filterwarnings('ignore')
 
 
 def create_conv(outfile):
+    """Write a 3x3 CONV NORM filter file for Source Extractor.
+
+    Parameters
+    ----------
+    outfile : str
+        Path to write the convolution kernel file.
+
+    Returns
+    -------
+    None
+    """
     with open(outfile, 'w') as f:
         f.write('CONV NORM \n')
         f.write('1 2 1 \n')
@@ -43,6 +56,17 @@ def create_conv(outfile):
         f.write('1 2 1 \n')
 
 def create_params(outfile):
+    """Write Source Extractor parameter file (NUMBER, X_IMAGE, FWHM_IMAGE, etc.).
+
+    Parameters
+    ----------
+    outfile : str
+        Path to write the parameter file.
+
+    Returns
+    -------
+    None
+    """
     with open(outfile, 'w') as f:
         f.write('NUMBER \n')
         f.write('X_IMAGE \n')
@@ -56,7 +80,20 @@ def create_params(outfile):
         f.write('FWHM_IMAGE \n')
 
 def run_sextractor(img_file, log=None):
+    """Run Source Extractor on SCI extension; return catalog table or None.
 
+    Parameters
+    ----------
+    img_file : str
+        Path to FITS with SCI extension (and SATURATE in header).
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    astropy.table.Table or None
+        Source Extractor catalog, or None if run failed.
+    """
     hdu = fits.open(img_file)
 
     data = hdu['SCI'].data
@@ -106,8 +143,30 @@ def run_sextractor(img_file, log=None):
 
     return(table)
 
-def extract_aperture_stats(img_data, img_mask, img_error, stars, 
+def extract_aperture_stats(img_data, img_mask, img_error, stars,
     aperture_radius=10.0, log=None):
+    """Compute aperture flux and error for a star table; return table with added columns.
+
+    Parameters
+    ----------
+    img_data : np.ndarray
+        Science image data.
+    img_mask : np.ndarray
+        Boolean or integer mask (True/masked excluded).
+    img_error : np.ndarray
+        Per-pixel error array.
+    stars : astropy.table.Table
+        Table with xcentroid, ycentroid (modified in place with refined centroids).
+    aperture_radius : float, optional
+        Aperture radius in pixels. Default is 10.0.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    astropy.table.Table
+        Table with fwhm, flux_best, flux_best_err, Xpos, Ypos, etc.
+    """
 
     apertable = Table([[0.],[0.],[0.],[0.],[0.],[0.],[0.],[0.],[0.],[0.],
         [0.],[0.]], 
@@ -143,25 +202,49 @@ def extract_aperture_stats(img_data, img_mask, img_error, stars,
         aperstats = ApertureStats(img_data, aper, mask=img_mask, 
             error=img_error)
 
+        covx = np.maximum(aperstats.covar_sigx2.value, 0.0)
+        covy = np.maximum(aperstats.covar_sigy2.value, 0.0)
         apertable.add_row([aperstats.fwhm.value, aperstats.semimajor_sigma.value,
             aperstats.semiminor_sigma.value, aperstats.orientation.value,
             aperstats.eccentricity, aperstats.sum/aperstats.sum_err,
             aperstats.sum, aperstats.sum_err, aperstats.xcentroid,
-            aperstats.ycentroid, np.sqrt(aperstats.covar_sigx2.value),
-            np.sqrt(aperstats.covar_sigy2.value)])
+            aperstats.ycentroid, np.sqrt(covx),
+            np.sqrt(covy)])
     
     return(apertable)
 
 
 def generate_epsf(img_file, x, y, size=11, oversampling=2, maxiters=11,
     log=None):
+    """Build an ePSF from cutouts at (x, y) positions in the image.
+
+    Parameters
+    ----------
+    img_file : str
+        Path to FITS with SCI extension.
+    x, y : array-like
+        Star x,y positions (pixels).
+    size : int, optional
+        Cutout size in pixels. Default is 11.
+    oversampling : int, optional
+        EPSFBuilder oversampling. Default is 2.
+    maxiters : int, optional
+        EPSFBuilder max iterations. Default is 11.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    photutils.psf.EPSFModel
+        Fitted ePSF model.
+    """
     # Construct stars table from bright
     stars_tbl = Table()
     stars_tbl['x'] = x
     stars_tbl['y'] = y
 
-    img_hdu = fits.open(img_file)
-    ndimage = NDData(data=img_hdu['SCI'].data)
+    with fits.open(img_file) as img_hdu:
+        ndimage = NDData(data=img_hdu['SCI'].data)
 
     stars = extract_stars(ndimage, stars_tbl, size=size)
 
@@ -180,7 +263,20 @@ def generate_epsf(img_file, x, y, size=11, oversampling=2, maxiters=11,
     return(epsf)
 
 def extract_fwhm_from_epsf(epsf, fwhm_init):
+    """Estimate FWHM from ePSF model (Moffat2D fit).
 
+    Parameters
+    ----------
+    epsf : photutils.psf.EPSFModel
+        ePSF model with .data array.
+    fwhm_init : float
+        Initial FWHM guess for fit (pixels).
+
+    Returns
+    -------
+    float
+        FWHM in pixels from fitted Moffat2D.
+    """
     # Get the raw data for the FWHM and size in x and y
     data = epsf.data
     x = np.arange(data.shape[0])
@@ -204,12 +300,33 @@ def extract_fwhm_from_epsf(epsf, fwhm_init):
     return(p.fwhm)
 
 def run_photometry(img_file, epsf, fwhm, threshold, shape, stars):
+    """Run PSF photometry and aperture photometry; append result tables to FITS.
 
-    img_hdu = fits.open(img_file)
-    image = img_hdu['SCI'].data
-    ndimage = NDData(data=img_hdu['SCI'].data)
-    mask = img_hdu['MASK'].data.astype(bool)
-    error = img_hdu['ERROR'].data
+    Parameters
+    ----------
+    img_file : str
+        Path to FITS with SCI, MASK, ERROR extensions.
+    epsf : photutils.psf.EPSFModel
+        ePSF model for PSF fit.
+    fwhm : float
+        FWHM in pixels (for aperture radius).
+    threshold : float
+        Detection threshold (unused in this wrapper; for compatibility).
+    shape : int
+        Fit shape (pixels) for PSFPhotometry.
+    stars : astropy.table.Table
+        Star table with xcentroid, ycentroid, flux_best for initial guesses.
+
+    Returns
+    -------
+    tuple
+        (result_table, residual_image). result_table has flux_fit, x_fit, y_fit, etc.
+    """
+    with fits.open(img_file) as img_hdu:
+        image = img_hdu['SCI'].data
+        ndimage = NDData(data=img_hdu['SCI'].data)
+        mask = img_hdu['MASK'].data.astype(bool)
+        error = img_hdu['ERROR'].data
 
     psf = copy.copy(epsf)
 
@@ -244,8 +361,30 @@ def run_photometry(img_file, epsf, fwhm, threshold, shape, stars):
 
 # Identifies stars and gets aperture photometry and statistics using 
 # photutils.aperture.ApertureStats
-def get_star_catalog(img_data, img_mask, img_error, fwhm_init=5.0, 
+def get_star_catalog(img_data, img_mask, img_error, fwhm_init=5.0,
     threshold=50.0, log=None):
+    """Detect stars with DAOStarFinder and compute aperture stats; return star table.
+
+    Parameters
+    ----------
+    img_data : np.ndarray
+        Science image data.
+    img_mask : np.ndarray
+        Boolean mask (True = masked).
+    img_error : np.ndarray
+        Per-pixel error array.
+    fwhm_init : float, optional
+        DAOStarFinder FWHM and aperture scale. Default is 5.0.
+    threshold : float, optional
+        DAOStarFinder detection threshold. Default is 50.0.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    astropy.table.Table
+        Star table with centroid, flux, fwhm, flux_best, etc.
+    """
 
     # Construct the finder with input FWHM and threshold
     daofind = DAOStarFinder(fwhm=fwhm_init, threshold=threshold,
@@ -279,10 +418,34 @@ def do_phot(img_file,
     save_psf_img=False,
     save_residual_hdu=False,
     log=None):
+    """Run full PSF and aperture photometry on a stack; write extensions to FITS.
 
+    Builds ePSF, finds stars, runs PSF and aperture photometry, and appends
+    APPPHOT, PSFPHOT, EPSF, and optional residual extensions to the FITS file.
+
+    Parameters
+    ----------
+    img_file : str
+        Path to stack FITS (SCI, MASK, ERROR).
+    fwhm_scale_psf : float, optional
+        Scale factor for PSF fit shape. Default is 4.5.
+    oversampling : int, optional
+        ePSF oversampling. Default is 1.
+    star_param : dict, optional
+        Keys: snthresh_psf, fwhm_init, snthresh_final. Defaults as shown.
+    save_psf_img : bool, optional
+        If True, save ePSF image extension. Default is False.
+    save_residual_hdu : bool, optional
+        If True, save residual image extension. Default is False.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    None
+        img_file is updated in place with new extensions.
+    """
     img_hdu = fits.open(img_file)
-
-    # Get image statistics
     data = img_hdu['SCI'].data
     mask = img_hdu['MASK'].data.astype(bool)
     error = img_hdu['ERROR'].data
@@ -435,7 +598,10 @@ def do_phot(img_file,
     coords = w.pixel_to_world(photometry['x_fit'], photometry['y_fit'])
 
     # Join the photometry and all star catalogs and rename columns
-    photometry['SN'] = photometry['flux_fit']/photometry['flux_err']
+    flux_err = np.asarray(photometry['flux_err'], dtype=float)
+    sn = np.full_like(flux_err, np.nan)
+    np.divide(photometry['flux_fit'], flux_err, out=sn, where=flux_err > 0)
+    photometry['SN'] = sn
     photometry['mag'] = -2.5*np.log10(photometry['flux_fit'])
     photometry['mag_err'] = 2.5/np.log(10) * 1./photometry['SN']
     photometry['RA'] = [c.ra.degree for c in coords]
@@ -513,8 +679,29 @@ def do_phot(img_file,
 
     # Finally, write out img_hdu to save all data
     img_hdu.writeto(img_file, overwrite=True)
+    img_hdu.close()
 
 def photloop(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
+    """Try PSF photometry with decreasing S/N threshold until do_phot succeeds.
+
+    Parameters
+    ----------
+    stack : str
+        Path to stack FITS (SCI, MASK, ERROR).
+    phot_sn_min : float, optional
+        Minimum S/N threshold to try. Default is 3.0.
+    phot_sn_max : float, optional
+        Initial S/N threshold. Default is 40.0.
+    fwhm_init : float, optional
+        Initial FWHM for star finding. Default is 5.0.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    None
+        Stack FITS is updated in place when do_phot succeeds.
+    """
     signal_to_noise = phot_sn_max
 
     epsf = None ; fwhm = None

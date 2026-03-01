@@ -1,11 +1,12 @@
-"Functions for initializing pipeline options and data paths."
-"Authors: Charlie Kilpatrick"
+"""Pipeline option parsing and path setup.
 
-# Initial version tracking on 09/21/2024
-__version__ = "1.0"
+Provides argument parsing for the main pipeline and builds directory layouts
+(raw, red, log, cals, workspace, etc.) for a given data path and instrument.
+Authors: Charlie Kilpatrick.
+"""
+from potpyri._version import __version__
 
 import os
-import importlib
 import shutil
 import sys
 import subprocess
@@ -13,6 +14,14 @@ import subprocess
 from potpyri import instruments
 
 def init_options():
+    """Build and return the argument parser for the main pipeline.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        Parser with instrument, data_path, target, proc, include-bad,
+        file-list-name, photometry, and processing flags.
+    """
     import argparse
     params = argparse.ArgumentParser(description='Path of data.')
     params.add_argument('instrument', 
@@ -94,6 +103,15 @@ def init_options():
 
 
 def add_options():
+    """Parse command-line options and return normalized args.
+
+    Handles instrument aliases (e.g. BINO -> BINOSPEC, MMIR -> MMIRS).
+
+    Returns
+    -------
+    argparse.Namespace
+        Parsed and normalized command-line arguments.
+    """
     params = init_options()
     args = params.parse_args()
 
@@ -106,7 +124,14 @@ def add_options():
     return(args)
 
 def test_for_dependencies():
+    """Check that astrometry.net and Source Extractor are on the system path.
 
+    Raises
+    ------
+    Exception
+        If solve-field (astrometry.net) or sex (sextractor) is not found
+        or does not report expected help text.
+    """
     p = subprocess.run(['solve-field','-h'], capture_output=True)
     data = p.stdout.decode().lower()
 
@@ -125,7 +150,31 @@ def test_for_dependencies():
             https://github.com/astromatic/sextractor.''')
 
 def add_paths(data_path, file_list_name, tel):
+    """Build the directory and path dictionary for a reduction run.
 
+    Creates raw, bad, red, log, cal, work dirs under data_path and resolves
+    the path to the Source Extractor binary.
+
+    Parameters
+    ----------
+    data_path : str
+        Top-level data directory.
+    file_list_name : str
+        Filename of the file list (e.g. files.txt).
+    tel : Instrument
+        Instrument instance (used for name and caldb).
+
+    Returns
+    -------
+    dict
+        Keys include 'data', 'raw', 'bad', 'red', 'log', 'cal', 'work',
+        'filelist', 'caldb', 'source_extractor'.
+
+    Raises
+    ------
+    Exception
+        If data_path does not exist.
+    """
     if not os.path.exists(data_path):
         raise Exception(f'Data path does not exist: {data_path}')
 
@@ -152,12 +201,25 @@ def add_paths(data_path, file_list_name, tel):
     return(paths)
 
 def initialize_telescope(instrument, data_path):
+    """Load the instrument class and build paths for that instrument.
 
-    module = importlib.import_module(f'potpyri.instruments.{instrument.upper()}')
-    tel = getattr(module, instrument.upper())()
+    Parameters
+    ----------
+    instrument : str
+        Instrument name (e.g. 'GMOS', 'LRIS').
+    data_path : str
+        Top-level data directory.
 
-    # Generate code and data paths based on input path
-    paths = add_paths(data_path, tel)
+    Returns
+    -------
+    tuple
+        (paths, tel) where paths is the dict from add_paths and tel is the
+        instrument instance. Uses default file list name.
+    """
+    tel = instruments.instrument_getter(instrument)
+
+    # Generate code and data paths based on input path (default file list name)
+    paths = add_paths(data_path, 'files.txt', tel)
 
     return(paths, tel)
 

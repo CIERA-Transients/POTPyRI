@@ -40,6 +40,10 @@ env/
 *.sublime-project
 *.sublime-workspace
 
+# Sphinx
+docs/build/
+docs/source/api/generated/
+
 # Miscellaneous
 *.bak
 *.swp

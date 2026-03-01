@@ -1,3 +1,9 @@
+"""Instrument implementations and factory for POTPyRI.
+
+Each instrument module defines a subclass of Instrument with detector keywords,
+calibration behavior, and file-sorting rules. New instruments must be added
+here and to __all__.
+"""
 from . import BINOSPEC
 from . import DEIMOS
 from . import F2
@@ -13,7 +19,26 @@ __all__ = ["BINOSPEC","DEIMOS","F2","FOURSTAR","GMOS","IMACS","LRIS","MMIRS","MO
 
 
 def instrument_getter(instname, log=None):
+    """Return an Instrument instance for the given instrument name.
 
+    Parameters
+    ----------
+    instname : str
+        Instrument name (e.g. 'GMOS', 'LRIS', 'BINOSPEC').
+    log : ColoredLogger, optional
+        Logger for error messages. If None, raises Exception on unsupported
+        instrument.
+
+    Returns
+    -------
+    Instrument
+        Subclass instance for the requested instrument.
+
+    Raises
+    ------
+    Exception
+        If instname is not in __all__ and log is None.
+    """
     instname = instname.upper()
 
     if instname not in __all__:
