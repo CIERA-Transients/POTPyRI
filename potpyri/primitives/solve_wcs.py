@@ -437,7 +437,7 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
 
     # Estimate sources that land within the image using WCS from header
     hdu = fits.open(file)
-    w = WCS(hdu[0].header)
+    w = WCS(hdu[0].header, relax=True)
     naxis1 = hdu[0].header['NAXIS1']
     naxis2 = hdu[0].header['NAXIS2']
 
@@ -523,8 +523,12 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
 
         central_coo = w.pixel_to_world(*central_pix)
         try:
-            w = fit_wcs_from_points(xy, coords, proj_point=central_coo,
-                sip_degree=sip_degree)
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore", category=RuntimeWarning,
+                    message=".*cdelt will be ignored since cd is present.*")
+                w = fit_wcs_from_points(xy, coords, proj_point=central_coo,
+                    sip_degree=sip_degree)
             succeeded = True
         except ValueError:
             # Try with next iteration
@@ -597,7 +601,11 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
         c = coords[idxs]
 
         central_coo = w.pixel_to_world(*central_pix)
-        new_wcs = fit_wcs_from_points(xy, c, projection=w)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore", category=RuntimeWarning,
+                message=".*cdelt will be ignored since cd is present.*")
+            new_wcs = fit_wcs_from_points(xy, c, projection=w)
 
         cent_coord = new_wcs.pixel_to_world(*central_pix)
         ra_cent.append(cent_coord.ra.degree)

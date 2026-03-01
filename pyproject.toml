@@ -104,4 +104,18 @@ filterwarnings = [
     "ignore:Units from inserted quantities will be ignored:UserWarning",
     "ignore:The EPSFModel class is deprecated:DeprecationWarning",
     "ignore:The fit may be unsuccessful:UserWarning",
+    "ignore:.*findChildren.*:DeprecationWarning",
+    "ignore:cdelt will be ignored since cd is present:RuntimeWarning",
+    "ignore:Some non-standard WCS keywords were excluded:astropy.utils.exceptions.AstropyWarning",
+    # Calibration / WCS from test data (FITS with legacy headers)
+    "ignore:RADECSYS keyword is deprecated",
+    "ignore:datfix",
+    "ignore:DATE-OBS.*MJD-OBS",
+    # Sigma clipping on data that may contain NaNs/infs (e.g. calibration)
+    "ignore:Input data contains invalid values:astropy.utils.exceptions.AstropyUserWarning",
+    # Photometry / photutils (PSF at image edges, fit convergence, FITS header metadata)
+    "ignore:.*star\\(s\\) were not extracted because their cutout:astropy.utils.exceptions.AstropyUserWarning",
+    "ignore:One or more fit\\(s\\) may not have converged:astropy.utils.exceptions.AstropyUserWarning",
+    "ignore:Attribute.*cannot be added to FITS Header:astropy.utils.exceptions.AstropyUserWarning",
+    "ignore:Keyword name.*greater than 8 characters",
 ]

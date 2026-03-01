@@ -35,10 +35,9 @@ def test_wcs(tmp_path):
     hdu.header['DEDISP'] = (dec_disp_val, 'Dispersion in Decl. of WCS [Arcsec]')
     hdu.writeto(file_path, overwrite=True)
 
-    hdu = fits.open(file_path)
-    ra_disp = hdu[0].header['RADISP']
-    dec_disp = hdu[0].header['DEDISP']
-    hdu.close()
+    with fits.open(file_path) as hdu:
+        ra_disp = hdu[0].header['RADISP']
+        dec_disp = hdu[0].header['DEDISP']
 
     assert ra_disp < 0.5
     assert dec_disp < 0.5
@@ -64,13 +63,13 @@ def test_wcs_integration(tmp_path):
     paths = options.add_paths(data_path, file_list_name, tel)
     log = logger.get_log(paths['log'])
 
-    hdu = fits.open(file_path)
-    binn = tel.get_binning(hdu[1].header)
-    file_path = file_path.replace('.fz', '')
-    hdu[1].header.pop('RADISP', None)
-    hdu[1].header.pop('DEDISP', None)
-    fits.writeto(file_path, hdu[1].data, hdu[1].header, overwrite=True)
-    hdu.close()
+    with fits.open(file_path) as hdu:
+        binn = tel.get_binning(hdu[1].header)
+        file_path_unfz = file_path.replace('.fz', '')
+        hdu[1].header.pop('RADISP', None)
+        hdu[1].header.pop('DEDISP', None)
+        fits.writeto(file_path_unfz, hdu[1].data, hdu[1].header, overwrite=True)
+    file_path = file_path_unfz
 
     try:
         solve_wcs.solve_astrometry(file_path, tel, binn, paths, index=astm_path, log=log)
@@ -80,10 +79,9 @@ def test_wcs_integration(tmp_path):
     finally:
         log.close()
 
-    hdu = fits.open(file_path)
-    ra_disp = hdu[0].header['RADISP']
-    dec_disp = hdu[0].header['DEDISP']
-    hdu.close()
+    with fits.open(file_path) as hdu:
+        ra_disp = hdu[0].header['RADISP']
+        dec_disp = hdu[0].header['DEDISP']
 
     assert ra_disp < 0.5
     assert dec_disp < 0.5

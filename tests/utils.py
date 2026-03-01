@@ -66,7 +66,9 @@ def download_gdrive_file(
     try:
         file_id = resolve_relative_path(shared_folder_url, rel_file_path)
         url = f"https://drive.google.com/uc?id={file_id}"
-        gdown.download(url, output_path, quiet=False)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*findChildren.*")
+            gdown.download(url, output_path, quiet=False)
     except:
         print(f"Failed to download {rel_file_path} from Google Drive.")
         raise
