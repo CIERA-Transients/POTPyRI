@@ -1,4 +1,4 @@
-name: potpyri_test
+name: potpyri
 channels:
   - conda-forge
   - defaults
