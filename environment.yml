@@ -1,9 +1,22 @@
-name: potpyri_test
+# Conda environment for POTPyRI (see README for full instructions).
+# Create with: conda env create -f environment.yml
+# Then: conda activate potpyri && pip install potpyri
+# Or from source: pip install -e .  (and optionally -e ".[test]" or ".[docs]")
+#
+# Platform support (conda-forge):
+#   - linux-64, osx-64 (Intel Mac): both astromatic-source-extractor and astrometry are available.
+#   - osx-arm64 (Apple Silicon): astromatic-source-extractor has a native build; astrometry does NOT.
+#     If "conda env create" fails on Apple Silicon (no astrometry build), create from this file with
+#     the "astrometry" line removed, then run: brew install astrometry-net
+#
+# Astrometry.net index files (~59 GB) are installed separately via: download_anet_index
+
+name: potpyri
 channels:
   - conda-forge
   - defaults
 dependencies:
   - python=3.12
-  - pip-tools
+  - pip
   - astromatic-source-extractor
   - astrometry
