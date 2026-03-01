@@ -1,3 +1,4 @@
+"""Query and download Gemini Observatory archive data by program ID and date."""
 import requests
 import sys
 import os
@@ -10,6 +11,7 @@ from astropy.time import Time, TimeDelta
 from astropy import units as u
 
 def add_options(parser=None, usage=None):
+    """Parse CLI: --progids, --cookie-file, --date, --outdir, --clobber."""
     import argparse
     if parser == None:
         parser = argparse.ArgumentParser(usage=usage,conflict_handler='resolve')

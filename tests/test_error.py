@@ -1,3 +1,4 @@
+"""Tests for create_error (per-pixel error array from science and mask)."""
 from potpyri.utils import options
 from potpyri.utils import logger
 from potpyri.primitives import image_procs
@@ -15,7 +16,7 @@ from astropy import units as u
 from . import utils
 
 def test_error(tmp_path):
-
+    """Create error array for synthetic image and compare to theoretical sqrt(poisson+rms^2+rdnoise)."""
     instrument = 'MOSFIRE'
     file_list_name = 'files.txt'
 
@@ -42,7 +43,10 @@ def test_error(tmp_path):
     hdu.header['SATURATE'] = 35000.0
     hdu.writeto(outfile, overwrite=True, output_verify='silentfix')
 
-    error_hdu = image_procs.create_error(outfile, maskhdu, rdnoise)
+    try:
+        error_hdu = image_procs.create_error(outfile, maskhdu, rdnoise)
+    finally:
+        log.close()
 
     rms = 0.5 * (
             np.percentile(imdata[~maskim.astype(bool)], 84.13)

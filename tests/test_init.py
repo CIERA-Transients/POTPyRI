@@ -1,8 +1,10 @@
+"""Tests for instrument initialization (instrument_getter for all supported instruments)."""
 from potpyri.utils import options
 from potpyri.instruments import instrument_getter
 
-def test_init(tmp_path):
 
+def test_init(tmp_path):
+    """Check that instrument_getter returns an instance with correct name for each CLI instrument."""
     # Parse allowed instruments directly from options so this test matches
     # to values that the argument parser allows as input
     instruments = []

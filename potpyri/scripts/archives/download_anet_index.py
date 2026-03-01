@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""Download astrometry.net index files from NERSC to the local index directory."""
 
 import os
 import sys
@@ -7,7 +8,7 @@ import argparse
 from astropy.utils.data import download_file
 
 def parse_astrometry_config(config_file):
-
+    """Read add_path from astrometry.cfg and return the index data path."""
     data_path = None
 
     with open(config_file, 'r') as f:
@@ -23,7 +24,7 @@ def parse_astrometry_config(config_file):
     return(data_path)
 
 def download_index_files(outdir=None, max_tries=4):
-
+    """Download index FITS from NERSC LITE to outdir (default from astrometry.cfg)."""
     # Define outdir based on where solve-field is located in path
     if outdir is None:
         path = shutil.which('solve-field')
@@ -72,6 +73,7 @@ def download_index_files(outdir=None, max_tries=4):
                 print(f'WARNING: could not download {outfile}.  Try download_anet_index again...')
 
 def add_options():
+    """Parse command line (--data-path for download directory)."""
     params = argparse.ArgumentParser(description='Path of data.')
     params.add_argument('--data-path', default=None, 
         help='''Path for downloading data.''')
@@ -80,6 +82,7 @@ def add_options():
     return(args)
 
 def main():
+    """CLI entry: parse args and run download_index_files."""
     args = add_options()
     download_index_files(outdir=args.data_path)
 

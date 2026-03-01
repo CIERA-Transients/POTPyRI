@@ -1,17 +1,20 @@
+"""Query and download Keck Observatory Archive (KOA) data by date and instrument."""
 import numpy as np
 import sys
 import io
 import os
-from pykoa.koa import Koa 
+from pykoa.koa import Koa
 from astropy.time import Time
 from astropy.table import Table
 from astropy.table import Column
 
 def login(cookie=None):
+    """Authenticate to KOA using a cookie file for proprietary data."""
     if cookie and os.path.isfile(cookie):
         Koa.login(cookie)
 
 def date_query(date, instr, form='ipac', base_outdir='.', cookie=None):
+    """Query KOA by date and instrument; write table and return (outfile, outdir) or (None, None)."""
     t = Time(date)
     outdir = os.path.join(base_outdir, t.datetime.strftime('%Y%m%d'))
     if not os.path.exists(outdir):
@@ -27,9 +30,12 @@ def date_query(date, instr, form='ipac', base_outdir='.', cookie=None):
         return(None, None)
 
 def download_data(recfile, outdir, form='ipac', cookie=None):
+    """Download files listed in recfile from KOA to outdir."""
     Koa.download(recfile, form, outdir, cookiepath=cookie)
 
+
 def add_options():
+    """Parse CLI: date, instrument, --cookie-file, --base-outdir."""
     import argparse
     params = argparse.ArgumentParser()
     params.add_argument('date', 
@@ -45,6 +51,7 @@ def add_options():
     return(args)
 
 def main():
+    """Entry point: parse args, optionally login, query by date, and download."""
     args = add_options()
 
     if args.cookie_file is not None:
