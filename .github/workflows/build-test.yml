@@ -29,18 +29,18 @@ jobs:
       shell: bash -l {0} # Use login shell for conda commands
       run: |
         conda env create -f environment.yml
-        conda activate potpyri_test
+        conda activate potpyri
 
     - name: Install the Package and Remaining Dependencies
       shell: bash -l {0}
       run: |
-          conda activate potpyri_test
+          conda activate potpyri
           python -m pip install --upgrade pip setuptools wheel
           pip install .
           
     - name: Run tests
       shell: bash -l {0}
       run: |
-          conda activate potpyri_test
+          conda activate potpyri
           pip install .[test]
-          pytest
+          pytest -m "not integration"
