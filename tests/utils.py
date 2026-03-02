@@ -1,3 +1,4 @@
+"""Test helpers: Google Drive and GitHub file download, dummy WCS for tests."""
 import requests
 import re
 import os
@@ -8,7 +9,7 @@ import json
 import itertools
 import warnings
 
-__all__ = ["download_gdrive_file","make_dummy_wcs","download_github_file"]
+__all__ = ["download_gdrive_file", "make_dummy_wcs", "download_github_file"]
 
 class _GoogleDriveFile:
     TYPE_FOLDER = "application/vnd.google-apps.folder"
@@ -65,7 +66,9 @@ def download_gdrive_file(
     try:
         file_id = resolve_relative_path(shared_folder_url, rel_file_path)
         url = f"https://drive.google.com/uc?id={file_id}"
-        gdown.download(url, output_path, quiet=False)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*findChildren.*")
+            gdown.download(url, output_path, quiet=False)
     except:
         print(f"Failed to download {rel_file_path} from Google Drive.")
         raise
@@ -163,6 +166,7 @@ def resolve_relative_path(shared_folder_url, relative_path):
         return match[0][0]  # return file id
 
 def make_dummy_wcs():
+    """Return a minimal FITS header dict with TAN WCS for test images."""
     header = {'WCSAXES': 2,
               'CTYPE1': 'RA---TAN',
               'CTYPE2': 'DEC--TAN',

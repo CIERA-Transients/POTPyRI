@@ -1,6 +1,5 @@
-# Parameter file for F2/Gemini-S
-
-__version__ = "1.0" # Last edited 11/23/2024
+"""F2/Gemini-S instrument configuration and reduction parameters."""
+from potpyri._version import __version__
 
 import os
 import ccdproc
@@ -15,6 +14,7 @@ from astropy.nddata import CCDData
 from . import instrument
 
 class F2(instrument.Instrument):
+    """F2 at Gemini-South: NIR imaging with dark and flat calibration."""
 
     def __init__(self):
 

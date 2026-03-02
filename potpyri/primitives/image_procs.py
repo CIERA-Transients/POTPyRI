@@ -1,12 +1,13 @@
-"Functions for calibrating, masking, creating error images, and stacking images."
-"Authors: Charlie Kilpatrick"
+"""Image calibration, masking, error arrays, alignment, and stacking.
 
-# Last updated on 09/29/2024
-__version__ = "2.1"
+Provides WCS handling, alignment to a common grid, cosmic-ray rejection,
+satellite masking, master calibration combination, and stacked science
+output. Authors: Charlie Kilpatrick.
+"""
+from potpyri._version import __version__
 
-import os 
+import os
 import time
-import importlib
 import numpy as np
 import logging
 import sys
@@ -32,7 +33,18 @@ from potpyri.primitives import solve_wcs
 from potpyri.utils import utilities
 
 def remove_pv_distortion(header):
+    """Remove PV* distortion keywords from a FITS header (modifies in place).
 
+    Parameters
+    ----------
+    header : astropy.io.fits.Header
+        Header to modify.
+
+    Returns
+    -------
+    astropy.io.fits.Header
+        The same header reference (modified in place).
+    """
     done = False
     while not done:
         bad_key = False
@@ -47,19 +59,30 @@ def remove_pv_distortion(header):
     return(header)
 
 def get_fieldcenter(images):
+    """Compute mean RA/Dec of image centers from a list of FITS files.
 
-    ras=[] ; des = []
+    Parameters
+    ----------
+    images : list of str
+        Paths to FITS files with WCS in primary header.
+
+    Returns
+    -------
+    list
+        [mean_ra_deg, mean_dec_deg].
+    """
+    ras = [] ; des = []
     for file in images:
-        hdu = fits.open(file)
-        w = WCS(hdu[0].header)
+        with fits.open(file) as hdu:
+            w = WCS(hdu[0].header)
 
-        data_shape = hdu[0].data.shape
-        center_pix = (data_shape[1]/2., data_shape[0]/2.)
+            data_shape = hdu[0].data.shape
+            center_pix = (data_shape[1]/2., data_shape[0]/2.)
 
-        coord = w.pixel_to_world(*center_pix)
+            coord = w.pixel_to_world(*center_pix)
 
-        ras.append(coord.ra.degree)
-        des.append(coord.dec.degree)
+            ras.append(coord.ra.degree)
+            des.append(coord.dec.degree)
 
     mean_ra = np.mean(ras)
     mean_de = np.mean(des)
@@ -67,7 +90,24 @@ def get_fieldcenter(images):
     return([mean_ra, mean_de])
 
 def generate_wcs(tel, binn, fieldcenter, out_size):
+    """Build a TAN WCS for a given field center and output size.
 
+    Parameters
+    ----------
+    tel : Instrument
+        Instrument instance (for pixel scale).
+    binn : str
+        Binning string (e.g. '22').
+    fieldcenter : sequence
+        [ra_deg, dec_deg] or parseable coordinate.
+    out_size : int
+        Output image size (out_size x out_size pixels).
+
+    Returns
+    -------
+    astropy.wcs.WCS
+        WCS instance.
+    """
     w = {'NAXES':2, 'NAXIS1': out_size, 'NAXIS2': out_size,
         'EQUINOX': 2000.0, 'LONPOLE': 180.0, 'LATPOLE': 0.0}
 
@@ -96,7 +136,39 @@ def generate_wcs(tel, binn, fieldcenter, out_size):
 
 def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None,
     out_size=None, skip_gaia=False, keep_all_astro=False, log=None):
+    """Solve WCS and align reduced images to a common grid.
 
+    Runs astrometry.net and optionally Gaia alignment, then reprojects to
+    a common WCS.
+
+    Parameters
+    ----------
+    reduced_files : list of str
+        Paths to reduced FITS files.
+    paths : dict
+        Paths dict from options.add_paths.
+    tel : Instrument
+        Instrument instance.
+    binn : str
+        Binning string.
+    use_wcs : astropy.wcs.WCS, optional
+        If provided, use this WCS instead of solving.
+    fieldcenter : sequence, optional
+        [ra, dec] for generating WCS.
+    out_size : int, optional
+        Output image size.
+    skip_gaia : bool, optional
+        If True, skip Gaia alignment. Default is False.
+    keep_all_astro : bool, optional
+        If True, keep all images regardless of astrometric dispersion.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    tuple or None
+        (aligned_data, masks, errors) as lists, or None if no images aligned.
+    """
     solved_images = []
     aligned_images = []
     aligned_data = []
@@ -192,9 +264,44 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
 
     return(aligned_images, aligned_data)
 
-def image_proc(image_data, tel, paths, skip_skysub=False, 
+def image_proc(image_data, tel, paths, skip_skysub=False,
     fieldcenter=None, out_size=None, satellites=True, cosmic_ray=True,
     skip_gaia=False, keep_all_astro=False, log=None):
+    """Full image processing: align, mask, stack, and optionally detrend.
+
+    Orchestrates WCS solving, alignment, satellite/cosmic-ray masking,
+    stacking, and optional sky subtraction.
+
+    Parameters
+    ----------
+    image_data : astropy.table.Table
+        File table subset (e.g. one TargType) with 'File' column.
+    tel : Instrument
+        Instrument instance.
+    paths : dict
+        Paths dict from options.add_paths.
+    skip_skysub : bool, optional
+        If True, skip sky subtraction. Default is False.
+    fieldcenter : sequence, optional
+        [ra, dec] for alignment.
+    out_size : int, optional
+        Output image size.
+    satellites : bool, optional
+        If True, mask satellite trails. Default is True.
+    cosmic_ray : bool, optional
+        If True, run cosmic-ray rejection. Default is True.
+    skip_gaia : bool, optional
+        If True, skip Gaia alignment. Default is False.
+    keep_all_astro : bool, optional
+        If True, keep all images regardless of astrometric dispersion.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    str or None
+        Path to stacked output FITS, or None if processing failed.
+    """
 
     wavelength = tel.wavelength
 
@@ -425,7 +532,18 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
     return(stackname)
 
 def detrend_stack(stack):
+    """Remove row and column median from stack science data (detrend).
 
+    Parameters
+    ----------
+    stack : astropy.io.fits.HDUList
+        HDU list with [0]=SCI, [1]=MASK. Modified in place.
+
+    Returns
+    -------
+    astropy.io.fits.HDUList
+        The same stack reference (modified in place).
+    """
     data = stack[0].data
     mask = stack[1].data.astype(bool)
 
@@ -450,7 +568,30 @@ def detrend_stack(stack):
     return(stack)
 
 def stack_data(stacking_data, tel, masks, errors, mem_limit=8.0e9, log=None):
+    """Combine aligned CCDData list with exposure scaling (median or average).
 
+    Masks are applied (masked pixels set to nan) before combination.
+
+    Parameters
+    ----------
+    stacking_data : list of ccdproc.CCDData
+        Aligned science images.
+    tel : Instrument
+        Instrument instance (for stack_method and get_exptime).
+    masks : list of astropy.io.fits.ImageHDU
+        Per-image masks.
+    errors : list of astropy.io.fits.ImageHDU
+        Per-image error arrays.
+    mem_limit : float, optional
+        Memory limit in bytes for ccdproc.combine. Default is 8e9.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    astropy.io.fits.HDUList
+        HDU list [science, mask, error] (mask/error from first image).
+    """
     stack_method = tel.stack_method
     if not stack_method:
         if log:
@@ -480,7 +621,20 @@ def stack_data(stacking_data, tel, masks, errors, mem_limit=8.0e9, log=None):
     return(sci_med)
 
 def add_stack_mask(stack, stacking_data):
+    """Update stack mask from per-image masks and saturation; set masked pixels to 0.
 
+    Parameters
+    ----------
+    stack : astropy.io.fits.HDUList
+        HDU list with [0]=SCI, [1]=MASK, [2]=ERROR. Modified in place.
+    stacking_data : list of ccdproc.CCDData
+        Per-image data (headers used for SATURATE).
+
+    Returns
+    -------
+    astropy.io.fits.HDUList
+        The same stack reference (modified in place).
+    """
     data = stack[0].data
     mask = stack[1].data
     error = stack[2].data
@@ -516,7 +670,21 @@ def add_stack_mask(stack, stacking_data):
     return(stack)
 
 def mask_satellites(images, filenames, log=None):
+    """Detect and mask satellite trails in science images using acstools.satdet.
 
+    Parameters
+    ----------
+    images : list of ccdproc.CCDData
+        Science images; data is modified in place (trail pixels set to nan).
+    filenames : list of str
+        Paths corresponding to images (used for temp files).
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    None
+    """
     out_data = []
     for i,science_data in enumerate(images):
 
@@ -559,10 +727,46 @@ def mask_satellites(images, filenames, log=None):
 
         os.remove(tmpfile)
 
-def create_mask(science_data, saturation, rdnoise, sigclip=3.0, 
-    sigfrac=0.10, objlim=4.0, niter=6, outpath='', grow=0, cosmic_ray=True, 
+def create_mask(science_data, saturation, rdnoise, sigclip=3.0,
+    sigfrac=0.10, objlim=4.0, niter=6, outpath='', grow=0, cosmic_ray=True,
     fsmode='convolve', cleantype='medmask', log=None):
+    """Build a bad-pixel/saturation/cosmic-ray mask using LACosmic and optional growth.
 
+    Parameters
+    ----------
+    science_data : str
+        Path to science FITS file.
+    saturation : float
+        Saturation level (ADU); pixels above this get flag 4.
+    rdnoise : float
+        Read noise for LACosmic (electrons).
+    sigclip : float, optional
+        LACosmic sigma clipping. Default is 3.0.
+    sigfrac : float, optional
+        LACosmic sigfrac. Default is 0.10.
+    objlim : float, optional
+        LACosmic objlim. Default is 4.0.
+    niter : int, optional
+        LACosmic iterations. Default is 6.
+    outpath : str, optional
+        Output path for debug files. Default is ''.
+    grow : int, optional
+        Pixels to grow mask (adds flag 8). Default is 0.
+    cosmic_ray : bool, optional
+        If True, run LACosmic. Default is True.
+    fsmode : str, optional
+        LACosmic fsmode. Default is 'convolve'.
+    cleantype : str, optional
+        LACosmic cleantype. Default is 'medmask'.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    tuple
+        (cleaned_data_ndarray, mask_ImageHDU). Mask uses additive flags:
+        1=bad, 2=cosmic ray, 4=saturated, 8=neighbor.
+    """
     t_start = time.time()
     
     if log:
@@ -699,34 +903,53 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.0,
 
 
 def create_error(science_data, mask_data, rdnoise):
+    """Compute per-pixel error array from science image, mask, and read noise.
 
-    hdu = fits.open(science_data)
-    img_data = hdu[0].data.astype(np.float32)
-    mask = mask_data.data.astype(bool)
+    Error = sqrt(poisson + rms^2 + rdnoise^2). Masked pixels are excluded
+    from RMS estimation. science_data can be a path or HDU; mask_data is
+    an HDU with mask array.
 
-    # Check for issue with all of the file being masked
-    if np.all(mask):
-        rms = hdu[0].header['SATURATE']
-    else:
-        rms = 0.5 * (
-            np.percentile(img_data[~mask], 84.13)
-            - np.percentile(img_data[~mask], 15.86)
-        )
+    Parameters
+    ----------
+    science_data : str or astropy.io.fits.HDUList
+        Path to science FITS or open HDU list.
+    mask_data : astropy.io.fits.PrimaryHDU or ImageHDU
+        HDU containing boolean or integer mask (masked pixels excluded from rms).
+    rdnoise : float
+        Read noise in electrons.
 
-    poisson = img_data
-    poisson[poisson<0.]=0.
-    error = np.sqrt(poisson + rms**2 + rdnoise)
+    Returns
+    -------
+    astropy.io.fits.PrimaryHDU
+        Error array in electrons (BUNIT='ELECTRONS').
+    """
+    with fits.open(science_data) as hdu:
+        img_data = hdu[0].data.astype(np.float32)
+        mask = mask_data.data.astype(bool)
 
-    # Sanitize error array
-    mask = np.isnan(error)
-    error[mask] = np.nanmedian(error)
-    mask = error < 0.0
-    error[mask] = np.nanmedian(error)
-    maxval = np.float32(hdu[0].header['SATURATE'])
-    mask = np.isinf(error)
-    error[mask] = maxval
+        # Check for issue with all of the file being masked
+        if np.all(mask):
+            rms = hdu[0].header['SATURATE']
+        else:
+            rms = 0.5 * (
+                np.percentile(img_data[~mask], 84.13)
+                - np.percentile(img_data[~mask], 15.86)
+            )
 
-    error_hdu = fits.PrimaryHDU(error) #create mask Primary HDU
+        poisson = img_data.copy()
+        poisson[poisson < 0.] = 0.
+        error = np.sqrt(poisson + rms**2 + rdnoise)
+
+        # Sanitize error array
+        mask = np.isnan(error)
+        error[mask] = np.nanmedian(error)
+        mask = error < 0.0
+        error[mask] = np.nanmedian(error)
+        maxval = np.float32(hdu[0].header['SATURATE'])
+        mask = np.isinf(error)
+        error[mask] = maxval
+
+    error_hdu = fits.PrimaryHDU(error)  # create mask Primary HDU
     error_hdu.header['VER'] = (__version__, 
         'Version of image procedures used used.')
     error_hdu.header['USE'] = 'Error array for Poisson, read, and RMS noise'

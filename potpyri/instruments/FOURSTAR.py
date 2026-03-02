@@ -1,6 +1,5 @@
-# Parameter file for Magellan/IMACS
-
-__version__ = "1.0" # Last edited 02/13/2025
+"""FourStar/Magellan instrument configuration and reduction parameters."""
+from potpyri._version import __version__
 
 import os
 import ccdproc
@@ -15,6 +14,7 @@ from astropy.nddata import CCDData
 from . import instrument
 
 class FOURSTAR(instrument.Instrument):
+    """FourStar at Magellan: NIR imaging with flat calibration."""
 
     def __init__(self):
 

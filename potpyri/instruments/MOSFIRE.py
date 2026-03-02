@@ -1,6 +1,5 @@
-# Parameter file for MOSFIRE/Keck
-
-__version__ = "2.0" # Last edited 09/21/2024
+"""MOSFIRE/Keck instrument configuration and reduction parameters."""
+from potpyri._version import __version__
 
 import os
 import ccdproc
@@ -15,6 +14,7 @@ from astropy.nddata import CCDData
 from . import instrument
 
 class MOSFIRE(instrument.Instrument):
+    """MOSFIRE at Keck: NIR imaging with flat calibration."""
 
     def __init__(self):
 

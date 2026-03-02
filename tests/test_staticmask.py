@@ -1,8 +1,10 @@
+"""Tests for load_staticmask for F2, GMOS-N/S, MOSFIRE, BINOSPEC."""
 from potpyri.utils import options
 from potpyri.instruments import instrument_getter
 
-def test_staticmask(tmp_path):
 
+def test_staticmask(tmp_path):
+    """Load static mask for each instrument (F2, GMOS-N/S, MOSFIRE, BINOSPEC) and assert non-None."""
     file_list_name = 'files.txt'
 
     instruments = {

@@ -3,7 +3,8 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.abspath("../.."))
 
 import potpyri
@@ -22,6 +23,7 @@ author = 'POTPyRI Team'
 extensions = [
     'sphinx.ext.doctest',
     'sphinx.ext.autodoc',
+    'sphinx.ext.napoleon',  # NumPy/Google-style docstrings
     'sphinx.ext.intersphinx',
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
@@ -33,11 +35,17 @@ extensions = [
     'nbsphinx',
 ]
 
-autosummary_generate = True  # Generate autosummary stubs automatically
+# Napoleon settings for NumPy-style docstrings (used throughout potpyri)
+napoleon_use_param = True
+napoleon_use_rtype = True
+napoleon_preprocess_types = True
+
+autosummary_generate = True
 autodoc_default_options = {
-    'members': True,          # Include all class members
-    'undoc-members': False,    # Include undocumented members
-    'show-inheritance': True, # Show class inheritance
+    'members': True,
+    'undoc-members': False,
+    'show-inheritance': True,
+    'inherited-members': False,
 }
 
 templates_path = ['_templates']
