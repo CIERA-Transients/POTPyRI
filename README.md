@@ -76,8 +76,12 @@ From the project root (with test deps installed: `pip install -e ".[test]"`):
 pytest tests
 ```
 
-- **Offline (no network):**  
-  `pytest tests -m "not integration"`
+- **Unit tests only (no network):**  
+  `pytest tests -m "not integration"`  
+  This skips the five integration tests that download fixtures from external storage. CI runs this by default.
+- **All tests (including integration):**  
+  `pytest tests`  
+  Requires network access for fixture downloads.
 - **Verbose:**  
   `pytest tests -v`
 
@@ -227,7 +231,9 @@ POTPyRI can stack data from multiple nights, although it will not use unique cal
 
 ## Documentation
 
-Full API documentation (generated from docstrings) is available at [https://CIERA-Transients.github.io/POTPyRI/](https://CIERA-Transients.github.io/POTPyRI/). To build the docs locally, install with `pip install -e ".[docs]"` and run `cd docs && make html` (or use the Sphinx `make.bat` on Windows).
+- **Online:** Full API documentation (generated from docstrings) is at [https://ciera-transients.github.io/POTPyRI/](https://ciera-transients.github.io/POTPyRI/).
+- **Local build:** Install with `pip install -e ".[docs]"` and run `cd docs && make html` (on Windows use `make.bat html`). Output is in `docs/build/html/`.
+- **Deployment:** Docs are built and deployed to GitHub Pages on pushes to `main`; see `docs/DEPLOY.md` for setup details.
 
 ## Contributing and support
 
@@ -237,7 +243,7 @@ We welcome contributions and feedback. See [CONTRIBUTING.md](CONTRIBUTING.md) fo
 - How to **contribute** code or documentation (pull requests)
 - Where to **seek support** (issues or developer contact)
 
-If you encounter an error in the pipeline, have a special data setup that does not run through the pipeline, or wish to add an instrument, please open an issue on [GitHub](https://github.com/CIERA-Transients/POTPyRI/issues) or contact the developers at `ckilpatrick@northwestern.edu`.
+Development often uses the `dev` branch; pull requests may target `main` or `dev` as noted in the repository. If you encounter an error in the pipeline, have a special data setup that does not run through the pipeline, or wish to add an instrument, please open an issue on [GitHub](https://github.com/CIERA-Transients/POTPyRI/issues) or contact the developers at `ckilpatrick@northwestern.edu`.
 
 ## License
 
