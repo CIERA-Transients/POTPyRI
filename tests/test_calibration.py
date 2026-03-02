@@ -6,8 +6,11 @@ from potpyri.instruments import instrument_getter
 import os
 import numpy as np
 
+import pytest
 from tests.utils import download_gdrive_file
 
+
+@pytest.mark.integration
 def test_cal(tmp_path):
     """Run bias/flat and process_science on GMOS raw; compare to manual (sci-bias)/flat."""
     instrument = 'GMOS'

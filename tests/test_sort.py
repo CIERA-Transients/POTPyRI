@@ -8,9 +8,11 @@ import os
 
 from astropy.io import fits
 
+import pytest
 from tests.utils import download_gdrive_file
 
 
+@pytest.mark.integration
 def test_sort(tmp_path):
     """Run handle_files on BINOSPEC proc file; check file table rows and no_redo reuse."""
     instrument = 'BINOSPEC'

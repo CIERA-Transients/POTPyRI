@@ -13,9 +13,11 @@ from astropy.io import fits
 from astropy.table import Table
 from photutils.psf import EPSFModel
 
+import pytest
 from tests.utils import download_gdrive_file
 
 
+@pytest.mark.integration
 def test_photometry(tmp_path):
     """Run photloop on GMOS stack; assert APPPHOT, PSFPHOT, PSFSTARS, PSF extensions and catalog size."""
     instrument = 'GMOS'

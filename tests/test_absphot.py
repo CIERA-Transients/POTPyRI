@@ -15,6 +15,7 @@ from potpyri.instruments import instrument_getter
 from tests.utils import download_gdrive_file
 
 
+@pytest.mark.integration
 def test_absphot(tmp_path):
     """Run find_zeropoint on LRIS stack and check ZPTMAG, ZPTCAT, ZPTMUCER in header."""
     instrument = 'LRIS'
