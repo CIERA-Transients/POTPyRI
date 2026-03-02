@@ -1,8 +1,10 @@
-"Function to sort files for main_pipeline."
-"Authors: Owen Eskandari, Kerry Paterson, Charlie Kilpatrick"
+"""File sorting and file-list generation for the main pipeline.
 
-# Last updated 04/01/2025
-__version__ = "3.1"
+Classifies raw files (science, flat, bias, dark, bad) from header keywords
+and writes a fixed-width file list used by calibration and reduction.
+Authors: Owen Eskandari, Kerry Paterson, Charlie Kilpatrick.
+"""
+from potpyri._version import __version__
 
 from astropy.io import fits
 from astropy.io import ascii
@@ -19,6 +21,20 @@ import sys
 import re
 
 def is_bad(hdr, tel):
+    """Return True if the header matches bad_keywords/bad_values or has invalid binning.
+
+    Parameters
+    ----------
+    hdr : astropy.io.fits.Header
+        FITS header to check.
+    tel : Instrument
+        Instrument instance (bad_keywords, bad_values, get_binning).
+
+    Returns
+    -------
+    bool
+        True if file should be excluded as bad.
+    """
     keywords = tel.bad_keywords
     values = tel.bad_values
 
@@ -37,6 +53,20 @@ def is_bad(hdr, tel):
     return(bad)
 
 def is_spec(hdr, tel):
+    """Return True if the header matches spectroscopic observation keywords.
+
+    Parameters
+    ----------
+    hdr : astropy.io.fits.Header
+        FITS header to check.
+    tel : Instrument
+        Instrument instance (spec_keywords, spec_values).
+
+    Returns
+    -------
+    bool
+        True if file is spectroscopic.
+    """
     keywords = tel.spec_keywords
     values = tel.spec_values
 
@@ -49,6 +79,20 @@ def is_spec(hdr, tel):
     return(spec)
 
 def is_flat(hdr, tel):
+    """Return True if the header matches flat-field observation keywords.
+
+    Parameters
+    ----------
+    hdr : astropy.io.fits.Header
+        FITS header to check.
+    tel : Instrument
+        Instrument instance (flat_keywords, flat_values).
+
+    Returns
+    -------
+    bool
+        True if file is a flat.
+    """
     keywords = tel.flat_keywords
     values = tel.flat_values
 
@@ -61,6 +105,20 @@ def is_flat(hdr, tel):
     return(flat)
 
 def is_dark(hdr, tel):
+    """Return True if the header matches dark observation keywords and valid binning.
+
+    Parameters
+    ----------
+    hdr : astropy.io.fits.Header
+        FITS header to check.
+    tel : Instrument
+        Instrument instance (dark_keywords, dark_values, get_binning).
+
+    Returns
+    -------
+    bool
+        True if file is a dark.
+    """
     keywords = tel.dark_keywords
     values = tel.dark_values
 
@@ -81,6 +139,20 @@ def is_dark(hdr, tel):
     return(dark)
 
 def is_bias(hdr, tel):
+    """Return True if the header matches bias observation keywords and valid binning.
+
+    Parameters
+    ----------
+    hdr : astropy.io.fits.Header
+        FITS header to check.
+    tel : Instrument
+        Instrument instance (bias_keywords, bias_values, get_binning).
+
+    Returns
+    -------
+    bool
+        True if file is a bias.
+    """
     keywords = tel.bias_keywords
     values = tel.bias_values
 
@@ -101,6 +173,20 @@ def is_bias(hdr, tel):
     return(bias)
 
 def is_science(hdr, tel):
+    """Return True if the header matches science observation keywords and min exptime.
+
+    Parameters
+    ----------
+    hdr : astropy.io.fits.Header
+        FITS header to check.
+    tel : Instrument
+        Instrument instance (science_keywords, science_values, min_exptime, get_exptime).
+
+    Returns
+    -------
+    bool
+        True if file is science.
+    """
     keywords = tel.science_keywords
     values = tel.science_values
 
@@ -118,10 +204,40 @@ def is_science(hdr, tel):
 
     return(science)
 
-# Overall method to handle files:
-def handle_files(file_list, paths, tel, incl_bad=False, proc=None, 
+def handle_files(file_list, paths, tel, incl_bad=False, proc=None,
     no_redo=False, log=None):
+    """Build or read the file list: discover raw files, sort, and write table.
 
+    If no_redo and file_list exists, reads existing table. Otherwise globs
+    raw/bad/data, runs sort_files, and writes the fixed-width list.
+
+    Parameters
+    ----------
+    file_list : str
+        Path to output (or existing) file list table.
+    paths : dict
+        Paths dict with 'raw', 'data', 'bad' keys.
+    tel : Instrument
+        Instrument instance.
+    incl_bad : bool, optional
+        If True, include bad files in list. Default is False.
+    proc : str, optional
+        Processor/run identifier for raw_format glob.
+    no_redo : bool, optional
+        If True and file_list exists, read it instead of regenerating.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    astropy.table.Table
+        File table with Target, Filter, Type, CalType, File, etc.
+
+    Raises
+    ------
+    SystemExit
+        If no files found or no good files after sorting.
+    """
     file_table = None
 
     # Always regenerate file list from existing data in data, raw, and bad
@@ -166,37 +282,33 @@ def handle_files(file_list, paths, tel, incl_bad=False, proc=None,
 
     return(file_table)
 
-# Sort the calibration files:
 def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
+    """Classify files by type (science, flat, bias, dark) and write file list table.
 
-    '''
-
-    Function used to sort a list of files into a dictionary of files sorted by filter.
+    Reads headers, applies instrument keyword rules, and writes a fixed-width
+    file list.
 
     Parameters
     ----------
-
-    :param files: list (string)
-        List of strings of files (path should be included).
-
-    :param tel: Telescope
-        Telescope with parameters and methods to sort data.
-
-    :param incl_bad: bool, optional
-
-    :param log: log, optional
-        Overview log used to write the object and date observed (if ``date`` parameter is not ``None``).
-        If no log is inputted, information is printed out instead of being written to ``log2``.
-        Default is ``None``.
-
+    files : list of str
+        Paths to raw FITS files.
+    file_list : str
+        Path to write fixed-width file list.
+    tel : Instrument
+        Instrument instance.
+    paths : dict
+        Paths dict (raw, data, bad, work).
+    incl_bad : bool, optional
+        If True, include bad files in table. Default is False.
+    log : ColoredLogger, optional
+        Logger for progress.
 
     Returns
     -------
+    astropy.table.Table
+        Table with Target, Filter, Type, CalType, File, Exp, Time, etc.
+    """
 
-    :return: python dictionary
-        Dictionary of files. Key is the filter of the file, values are the file names themselves.
-
-    '''
 
     t_start = time.time()
     
@@ -226,20 +338,23 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
 
     for i, f in enumerate(sorted(files)):
         try:
-            file_open = fits.open(f, mode='readonly')
-            ext = tel.raw_header_ext
-            hdr = file_open[ext].header
+            with fits.open(f, mode='readonly') as file_open:
+                ext = tel.raw_header_ext
+                hdr = file_open[ext].header
 
-            # Extend header to first extension?
-            if tel.extend_header:
-                if len(file_open)>ext+1:
-                    extra_hdr = file_open[ext+1].header
-                    for key in extra_hdr.keys():
-                        if key not in hdr.keys():
-                            hdr[key] = extra_hdr[key]
+                # Extend header to first extension?
+                if tel.extend_header:
+                    if len(file_open)>ext+1:
+                        extra_hdr = file_open[ext+1].header
+                        for key in extra_hdr.keys():
+                            if key not in hdr.keys():
+                                value = extra_hdr[key]
+                                if isinstance(value, (str, int, float, complex,
+                                    bool, np.floating, np.integer, np.bool_)):
+                                    hdr[key] = value
 
-            check_data = file_open[ext].data
-            file_open._verify()
+                check_data = file_open[ext].data
+                file_open._verify()
         except IndexError:
             if log: 
                 log.error(f'Moving file {f} to bad due to error opening file.')

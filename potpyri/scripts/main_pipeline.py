@@ -12,7 +12,7 @@ grant Nos. AST-1814782, AST-1909358 and CAREER grant No. AST-2047919.
 If you use this code for your work, please consider citing the package release.
 """
 
-__version__ = "2.2" # Last updated 03/10/2025
+from potpyri._version import __version__
 
 import time
 import numpy as np
@@ -30,25 +30,29 @@ from potpyri.primitives import image_procs
 
 # Check options.py - all named parameters need to correspond to options that are
 # provided via argparse.
-def main_pipeline(instrument:str,
-                  data_path:str,
-                  target:list=None,
-                  proc:str=None,
-                  incl_bad:bool=None,
-                  no_redo_sort:bool=None,
-                  phot_sn_min:float=None,
-                  phot_sn_max:float=None,
-                  fwhm_init:float=None,
-                  skip_skysub:bool=None,
-                  file_list_name:str=None,
-                  fieldcenter:list=None,
-                  out_size:int=None,
-                  skip_flatten:bool=None,
-                  skip_cr:bool=None,
-                  skip_gaia:bool=None,
-                  keep_all_astro:bool=None,
-                  **kwargs)->None:
+def main_pipeline(instrument: str,
+                  data_path: str,
+                  target: list = None,
+                  proc: str = None,
+                  incl_bad: bool = None,
+                  no_redo_sort: bool = None,
+                  phot_sn_min: float = None,
+                  phot_sn_max: float = None,
+                  fwhm_init: float = None,
+                  skip_skysub: bool = None,
+                  file_list_name: str = None,
+                  fieldcenter: list = None,
+                  out_size: int = None,
+                  skip_flatten: bool = None,
+                  skip_cr: bool = None,
+                  skip_gaia: bool = None,
+                  keep_all_astro: bool = None,
+                  **kwargs) -> None:
+    """Run the full reduction pipeline: sort files, calibrate, process, stack, photometry, zeropoint.
 
+    Parameters mirror options from options.add_options() (instrument, data_path,
+    target, proc, file_list_name, photometry and processing flags, etc.).
+    """
     # start time
     t1 = time.time()
     
@@ -104,6 +108,7 @@ def main_pipeline(instrument:str,
     log.shutdown()
 
 def main():
+    """Entry point: check dependencies, parse args, and run main_pipeline."""
     options.test_for_dependencies()
     args = options.add_options()
     main_pipeline(**vars(args))

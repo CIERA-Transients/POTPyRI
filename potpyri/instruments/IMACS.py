@@ -1,6 +1,5 @@
-# Parameter file for Magellan/IMACS
-
-__version__ = "1.0" # Last edited 02/13/2025
+"""IMACS/Magellan instrument configuration and reduction parameters."""
+from potpyri._version import __version__
 
 import os
 import ccdproc
@@ -16,6 +15,7 @@ from astropy.time import Time
 from . import instrument
 
 class IMACS(instrument.Instrument):
+    """IMACS at Magellan: optical imaging with bias and flat calibration."""
 
     def __init__(self):
 

@@ -1,8 +1,9 @@
-"Wrapper methods for creating bias, dark, and flat images from pipeline data."
-"Authors: Charlie Kilpatrick"
+"""Master bias, dark, and flat creation from pipeline file tables.
 
-# Initial version tracking on 09/29/2024
-__version__ = "1.1"
+Orchestrates grouping by CalType and calling instrument-specific
+create_bias/create_dark/create_flat. Authors: Charlie Kilpatrick.
+"""
+from potpyri._version import __version__
 
 import os
 import time
@@ -11,7 +12,26 @@ import numpy as np
 import sys
 
 def do_bias(file_table, tel, paths, nmin_images=3, log=None):
+    """Build master bias frames from file_table; skip if instrument has no bias.
 
+    Parameters
+    ----------
+    file_table : astropy.table.Table
+        File list from sort_files (Type, CalType, File, Amp, Binning).
+    tel : Instrument
+        Instrument instance (bias, match_type_keywords, create_bias, get_mbias_name).
+    paths : dict
+        Paths dict from options.add_paths.
+    nmin_images : int, optional
+        Minimum images per CalType to build master. Default is 3.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    None
+        Master bias FITS written to paths; exits if no bias and instrument requires it.
+    """
     # Exit if telescope does not require bias
     if not tel.bias:
         return(None)
@@ -62,7 +82,26 @@ def do_bias(file_table, tel, paths, nmin_images=3, log=None):
         sys.exit(-1)
 
 def do_dark(file_table, tel, paths, nmin_images=3, log=None):
+    """Build master dark frames from file_table; skip if instrument has no dark.
 
+    Parameters
+    ----------
+    file_table : astropy.table.Table
+        File list from sort_files.
+    tel : Instrument
+        Instrument instance (dark, bias, load_bias, create_dark, get_mdark_name).
+    paths : dict
+        Paths dict from options.add_paths.
+    nmin_images : int, optional
+        Minimum images per CalType to build master. Default is 3.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    None
+        Master dark FITS written to paths.
+    """
     # Exit if telescope does not require dark
     if not tel.dark:
         return(None)
@@ -116,7 +155,26 @@ def do_dark(file_table, tel, paths, nmin_images=3, log=None):
             if log: log.info(f'Master dark creation completed in {t2-t1} sec.')
 
 def do_flat(file_table, tel, paths, nmin_images=3, log=None):
+    """Build master flat frames from file_table; skip if instrument has no flat.
 
+    Parameters
+    ----------
+    file_table : astropy.table.Table
+        File list from sort_files.
+    tel : Instrument
+        Instrument instance (flat, match_type_keywords, create_flat, get_mflat_name).
+    paths : dict
+        Paths dict from options.add_paths.
+    nmin_images : int, optional
+        Minimum images per (filter, amp, binning) to build master. Default is 3.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    None
+        Master flat FITS written to paths.
+    """
     # Exit if telescope does not require dark
     if not tel.flat:
         return(None)

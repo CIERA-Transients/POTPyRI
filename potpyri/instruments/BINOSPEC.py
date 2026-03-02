@@ -1,6 +1,5 @@
-# Parameter file for BINOSPEC/MMT
-
-__version__ = "2.0" # Last edited 09/21/2024
+"""BINOSPEC/MMT instrument configuration and reduction parameters."""
+from potpyri._version import __version__
 
 import os
 import ccdproc
@@ -16,6 +15,7 @@ from astropy.time import Time
 from . import instrument
 
 class BINOSPEC(instrument.Instrument):
+    """BINOSPEC at MMT: optical imaging with flat calibration, no bias/dark."""
 
     def __init__(self):
 

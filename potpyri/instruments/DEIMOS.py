@@ -1,6 +1,5 @@
-# Parameter file for DEIMOS/Keck
-
-__version__ = "2.0" # Last edited 09/21/2024
+"""DEIMOS/Keck instrument configuration and reduction parameters."""
+from potpyri._version import __version__
 
 import os
 import ccdproc
@@ -16,6 +15,7 @@ from astropy.time import Time
 from . import instrument
 
 class DEIMOS(instrument.Instrument):
+    """DEIMOS at Keck: optical imaging with bias and flat calibration."""
 
     def __init__(self):
 

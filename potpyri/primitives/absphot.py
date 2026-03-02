@@ -1,12 +1,27 @@
-"Function for calculating zero points during flux calibration."
-"Authors: Kerry Paterson, Charlie Kilpatrick"
+"""Absolute photometry zeropoint calibration using catalog magnitudes.
 
-__version__ = "1.0" # Last updated on 03/10/2025
+Queries Vizier (e.g. PS1), matches sources, and fits zeropoint via
+iterative ODR. Writes ZPTMAG and related keywords to the stack header.
+Uses multiple Vizier mirrors (CDS, Tokyo, CfA, INASAN, IUCAA, IDIA) with
+fallback when the first attempt fails.
+Authors: Kerry Paterson, Charlie Kilpatrick.
+"""
+from potpyri._version import __version__
 
 import numpy as np
 
 from astroquery.vizier import Vizier
 from astropy import units as u
+
+# Vizier mirror servers (hostnames only); tried in order when a query fails.
+VIZIER_MIRRORS = [
+    'vizier.cds.unistra.fr',   # CDS / Strasbourg, France
+    'vizier.nao.ac.jp',        # ADAC / Tokyo, Japan
+    'vizier.cfa.harvard.edu',  # CfA / Harvard, USA
+    'vizier.inasan.ru',        # INASAN / Moscow, Russia
+    'vizier.iucaa.in',         # IUCAA / Pune, India
+    'vizier.idia.ac.za',       # IDIA / South Africa
+]
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
 from astropy.io import fits
@@ -15,18 +30,48 @@ from astropy.io import fits
 from potpyri.utils import utilities
 
 class absphot(object):
-    def __init__(self, iterations=5, sigma=5):
+    """Zeropoint fitter using catalog magnitudes and iterative sigma clipping."""
 
+    def __init__(self, iterations=5, sigma=5):
+        """Initialize zeropoint fitter.
+
+        Parameters
+        ----------
+        iterations : int, optional
+            Number of sigma-clip iterations. Default is 5.
+        sigma : float, optional
+            Sigma threshold for clipping. Default is 5.
+        """
         self.iterations = iterations
         self.sigma = sigma
 
         self.odr_iter = 2
 
     def get_zeropoint(self, flux, fluxerr, mag, magerr):
+        """Fit zeropoint (and error) from flux/mag arrays using ODR.
 
-        from scipy.odr import ODR
-        from scipy.odr import Model
-        from scipy.odr import RealData
+        Parameters
+        ----------
+        flux : array-like
+            Object fluxes (e.g. from aperture photometry).
+        fluxerr : array-like
+            Flux errors.
+        mag : array-like
+            Catalog magnitudes.
+        magerr : array-like
+            Catalog magnitude errors.
+
+        Returns
+        -------
+        tuple of float
+            (zeropoint, zeropoint_error).
+        """
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message=r'.*scipy\.odr.*', category=DeprecationWarning)
+            from scipy.odr import ODR
+            from scipy.odr import Model
+            from scipy.odr import RealData
         
         def magnitude(zpt, flux):
             return(zpt - 2.5*np.log10(flux))
@@ -49,7 +94,27 @@ class absphot(object):
         return(zpt, zpterr)
 
     def zpt_iteration(self, flux, fluxerr, mag, magerr, log=None):
+        """Iteratively sigma-clip and fit zeropoint via ODR.
 
+        Parameters
+        ----------
+        flux : array-like
+            Object fluxes.
+        fluxerr : array-like
+            Flux errors.
+        mag : array-like
+            Catalog magnitudes.
+        magerr : array-like
+            Catalog magnitude errors.
+        log : ColoredLogger, optional
+            Logger for progress.
+
+        Returns
+        -------
+        tuple
+            (zeropoint, zeropoint_error, master_mask). master_mask is boolean
+            array of sources used in final fit.
+        """
         flux = np.array(flux)
         fluxerr = np.array(fluxerr)
         mag = np.array(mag)
@@ -95,7 +160,25 @@ class absphot(object):
         return(zpt, zpterr, master_mask)
 
     def get_catalog(self, coords, catalog, filt, log=None):
+        """Query VizieR for catalog magnitudes in a filter around given coordinates.
 
+        Parameters
+        ----------
+        coords : astropy.coordinates.SkyCoord
+            Target coordinates (used for region size).
+        catalog : str
+            Catalog name (e.g. 'PS1', '2MASS').
+        filt : str
+            Filter name (e.g. 'g', 'r', 'J').
+        log : ColoredLogger, optional
+            Logger for progress.
+
+        Returns
+        -------
+        tuple or (None, None, None)
+            (astropy.table.Table, catalog_name, catalog_ID) or (None, None, None)
+            if query fails.
+        """
         if log: log.info(f'Searching for catalog {catalog}')
         
         coord_ra = np.median([c.ra.degree for c in coords])
@@ -113,17 +196,35 @@ class absphot(object):
         if cat_ID=='II/349':
             cols.append(f'{filt}Kmag')
         
-        vizier = Vizier(columns=cols)
-        vizier.ROW_LIMIT = -1
-        if log: 
+        if log:
             log.info(f'Getting {catalog} catalog with ID {cat_ID} in filt {filt}')
             log.info(f'Querying around {coord_ra}, {coord_dec} deg')
         Vizier.clear_cache()
         width = np.max([2.0 * max_sep, 0.5])
-        cat = vizier.query_region(med_coord, width=width*u.degree, 
-            catalog=cat_ID)
+        cat = None
+        last_error = None
+        for server in VIZIER_MIRRORS:
+            try:
+                vizier = Vizier(columns=cols, vizier_server=server)
+                vizier.ROW_LIMIT = -1
+                cat = vizier.query_region(med_coord, width=width*u.degree,
+                    catalog=cat_ID)
+                if cat is not None and len(cat) > 0:
+                    if log:
+                        log.info(f'Vizier query succeeded via {server}')
+                    break
+                cat = None
+            except Exception as e:
+                last_error = e
+                if log:
+                    log.warning(f'Vizier mirror {server} failed: {e}')
+                else:
+                    print(f'Vizier mirror {server} failed: {e}')
+                cat = None
+        if cat is None and last_error is not None and log:
+            log.warning('All Vizier mirrors failed; last error: {}'.format(last_error))
 
-        if len(cat)>0:
+        if cat is not None and len(cat)>0:
             cat = cat[0]
             cat = cat[~np.isnan(cat[cat_mag])]
             cat = cat[cat[cat_err]>0.]
@@ -175,7 +276,31 @@ class absphot(object):
 
     def find_zeropoint(self, cmpfile, tel, match_radius=2.5*u.arcsec,
         phottable='APPPHOT', input_catalog=None, log=None):
+        """Compute zeropoint from cmpfile photometry and catalog; write to FITS header.
 
+        Matches sources to catalog (e.g. PS1), runs iterative ODR fit, and
+        updates ZPTMAG, ZPTNSTAR, ZPTCAT, etc. in the stack FITS.
+
+        Parameters
+        ----------
+        cmpfile : str
+            Path to stacked/comparison FITS with SCI and phottable extensions.
+        tel : Instrument
+            Instrument instance (for get_catalog).
+        match_radius : astropy.units.Quantity, optional
+            Matching radius for catalog. Default is 2.5 arcsec.
+        phottable : str, optional
+            FITS extension with photometry table. Default is 'APPPHOT'.
+        input_catalog : astropy.table.Table, optional
+            Pre-loaded catalog; if None, catalog is queried via get_catalog.
+        log : ColoredLogger, optional
+            Logger for progress.
+
+        Returns
+        -------
+        None
+            cmpfile is updated in place.
+        """
         if log:
             log.info(f'Importing catalog from file: {cmpfile}')
         else:
@@ -291,6 +416,20 @@ class absphot(object):
             log.info('No zeropoint calculated.')
 
     def Y_band(self, J, J_err, K, K_err):
+        """Compute Y-band mag and error from J and K (2MASS relation).
+
+        Parameters
+        ----------
+        J, J_err : array-like or float
+            J magnitude(s) and error(s).
+        K, K_err : array-like or float
+            K magnitude(s) and error(s).
+
+        Returns
+        -------
+        tuple
+            (Y_mag, Y_err).
+        """
         Y = J+0.46*(J-K)
         JK_err = np.sqrt(J_err**2+K_err**2)
         JKY_err = 0.46*(J-K)*np.sqrt((0.02/0.46)**2+(JK_err/(J-K))**2)
@@ -298,6 +437,18 @@ class absphot(object):
         return Y, Y_err
 
     def convert_filter_name(self, filt):
+        """Map instrument filter names to catalog filter names (e.g. PS1).
+
+        Parameters
+        ----------
+        filt : str
+            Instrument filter keyword (e.g. 'gG0301', 'RG850').
+
+        Returns
+        -------
+        str
+            Catalog filter name ('u', 'g', 'r', 'i', 'z', 'J', etc.).
+        """
         if filt=='uG0308' or filt=='uG0332' or filt=='U':
             return 'u'
         if filt=='gG0301' or filt=='gG0325' or filt=='G' or filt=='V' or filt=='B':
@@ -316,6 +467,18 @@ class absphot(object):
             return filt
     
     def get_minmag(self, filt):
+        """Return minimum catalog magnitude to use for zeropoint (bright limit).
+
+        Parameters
+        ----------
+        filt : str
+            Filter name.
+
+        Returns
+        -------
+        float
+            Minimum magnitude (brighter limit).
+        """
         if filt=='J':
             return 15.5
         if filt=='K':
@@ -326,5 +489,21 @@ class absphot(object):
             return 16.0
 
 def find_zeropoint(stack, tel, log=None):
+    """Compute and write zeropoint to stack FITS using instrument catalog (e.g. PS1).
+
+    Parameters
+    ----------
+    stack : str
+        Path to stacked science FITS file (SCI + APPPHOT extensions).
+    tel : Instrument
+        Instrument instance (for catalog and filter).
+    log : ColoredLogger, optional
+        Logger for progress and errors.
+
+    Returns
+    -------
+    None
+        Stack FITS is updated in place with ZPTMAG, ZPTNSTAR, etc.
+    """
     cal = absphot()
     cal.find_zeropoint(stack, tel, log=log)
