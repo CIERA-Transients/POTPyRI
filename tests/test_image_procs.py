@@ -103,3 +103,22 @@ def test_add_stack_mask(tmp_path):
         assert np.any(stack[1].data >= 0)
     finally:
         log.close()
+
+
+def test_create_error(tmp_path):
+    """create_error returns error HDU from science path, mask HDU, and rdnoise."""
+    science_path = os.path.join(tmp_path, "sci.fits")
+    data = np.ones((16, 16), dtype=np.float32) * 100.0
+    hdu_sci = fits.PrimaryHDU(data)
+    hdu_sci.header["SATURATE"] = 50000.0
+    hdu_sci.writeto(science_path, overwrite=True)
+
+    mask_data = fits.ImageHDU(np.zeros((16, 16), dtype=np.uint8))
+    rdnoise = 4.0
+
+    err_hdu = image_procs.create_error(science_path, mask_data, rdnoise)
+    assert err_hdu is not None
+    assert err_hdu.data.shape == (16, 16)
+    assert err_hdu.header.get("BUNIT") == "ELECTRONS"
+    assert np.all(err_hdu.data > 0)
+    assert np.all(np.isfinite(err_hdu.data))

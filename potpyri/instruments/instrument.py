@@ -25,6 +25,49 @@ from astropy.stats import sigma_clipped_stats
 from astropy.stats import SigmaClip
 from astropy.time import Time
 
+# WCS-related keywords to remove from calibration headers so saved files never
+# trigger InvalidTransformError (e.g. DEC=-100, ill-conditioned CD matrix).
+_CAL_HEADER_WCS_KEYS = (
+    'CTYPE1', 'CTYPE2', 'CRVAL1', 'CRVAL2', 'CRPIX1', 'CRPIX2',
+    'CD1_1', 'CD1_2', 'CD2_1', 'CD2_2', 'CDELT1', 'CDELT2', 'CROTA2',
+    'RADECSYS', 'RADESYS', 'EQUINOX', 'RA', 'DEC', 'LONPOLE', 'LATPOLE',
+    'CUNIT1', 'CUNIT2', 'MJD-OBS',
+    'LTM1_1', 'LTM1_2', 'LTM2_1', 'LTM2_2', 'LTV1', 'LTV2',
+    'DTV1', 'DTV2', 'DTM1_1', 'DTM2_2',
+)
+
+
+def _sanitize_calibration_header(header):
+    """Remove WCS and coordinate keywords from a header so it can be written safely.
+
+    Calibration frames (bias, dark, flat, sky) inherit headers from input frames
+    that may contain invalid or ill-conditioned WCS (e.g. DEC=-100). Removing
+    these keywords ensures saved calibration files do not cause
+    InvalidTransformError when later loaded by code that parses WCS.
+    Modifies header in place.
+    """
+    for key in _CAL_HEADER_WCS_KEYS:
+        if key in header:
+            del header[key]
+    # Remove PV* distortion keywords (can be ill-conditioned)
+    to_del = [k for k in header.keys() if k.startswith('PV')]
+    for k in to_del:
+        del header[k]
+
+
+def _read_calibration_ccd(path, unit, hdu_index=0):
+    """Read a calibration FITS into CCDData without parsing WCS.
+
+    Master bias/dark/flat frames often have WCS keywords that are ill-conditioned
+    or copied from templates. Parsing them can raise InvalidTransformError and
+    log 'Ill-conditioned coordinate transformation parameter'. Calibration
+    frames do not need WCS, so we load data and header explicitly with wcs=None.
+    """
+    with fits.open(path) as hdu_list:
+        hdu = hdu_list[hdu_index]
+        return CCDData(hdu.data, meta=hdu.header.copy(), unit=unit, wcs=None)
+
+
 class Instrument(object):
     """Base class for all POTPyRI instruments.
 
@@ -384,10 +427,9 @@ class Instrument(object):
         """
         bias = self.get_mbias_name(paths, amp, binn)
         if os.path.exists(bias):
-            mbias = CCDData.read(bias)
+            mbias = _read_calibration_ccd(bias, u.electron, hdu_index=0)
         elif os.path.exists(bias+'.fz'):
-            hdu = fits.open(bias+'.fz')
-            mbias = CCDData(hdu[1].data, header=hdu[1].header, unit=u.electron)
+            mbias = _read_calibration_ccd(bias+'.fz', u.electron, hdu_index=1)
         else:
             raise Exception(f'Could not find bias: {bias}')
         return(mbias)
@@ -416,10 +458,9 @@ class Instrument(object):
         """
         dark = self.get_mdark_name(paths, amp, binn)
         if os.path.exists(dark):
-            mdark = CCDData.read(dark)
+            mdark = _read_calibration_ccd(dark, u.electron, hdu_index=0)
         elif os.path.exists(dark+'.fz'):
-            hdu = fits.open(dark+'.fz')
-            mdark = CCDData(hdu[1].data, header=hdu[1].header, unit=u.electron)
+            mdark = _read_calibration_ccd(dark+'.fz', u.electron, hdu_index=1)
         else:
             raise Exception(f'Could not find dark: {dark}')
         return(mdark)
@@ -450,10 +491,9 @@ class Instrument(object):
         """
         flat = self.get_mflat_name(paths, fil, amp, binn)
         if os.path.exists(flat):
-            mflat = CCDData.read(flat)
+            mflat = _read_calibration_ccd(flat, u.dimensionless_unscaled, hdu_index=0)
         elif os.path.exists(flat+'.fz'):
-            hdu = fits.open(flat+'.fz')
-            mflat = CCDData(hdu[1].data, header=hdu[1].header, unit=u.electron)
+            mflat = _read_calibration_ccd(flat+'.fz', u.dimensionless_unscaled, hdu_index=1)
         else:
             raise Exception(f'Could not find flat: {flat}')
         return(mflat)
@@ -484,10 +524,9 @@ class Instrument(object):
         """
         sky = self.get_msky_name(paths, fil, amp, binn)
         if os.path.exists(sky):
-            msky = CCDData.read(sky)
+            msky = _read_calibration_ccd(sky, u.dimensionless_unscaled, hdu_index=0)
         elif os.path.exists(sky+'.fz'):
-            hdu = fits.open(sky+'.fz')
-            msky = CCDData(hdu[1].data, header=hdu[1].header, unit=u.electron)
+            msky = _read_calibration_ccd(sky+'.fz', u.dimensionless_unscaled, hdu_index=1)
         else:
             raise Exception(f'Could not find sky frame: {sky}')
         return(msky)
@@ -615,8 +654,9 @@ class Instrument(object):
             'Version of telescope parameter file used.')
 
         bias_filename = self.get_mbias_name(paths, amp, binn)
+        _sanitize_calibration_header(mbias.header)
         mbias.write(bias_filename, overwrite=True, output_verify='silentfix')
-        log.info(f'Master bias written to {bias_filename}')
+        if log: log.info(f'Master bias written to {bias_filename}')
         
         return
 
@@ -686,6 +726,7 @@ class Instrument(object):
         
         darkname = self.get_mdark_name(paths, amp, binn)
         if log: log.info(f'Writing master dark to {darkname}')
+        _sanitize_calibration_header(mdark.header)
         mdark.write(darkname, overwrite=True, output_verify='silentfix')
         
         return
@@ -798,8 +839,9 @@ class Instrument(object):
             'Version of telescope parameter file used.')
 
         flat_filename = self.get_mflat_name(paths, fil, amp, binn)
+        _sanitize_calibration_header(mflat.header)
         mflat.write(flat_filename, overwrite=True, output_verify='silentfix')
-        log.info(f'Master flat written to {flat_filename}')
+        if log: log.info(f'Master flat written to {flat_filename}')
         
         return
 
@@ -881,8 +923,9 @@ class Instrument(object):
             'Version of telescope parameter file used.')
 
         sky_filename = self.get_msky_name(paths, fil, amp, binn)
+        _sanitize_calibration_header(msky.header)
         msky.write(sky_filename, overwrite=True, output_verify='silentfix')
-        log.info(f'Master sky written to {sky_filename}')
+        if log: log.info(f'Master sky written to {sky_filename}')
         
         return
 
@@ -1121,10 +1164,12 @@ class Instrument(object):
             for i,frame in enumerate(processed):
 
                 mean, med, stddev = sigma_clipped_stats(frame.data)
-                frame_sky = sky_frame.multiply(med, 
+                # Scale normalized sky to same units as science (electrons) so subtract is valid
+                science_unit = frame.unit if frame.unit is not None else u.electron
+                frame_sky = sky_frame.multiply(med * science_unit,
                     propagate_uncertainties=True, handle_meta='first_found')
 
-                processed[i] = frame.subtract(frame_sky, 
+                processed[i] = frame.subtract(frame_sky,
                     propagate_uncertainties=True, handle_meta='first_found')
                 processed[i].header['SKYBKG']=med
                 processed[i].header['SATURATE']-=med

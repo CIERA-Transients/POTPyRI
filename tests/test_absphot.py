@@ -91,6 +91,10 @@ def test_convert_filter_name():
     assert cal.convert_filter_name('Y') == 'J'
     assert cal.convert_filter_name('V') == 'g'
     assert cal.convert_filter_name('I') == 'i'
+    # K, Ks, Kspec all map to 2MASS K-band
+    assert cal.convert_filter_name('K') == 'K'
+    assert cal.convert_filter_name('Ks') == 'K'
+    assert cal.convert_filter_name('Kspec') == 'K'
 
 
 def test_get_minmag():

@@ -11,9 +11,9 @@ If you encounter a bug, have a question about usage, or have a feature request:
 
 ## Contributing code or documentation
 
-1. **Fork the repository** and create a branch from the default branch.
-2. **Make your changes** and add or update tests if applicable. Run the test suite with `pytest tests` (use `pytest tests -m "not integration"` for offline runs).
-3. **Open a pull request** against the main repository. Describe your changes clearly and reference any related issues.
+1. **Fork the repository** and create a branch (often from `dev` for ongoing development; the default branch may be `main`).
+2. **Make your changes** and add or update tests if applicable. Run the test suite with `pytest tests` (use `pytest tests -m "not integration"` for offline runs without fixture downloads).
+3. **Open a pull request** against the main repository (or against `dev` when that branch is used for integration). Describe your changes clearly and reference any related issues.
 4. **Code style:** Follow the existing style in the codebase. The project uses standard Python packaging and type hints where appropriate.
 
 Instrument-specific changes (e.g. new instruments or header/sorting logic) should include a brief justification and, if possible, a note in the PR description on how the change was tested.
