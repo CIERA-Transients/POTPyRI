@@ -1,11 +1,13 @@
-"""Tests for image_procs: remove_pv_distortion, get_fieldcenter, generate_wcs, detrend_stack, add_stack_mask."""
+"""Tests for image_procs: remove_pv_distortion, get_fieldcenter, generate_wcs, detrend_stack, add_stack_mask, compute_relative_scales."""
 from potpyri.primitives import image_procs
 from potpyri.instruments import instrument_getter
 
 import numpy as np
 import os
+from unittest.mock import patch
 
 from astropy.io import fits
+from astropy.table import Table
 from astropy.wcs import WCS
 from ccdproc import CCDData
 from astropy import units as u
@@ -122,3 +124,167 @@ def test_create_error(tmp_path):
     assert err_hdu.header.get("BUNIT") == "ELECTRONS"
     assert np.all(err_hdu.data > 0)
     assert np.all(np.isfinite(err_hdu.data))
+
+
+def _make_catalog(n, ra=30.0, dec=-30.0, flux=100.0, fluxerr=5.0, dra=0.001, ddec=0.001):
+    """Build a minimal SExtractor-like table with ALPHA_J2000, DELTA_J2000, FLUX_AUTO, FLUXERR_AUTO."""
+    rng = np.random.default_rng(42)
+    ra_arr = ra + (rng.random(n) - 0.5) * dra
+    dec_arr = dec + (rng.random(n) - 0.5) * ddec
+    flux_arr = np.full(n, flux, dtype=float) + (rng.random(n) - 0.5) * 0.1 * flux
+    err_arr = np.full(n, fluxerr, dtype=float)
+    t = Table()
+    t['ALPHA_J2000'] = ra_arr
+    t['DELTA_J2000'] = dec_arr
+    t['FLUX_AUTO'] = np.maximum(flux_arr, 1.0)
+    t['FLUXERR_AUTO'] = err_arr
+    return t
+
+
+def test_compute_relative_scales_returns_none_for_single_image():
+    """compute_relative_scales returns None when fewer than 2 images."""
+    paths = {}
+    data_images = ['/fake/path0.fits']
+    exptimes = [60.0]
+    out = image_procs.compute_relative_scales(data_images, paths, exptimes)
+    assert out is None
+
+
+def test_compute_relative_scales_returns_none_for_exptimes_length_mismatch():
+    """compute_relative_scales returns None when exptimes length != number of images."""
+    paths = {}
+    data_images = ['/fake/a.fits', '/fake/b.fits']
+    exptimes = [60.0, 30.0, 90.0]
+    with patch.object(image_procs.photometry, 'run_sextractor') as m_sextractor:
+        m_sextractor.return_value = _make_catalog(10)
+        out = image_procs.compute_relative_scales(data_images, paths, exptimes)
+    assert out is None
+
+
+def test_compute_relative_scales_returns_none_when_sextractor_fails():
+    """compute_relative_scales returns None when run_sextractor returns None for one image."""
+    paths = {}
+    data_images = ['/fake/a.fits', '/fake/b.fits']
+    exptimes = [60.0, 60.0]
+
+    def side_effect(path, log=None, sextractor_path=None):
+        if 'a.fits' in path:
+            return _make_catalog(10)
+        return None
+
+    with patch.object(image_procs.photometry, 'run_sextractor', side_effect=side_effect):
+        out = image_procs.compute_relative_scales(data_images, paths, exptimes)
+    assert out is None
+
+
+def test_compute_relative_scales_returns_none_when_catalog_too_small():
+    """compute_relative_scales returns None when a catalog has fewer than min_sources."""
+    paths = {}
+    data_images = ['/fake/a.fits', '/fake/b.fits']
+    exptimes = [60.0, 60.0]
+    small = _make_catalog(2)
+    big = _make_catalog(10)
+
+    def side_effect(path, log=None, sextractor_path=None):
+        return small if 'a.fits' in path else big
+
+    with patch.object(image_procs.photometry, 'run_sextractor', side_effect=side_effect):
+        out = image_procs.compute_relative_scales(data_images, paths, exptimes, min_sources=5)
+    assert out is None
+
+
+def test_compute_relative_scales_two_frames_flux_ratio():
+    """compute_relative_scales returns [1, scale] when frame 1 has half the flux of reference."""
+    paths = {}
+    data_images = ['/fake/ref.fits', '/fake/f1.fits']
+    exptimes = [60.0, 60.0]
+    # Same positions so they match; ref flux 100, frame1 flux 50 -> ratio 2.0
+    ref_cat = _make_catalog(10, flux=100.0, fluxerr=5.0)
+    f1_cat = _make_catalog(10, flux=50.0, fluxerr=2.5)
+    # Use identical RA/Dec so match_to_catalog_sky finds pairs (same seed and pattern)
+    f1_cat['ALPHA_J2000'] = ref_cat['ALPHA_J2000'].copy()
+    f1_cat['DELTA_J2000'] = ref_cat['DELTA_J2000'].copy()
+
+    def side_effect(path, log=None, sextractor_path=None):
+        return ref_cat if 'ref.fits' in path else f1_cat
+
+    with patch.object(image_procs.photometry, 'run_sextractor', side_effect=side_effect):
+        out = image_procs.compute_relative_scales(data_images, paths, exptimes, min_sources=5)
+    assert out is not None
+    assert len(out) == 2
+    assert out[0] == 1.0
+    np.testing.assert_allclose(out[1], 2.0, rtol=0.15)
+
+
+def test_compute_relative_scales_frame_fails_gets_exptime_scale():
+    """When one frame has too few matches, that frame gets scale = 1.0/exptime."""
+    paths = {}
+    data_images = ['/fake/ref.fits', '/fake/f1.fits', '/fake/f2.fits']
+    exptimes = [60.0, 30.0, 90.0]
+    ref_cat = _make_catalog(10, ra=30.0, dec=-30.0, flux=100.0)
+    f1_cat = _make_catalog(10, ra=30.0, dec=-30.0, flux=50.0)
+    f1_cat['ALPHA_J2000'] = ref_cat['ALPHA_J2000'].copy()
+    f1_cat['DELTA_J2000'] = ref_cat['DELTA_J2000'].copy()
+    # Frame 2: completely different sky position -> no matches
+    f2_cat = _make_catalog(10, ra=100.0, dec=50.0, flux=100.0)
+
+    def side_effect(path, log=None, sextractor_path=None):
+        if 'ref.fits' in path:
+            return ref_cat
+        if 'f1.fits' in path:
+            return f1_cat
+        return f2_cat
+
+    with patch.object(image_procs.photometry, 'run_sextractor', side_effect=side_effect):
+        out = image_procs.compute_relative_scales(data_images, paths, exptimes, min_sources=5, match_radius_arcsec=2.0)
+    assert out is not None
+    assert len(out) == 3
+    # Ref (most sources) is frame 0; scale[0]=1
+    assert out[0] == 1.0
+    # Frame 1 matches ref -> computed ratio ~2.0
+    np.testing.assert_allclose(out[1], 2.0, rtol=0.2)
+    # Frame 2 has no matches within 2" -> 1/exptime = 1/90
+    np.testing.assert_allclose(out[2], 1.0 / 90.0, rtol=1e-5)
+
+
+def test_compute_relative_scales_uses_fluxerr_weighting():
+    """compute_relative_scales uses FLUXERR_AUTO when present (weighted mean)."""
+    paths = {}
+    data_images = ['/fake/ref.fits', '/fake/f1.fits']
+    exptimes = [60.0, 60.0]
+    ref_cat = _make_catalog(10, flux=100.0, fluxerr=2.0)
+    f1_cat = _make_catalog(10, flux=50.0, fluxerr=1.0)
+    f1_cat['ALPHA_J2000'] = ref_cat['ALPHA_J2000'].copy()
+    f1_cat['DELTA_J2000'] = ref_cat['DELTA_J2000'].copy()
+
+    def side_effect(path, log=None, sextractor_path=None):
+        return ref_cat if 'ref.fits' in path else f1_cat
+
+    with patch.object(image_procs.photometry, 'run_sextractor', side_effect=side_effect):
+        out = image_procs.compute_relative_scales(data_images, paths, exptimes, min_sources=5)
+    assert out is not None
+    assert out[0] == 1.0
+    # Weighted mean of ratio ~2.0 (with small errors) should be close to 2
+    np.testing.assert_allclose(out[1], 2.0, rtol=0.15)
+
+
+def test_compute_relative_scales_without_fluxerr_uses_median():
+    """When FLUXERR_AUTO is missing, compute_relative_scales uses median of ratios."""
+    paths = {}
+    data_images = ['/fake/ref.fits', '/fake/f1.fits']
+    exptimes = [60.0, 60.0]
+    ref_cat = _make_catalog(10, flux=100.0, fluxerr=5.0)
+    ref_cat.remove_column('FLUXERR_AUTO')
+    f1_cat = _make_catalog(10, flux=50.0, fluxerr=2.5)
+    f1_cat.remove_column('FLUXERR_AUTO')
+    f1_cat['ALPHA_J2000'] = ref_cat['ALPHA_J2000'].copy()
+    f1_cat['DELTA_J2000'] = ref_cat['DELTA_J2000'].copy()
+
+    def side_effect(path, log=None, sextractor_path=None):
+        return ref_cat if 'ref.fits' in path else f1_cat
+
+    with patch.object(image_procs.photometry, 'run_sextractor', side_effect=side_effect):
+        out = image_procs.compute_relative_scales(data_images, paths, exptimes, min_sources=5)
+    assert out is not None
+    assert out[0] == 1.0
+    np.testing.assert_allclose(out[1], 2.0, rtol=0.2)

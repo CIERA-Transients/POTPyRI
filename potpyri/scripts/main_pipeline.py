@@ -47,6 +47,7 @@ def main_pipeline(instrument: str,
                   skip_cr: bool = None,
                   skip_gaia: bool = None,
                   keep_all_astro: bool = None,
+                  relative_calibration: bool = None,
                   **kwargs) -> None:
     """Run the full reduction pipeline: sort files, calibrate, process, stack, photometry, zeropoint.
 
@@ -89,7 +90,7 @@ def main_pipeline(instrument: str,
         stack = image_procs.image_proc(file_table[file_table['TargType']==tar], tel, paths,
             skip_skysub=skip_skysub, fieldcenter=fieldcenter, out_size=out_size,
             cosmic_ray=not skip_cr, skip_gaia=skip_gaia, keep_all_astro=keep_all_astro,
-            log=log)
+            relative_calibration=relative_calibration or False, log=log)
 
         # Photometry step
         #################

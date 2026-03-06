@@ -79,7 +79,7 @@ def create_params(outfile):
         f.write('FLUXERR_AUTO \n')
         f.write('FWHM_IMAGE \n')
 
-def run_sextractor(img_file, log=None):
+def run_sextractor(img_file, log=None, sextractor_path=None):
     """Run Source Extractor on SCI extension; return catalog table or None.
 
     Parameters
@@ -88,6 +88,8 @@ def run_sextractor(img_file, log=None):
         Path to FITS with SCI extension (and SATURATE in header).
     log : ColoredLogger, optional
         Logger for progress.
+    sextractor_path : str, optional
+        Path to Source Extractor binary. If None, uses 'sex' from PATH.
 
     Returns
     -------
@@ -113,12 +115,13 @@ def run_sextractor(img_file, log=None):
     datahdu.header = hdu['SCI'].header
     datahdu.writeto(tmpfile, overwrite=True)
 
+    sex_cmd = (sextractor_path if sextractor_path else 'sex').strip()
     if log:
         log.info(f'Running source extractor on {img_file}')
     else:
         print(f'Running source extractor on {img_file}')
 
-    cmd = f'sex {tmpfile} -CATALOG_NAME {catfile} -CATALOG_TYPE ASCII_HEAD '
+    cmd = f'{sex_cmd} {tmpfile} -CATALOG_NAME {catfile} -CATALOG_TYPE ASCII_HEAD '
     cmd += f'-PARAMETERS_NAME {paramfile} -FILTER_NAME {convfile} '
     cmd += f'-SATUR_LEVEL {saturate} > /dev/null 2> /dev/null'
 
