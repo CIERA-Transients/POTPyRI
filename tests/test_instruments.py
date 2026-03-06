@@ -5,10 +5,16 @@ import numpy as np
 import pytest
 from astropy.io import fits
 from astropy.table import Table
+from astropy.nddata import CCDData
+from astropy import units as u
 
 from potpyri.instruments import instrument_getter
 from potpyri.instruments.GMOS import GMOS
-from potpyri.instruments.instrument import Instrument
+from potpyri.instruments.instrument import (
+    Instrument,
+    _sanitize_calibration_header,
+    _read_calibration_ccd,
+)
 from potpyri.utils import options
 from potpyri.utils import logger
 
@@ -180,3 +186,147 @@ def test_base_instrument_get_ampl_get_binning_missing_keyword():
     hdr = fits.Header()
     assert base.get_ampl(hdr) == "2"
     assert base.get_binning(hdr) == "CCDSUM"
+
+
+def test_sanitize_calibration_header():
+    """_sanitize_calibration_header removes WCS/coord keywords so saved cals don't trigger InvalidTransformError."""
+    h = fits.Header()
+    h["CTYPE1"] = "RA---TAN"
+    h["CTYPE2"] = "DEC--TAN"
+    h["CRVAL1"] = 0.0
+    h["CRVAL2"] = -100.0
+    h["RA"] = "00:00:00"
+    h["DEC"] = "-100:00:00"
+    h["PV1_1"] = 1.0
+    h["EXPTIME"] = 60.0
+    h["VER"] = "1.0"
+    _sanitize_calibration_header(h)
+    assert "CTYPE1" not in h
+    assert "CRVAL2" not in h
+    assert "RA" not in h
+    assert "DEC" not in h
+    assert "PV1_1" not in h
+    assert h["EXPTIME"] == 60.0
+    assert h["VER"] == "1.0"
+
+
+def test_read_calibration_ccd(tmp_path):
+    """_read_calibration_ccd loads calibration FITS without parsing WCS (avoids ill-conditioned header errors)."""
+    path = tmp_path / "cal.fits"
+    hdu = fits.PrimaryHDU(np.zeros((10, 10), dtype=np.float32))
+    hdu.header["CRVAL2"] = -100.0  # invalid; would raise if WCS were parsed
+    hdu.header["CTYPE1"] = "RA---TAN"
+    hdu.writeto(path, overwrite=True)
+    ccd = _read_calibration_ccd(str(path), u.electron, hdu_index=0)
+    assert ccd.wcs is None
+    assert ccd.unit == u.electron
+    assert ccd.data.shape == (10, 10)
+
+
+def test_sky_subtraction_units():
+    """Scaled sky (normalized * med * electron) has same unit as science so subtract is valid."""
+    # Normalized master sky (dimensionless) * (med * u.electron) -> electron; then science - sky is valid
+    sky = CCDData(np.ones((5, 5)), unit=u.dimensionless_unscaled)
+    frame = CCDData(np.ones((5, 5)) * 100.0, unit=u.electron)
+    med = 50.0
+    science_unit = frame.unit if frame.unit is not None else u.electron
+    frame_sky = sky.multiply(med * science_unit, propagate_uncertainties=True, handle_meta="first_found")
+    result = frame.subtract(frame_sky, propagate_uncertainties=True, handle_meta="first_found")
+    assert result.unit == u.electron
+    np.testing.assert_allclose(result.data, 50.0)
+
+
+def test_get_staticmask_filename(tmp_path):
+    """get_staticmask_filename returns [path] when mask exists, [None] otherwise."""
+    tel = GMOS()
+    hdr = fits.Header({"CCDSUM": "2 2"})
+    # Path is paths['code']/../data/staticmasks/{instname}.{binn}.staticmask.fits.fz
+    code_dir = tmp_path / "code"
+    code_dir.mkdir()
+    data_dir = tmp_path / "data" / "staticmasks"
+    data_dir.mkdir(parents=True)
+    paths = {"code": str(code_dir)}
+    # When file does not exist
+    out = tel.get_staticmask_filename(hdr, paths)
+    assert out == [None]
+    # When file exists
+    mask_file = data_dir / "gmos.22.staticmask.fits.fz"
+    mask_file.touch()
+    out = tel.get_staticmask_filename(hdr, paths)
+    assert out[0] is not None
+    assert "gmos.22.staticmask.fits.fz" in out[0]
+
+
+def test_load_bias_load_dark_load_flat_load_sky(tmp_path):
+    """load_bias, load_dark, load_flat, load_sky load from temp FITS via _read_calibration_ccd."""
+    tel = GMOS()
+    cal_dir = tmp_path / "cals"
+    cal_dir.mkdir()
+    paths = {"cal": str(cal_dir)}
+
+    # Bias: mbias_1_22.fits
+    bias_path = cal_dir / "mbias_1_22.fits"
+    fits.PrimaryHDU(np.zeros((10, 10), dtype=np.float32)).writeto(bias_path, overwrite=True)
+    mbias = tel.load_bias(paths, "1", "22")
+    assert mbias.unit == u.electron
+    assert mbias.data.shape == (10, 10)
+
+    # Dark: mdark_1_22.fits
+    dark_path = cal_dir / "mdark_1_22.fits"
+    fits.PrimaryHDU(np.zeros((10, 10), dtype=np.float32)).writeto(dark_path, overwrite=True)
+    mdark = tel.load_dark(paths, "1", "22")
+    assert mdark.unit == u.electron
+
+    # Flat: mflat_r_1_22.fits
+    flat_path = cal_dir / "mflat_r_1_22.fits"
+    fits.PrimaryHDU(np.ones((10, 10), dtype=np.float32)).writeto(flat_path, overwrite=True)
+    mflat = tel.load_flat(paths, "r", "1", "22")
+    assert mflat.unit == u.dimensionless_unscaled
+
+    # Sky: msky_r_1_22.fits
+    sky_path = cal_dir / "msky_r_1_22.fits"
+    fits.PrimaryHDU(np.ones((10, 10), dtype=np.float32)).writeto(sky_path, overwrite=True)
+    msky = tel.load_sky(paths, "r", "1", "22")
+    assert msky.unit == u.dimensionless_unscaled
+
+
+def test_load_bias_raises_when_missing(tmp_path):
+    """load_bias raises when no bias file exists at expected path."""
+    tel = GMOS()
+    paths = {"cal": str(tmp_path)}
+    with pytest.raises(Exception, match="Could not find bias"):
+        tel.load_bias(paths, "1", "22")
+
+
+def test_expand_mask():
+    """expand_mask combines NaN, inf, zero pixels with optional input mask."""
+    tel = Instrument()
+    data = np.ones((8, 8), dtype=float)
+    data[0, 0] = np.nan
+    data[1, 1] = np.inf
+    data[2, 2] = 0.0
+    ccd = CCDData(data, unit=u.electron)
+    out = tel.expand_mask(ccd, input_mask=None)
+    assert out[0, 0]
+    assert out[1, 1]
+    assert out[2, 2]
+    assert not out[3, 3]
+    # With input mask
+    extra = np.zeros((8, 8), dtype=bool)
+    extra[4, 4] = True
+    out2 = tel.expand_mask(ccd, input_mask=extra)
+    assert out2[4, 4]
+
+
+def test_base_get_catalog():
+    """Base Instrument get_catalog returns catalog_zp."""
+    base = Instrument()
+    hdr = fits.Header()
+    assert base.get_catalog(hdr) == "PS1"
+
+
+def test_format_datasec_binning_one():
+    """format_datasec with binning=1 preserves integer bounds."""
+    base = Instrument()
+    out = base.format_datasec("[100:200,50:150]", binning=1)
+    assert "[100:200,50:150]" == out
