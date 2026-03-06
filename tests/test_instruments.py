@@ -334,8 +334,6 @@ def test_format_datasec_binning_one():
 
 def test_create_sky_masks_bright_sources(tmp_path):
     """create_sky uses iterative sigma clipping and masks bright sources so sky estimate is robust."""
-    from astropy.stats import sigma_clipped_stats
-
     tel = GMOS()
     cal_dir = tmp_path / "cal"
     cal_dir.mkdir()

@@ -98,6 +98,11 @@ def init_options():
         default=False,
         action='store_true',
         help='Tell the pipeline to keep all images regardless of astrometric dispersion.')
+    params.add_argument('--relative-calibration',
+        default=False,
+        action='store_true',
+        help='Before stacking, calibrate frames to each other using SExtractor catalogs '
+             'and RA/Dec cross-matching; use relative source fluxes to set combine scales.')
 
     return(params)
 
