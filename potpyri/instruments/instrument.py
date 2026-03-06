@@ -845,8 +845,17 @@ class Instrument(object):
         
         return
 
-    def create_sky(self, sky_list, fil, amp, binn, paths, log=None, **kwargs):
+    def create_sky(self, sky_list, fil, amp, binn, paths, log=None,
+            sky_sigma_upper=3.0, sky_sigma_lower=4.0, sky_maxiters=5,
+            sky_n_sigma_high=3.0, sky_n_sigma_low=4.0,
+            msky_n_sigma_high=5.0, msky_n_sigma_low=5.0, msky_maxiters=5,
+            **kwargs):
         """Combine sky frames (normalize by median) and write master sky.
+
+        Uses iterative sigma clipping to estimate the sky background and mask
+        bright sources (and optionally low outliers) so the median is not
+        biased. Per-frame and combined master sky masking use configurable
+        sigma and iteration limits.
 
         Parameters
         ----------
@@ -862,6 +871,24 @@ class Instrument(object):
             Paths dict (cal key).
         log : ColoredLogger, optional
             Logger for progress.
+        sky_sigma_upper : float, optional
+            Upper sigma for iterative clip when estimating per-frame sky.
+            Default 3.0.
+        sky_sigma_lower : float, optional
+            Lower sigma for iterative clip when estimating per-frame sky.
+            Default 4.0.
+        sky_maxiters : int, optional
+            Max iterations for sigma clipping per sky frame. Default 5.
+        sky_n_sigma_high : float, optional
+            Mask pixels above med + this many * std (bright sources). Default 3.0.
+        sky_n_sigma_low : float, optional
+            Mask pixels below med - this many * std (defects). Default 4.0.
+        msky_n_sigma_high : float, optional
+            Mask master sky pixels above median + this * std. Default 5.0.
+        msky_n_sigma_low : float, optional
+            Mask master sky pixels below median - this * std. Default 5.0.
+        msky_maxiters : int, optional
+            Max iterations for sigma clipping on combined master sky. Default 5.
         **kwargs
             Unused; for subclass compatibility.
 
@@ -874,59 +901,82 @@ class Instrument(object):
             log.info(f'Processing files for filter: {fil}')
             log.info(f'{len(sky_list)} files found.')
 
-        scale = []
         skys = []
         for i, sky in enumerate(sky_list):
             if log: log.info(f'Importing {sky}')
             sky_full = self.import_sci_image(sky, log=log)
 
-            mean, med, stddev = sigma_clipped_stats(sky_full.data,
-                sigma_upper=2.5, sigma_lower=3.5)
+            # Iterative sigma-clipped stats for robust sky level (excludes
+            # bright sources and defects so median is unbiased)
+            mean, med, stddev = sigma_clipped_stats(
+                sky_full.data,
+                sigma_upper=sky_sigma_upper,
+                sigma_lower=sky_sigma_lower,
+                maxiters=sky_maxiters,
+            )
 
-            # Mask outliers
-            mask = sky_full.data > med + 2.5 * stddev
-            sky_full.data[mask]=np.nan
+            # Mask bright sources and low outliers so they don't affect norm
+            mask_high = sky_full.data > med + sky_n_sigma_high * stddev
+            mask_low = sky_full.data < med - sky_n_sigma_low * stddev
+            sky_full.data[mask_high] = np.nan
+            sky_full.data[mask_low] = np.nan
 
-            # Normalize by median sky background
-            mean, med, stddev = sigma_clipped_stats(sky_full.data,
-                sigma_upper=2.5, sigma_lower=3.5)
-            norm = 1./med
+            # Recompute stats on masked data (NaNs excluded) for normalization
+            mean, med, stddev = sigma_clipped_stats(
+                sky_full.data,
+                sigma_upper=sky_sigma_upper,
+                sigma_lower=sky_sigma_lower,
+                maxiters=sky_maxiters,
+            )
+            norm = 1.0 / med
             sky_full = sky_full.multiply(norm)
-            
+
             # Vet the sky normalization - it should not be negative
             if norm > 0.:
-                log.info(f'Sky normalization: {norm}')
+                if log: log.info(f'Sky normalization: {norm}')
             else:
-                # Skip this file
-                log.error(f'Sky normalization: {norm}')
+                if log: log.error(f'Sky normalization: {norm}')
                 continue
 
-            sky_full.mask[np.isnan(sky_full.data)]=True
-            sky_full.data[np.isnan(sky_full.data)]=1.0
-                
+            nan_mask = np.isnan(sky_full.data)
+            if sky_full.mask is None:
+                sky_full.mask = np.zeros(sky_full.data.shape, dtype=bool)
+            sky_full.mask[nan_mask] = True
+            sky_full.data[nan_mask] = 1.0
+
             skys.append(sky_full)
 
-        msky = ccdproc.combine(skys, method='median', sigma_clip=True, 
+        msky = ccdproc.combine(skys, method='median', sigma_clip=True,
             clip_extrema=True)
 
-        # Mask sky image
-        msky.data[np.isinf(msky.data)]=1.0
-        msky.data[msky.data==0.0]=1.0
-        mean, median, stddev = sigma_clipped_stats(msky.data)
-        mask = msky.data > median + 10 * stddev
-        msky.data[mask]=1.0
-        
-        if log: 
+        # Robust masking of combined master sky: iterative sigma clipping
+        # for accurate median/std, then mask excess flux and defects
+        msky.data[np.isinf(msky.data)] = np.nan
+        msky.data[msky.data == 0.0] = np.nan
+        mean, median, stddev = sigma_clipped_stats(
+            msky.data,
+            sigma_upper=3.0,
+            sigma_lower=3.0,
+            maxiters=msky_maxiters,
+        )
+        mask_high = msky.data > median + msky_n_sigma_high * stddev
+        mask_low = msky.data < median - msky_n_sigma_low * stddev
+        msky.data[mask_high] = 1.0
+        msky.data[mask_low] = 1.0
+        # Restore valid fill for normalized sky (1.0 = no correction)
+        msky.data[np.isnan(msky.data)] = 1.0
+
+        if log:
             log.info(f'Made sky for filter: {fil}, amp: {amp}, bin: {binn}.')
-        
-        msky.header['VER'] = (__version__, 
+
+        msky.header['VER'] = (__version__,
             'Version of telescope parameter file used.')
 
         sky_filename = self.get_msky_name(paths, fil, amp, binn)
         _sanitize_calibration_header(msky.header)
         msky.write(sky_filename, overwrite=True, output_verify='silentfix')
         if log: log.info(f'Master sky written to {sky_filename}')
-        
+
         return
 
     def load_staticmask(self, hdr, paths):
@@ -1161,9 +1211,14 @@ class Instrument(object):
             
             sky_frame = self.load_sky(paths, fil, amp, binn)
 
-            for i,frame in enumerate(processed):
-
-                mean, med, stddev = sigma_clipped_stats(frame.data)
+            for i, frame in enumerate(processed):
+                # Robust scale: sigma-clipped median so bright sources don't bias sky level
+                mean, med, stddev = sigma_clipped_stats(
+                    frame.data,
+                    sigma_upper=3.0,
+                    sigma_lower=3.0,
+                    maxiters=5,
+                )
                 # Scale normalized sky to same units as science (electrons) so subtract is valid
                 science_unit = frame.unit if frame.unit is not None else u.electron
                 frame_sky = sky_frame.multiply(med * science_unit,

@@ -330,3 +330,71 @@ def test_format_datasec_binning_one():
     base = Instrument()
     out = base.format_datasec("[100:200,50:150]", binning=1)
     assert "[100:200,50:150]" == out
+
+
+def test_create_sky_masks_bright_sources(tmp_path):
+    """create_sky uses iterative sigma clipping and masks bright sources so sky estimate is robust."""
+    from astropy.stats import sigma_clipped_stats
+
+    tel = GMOS()
+    cal_dir = tmp_path / "cal"
+    cal_dir.mkdir()
+    sky_dir = tmp_path / "sky"
+    sky_dir.mkdir()
+    paths = {"cal": str(cal_dir)}
+
+    # Two small sky frames: constant background + one frame with a bright source
+    sky_val = 1000.0
+    shape = (12, 12)
+    for i in range(2):
+        data = np.full(shape, sky_val, dtype=np.float32)
+        if i == 1:
+            data[5, 5] = 8000.0  # bright source
+            data[6, 5] = 6000.0
+        ccd = CCDData(data, unit=u.electron)
+        path = sky_dir / f"sky{i}.fits"
+        ccd.write(str(path), overwrite=True)
+
+    sky_list = [str(sky_dir / "sky0.fits"), str(sky_dir / "sky1.fits")]
+    tel.create_sky(sky_list, "r", "1", "22", paths, log=None,
+        sky_sigma_upper=3.0, sky_sigma_lower=4.0, sky_maxiters=5,
+        sky_n_sigma_high=3.0, sky_n_sigma_low=4.0,
+        msky_n_sigma_high=5.0, msky_n_sigma_low=5.0, msky_maxiters=5)
+
+    msky_path = cal_dir / "msky_r_1_22.fits"
+    assert msky_path.exists()
+    with fits.open(msky_path) as hdu:
+        msky_data = hdu[0].data
+    # Normalized sky: masked (bright) pixels set to 1.0, rest ~1.0
+    assert msky_data.shape == shape
+    # At (5,5) and (6,5) we had bright flux; after masking they should be 1.0
+    assert msky_data[5, 5] == 1.0
+    assert msky_data[6, 5] == 1.0
+    # Median of combined sky should be close to 1.0 (normalized)
+    med = np.nanmedian(msky_data)
+    assert 0.95 < med < 1.05
+
+
+def test_create_sky_accepts_default_and_custom_sigma_params(tmp_path):
+    """create_sky runs with default params and with custom sigma/maxiters."""
+    tel = GMOS()
+    cal_dir = tmp_path / "cal"
+    cal_dir.mkdir()
+    sky_dir = tmp_path / "sky"
+    sky_dir.mkdir()
+    paths = {"cal": str(cal_dir)}
+    data = np.full((8, 8), 500.0, dtype=np.float32)
+    ccd = CCDData(data, unit=u.electron)
+    sky_path = sky_dir / "sky.fits"
+    ccd.write(str(sky_path), overwrite=True)
+    sky_list = [str(sky_path)]
+
+    # Default params
+    tel.create_sky(sky_list, "r", "1", "22", paths, log=None)
+    assert (cal_dir / "msky_r_1_22.fits").exists()
+
+    # Custom params (tight sigma)
+    (cal_dir / "msky_r_1_22.fits").unlink()
+    tel.create_sky(sky_list, "r", "1", "22", paths, log=None,
+        sky_n_sigma_high=2.0, msky_n_sigma_high=4.0)
+    assert (cal_dir / "msky_r_1_22.fits").exists()
