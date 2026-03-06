@@ -463,6 +463,9 @@ class absphot(object):
             return 'z'
         if filt=='Y':
             return 'J'
+        # K, Ks, Kspec all use 2MASS K-band for calibration
+        if filt in ('K', 'Ks', 'Kspec'):
+            return 'K'
         else:
             return filt
     

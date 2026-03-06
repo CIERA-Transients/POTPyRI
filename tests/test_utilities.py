@@ -30,6 +30,15 @@ def test_find_catalog_2mass():
     assert err == "e_Jmag"
 
 
+def test_find_catalog_2mass_k_band():
+    """find_catalog returns 2MASS K-band (Kmag, e_Kmag) for K, Ks, and Kspec."""
+    for filt in ("K", "Ks", "Kspec"):
+        cat, cid, ra, dec, mag, err = utilities.find_catalog("2MASS", filt, 0.0, 0.0)
+        assert cid == "II/246", f"2MASS catalog ID for filter {filt!r}"
+        assert mag == "Kmag", f"2MASS K-band mag column for filter {filt!r}"
+        assert err == "e_Kmag", f"2MASS K-band err column for filter {filt!r}"
+
+
 def test_find_catalog_sdss():
     """find_catalog returns SDSS columns for u,g,r,i,z."""
     cat, cid, ra, dec, mag, err = utilities.find_catalog("SDSS", "g", 0.0, 0.0)

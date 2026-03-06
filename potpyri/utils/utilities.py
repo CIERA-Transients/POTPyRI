@@ -74,8 +74,13 @@ def find_catalog(catalog, fil, coord_ra, coord_dec):
         if fil.lower() not in ['u','g','r','i','z']: return(catalog, catalog_ID, ra, dec, mag, err)
         catalog_ID, ra, dec, mag, err = 'V/154', 'RA_ICRS', 'DE_ICRS', fil.lower()+'mag', 'e_'+fil.lower()+'mag'
     elif catalog.upper() == '2MASS':
-        if fil.upper() not in ['J','H','K']: return(catalog, catalog_ID, ra, dec, mag, err)
-        catalog_ID, ra, dec, mag, err = 'II/246', 'RAJ2000', 'DEJ2000', fil.upper()+'mag', 'e_'+fil.upper()+'mag'
+        # K, Ks, Kspec all use 2MASS K-band columns (Kmag, e_Kmag)
+        fil_2mass = fil.upper()
+        if fil_2mass in ('KS', 'KSPEC'):
+            fil_2mass = 'K'
+        if fil_2mass not in ['J', 'H', 'K']:
+            return(catalog, catalog_ID, ra, dec, mag, err)
+        catalog_ID, ra, dec, mag, err = 'II/246', 'RAJ2000', 'DEJ2000', fil_2mass+'mag', 'e_'+fil_2mass+'mag'
     elif catalog.upper() == 'UKIRT':
         if fil.upper() not in ['Y','J','H','K']: return(catalog, catalog_ID, ra, dec, mag, err)
         catalog_ID, ra, dec, mag, err = 'II/319', 'ra', 'dec', fil.upper() + 'mag', 'e_'+fil.upper()+'mag'
