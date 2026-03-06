@@ -25,6 +25,19 @@ from astropy.stats import sigma_clipped_stats
 from astropy.stats import SigmaClip
 from astropy.time import Time
 
+def _read_calibration_ccd(path, unit, hdu_index=0):
+    """Read a calibration FITS into CCDData without parsing WCS.
+
+    Master bias/dark/flat frames often have WCS keywords that are ill-conditioned
+    or copied from templates. Parsing them can raise InvalidTransformError and
+    log 'Ill-conditioned coordinate transformation parameter'. Calibration
+    frames do not need WCS, so we load data and header explicitly with wcs=None.
+    """
+    with fits.open(path) as hdu_list:
+        hdu = hdu_list[hdu_index]
+        return CCDData(hdu.data, meta=hdu.header.copy(), unit=unit, wcs=None)
+
+
 class Instrument(object):
     """Base class for all POTPyRI instruments.
 
@@ -384,10 +397,9 @@ class Instrument(object):
         """
         bias = self.get_mbias_name(paths, amp, binn)
         if os.path.exists(bias):
-            mbias = CCDData.read(bias)
+            mbias = _read_calibration_ccd(bias, u.electron, hdu_index=0)
         elif os.path.exists(bias+'.fz'):
-            hdu = fits.open(bias+'.fz')
-            mbias = CCDData(hdu[1].data, header=hdu[1].header, unit=u.electron)
+            mbias = _read_calibration_ccd(bias+'.fz', u.electron, hdu_index=1)
         else:
             raise Exception(f'Could not find bias: {bias}')
         return(mbias)
@@ -416,10 +428,9 @@ class Instrument(object):
         """
         dark = self.get_mdark_name(paths, amp, binn)
         if os.path.exists(dark):
-            mdark = CCDData.read(dark)
+            mdark = _read_calibration_ccd(dark, u.electron, hdu_index=0)
         elif os.path.exists(dark+'.fz'):
-            hdu = fits.open(dark+'.fz')
-            mdark = CCDData(hdu[1].data, header=hdu[1].header, unit=u.electron)
+            mdark = _read_calibration_ccd(dark+'.fz', u.electron, hdu_index=1)
         else:
             raise Exception(f'Could not find dark: {dark}')
         return(mdark)
@@ -450,10 +461,9 @@ class Instrument(object):
         """
         flat = self.get_mflat_name(paths, fil, amp, binn)
         if os.path.exists(flat):
-            mflat = CCDData.read(flat)
+            mflat = _read_calibration_ccd(flat, u.dimensionless_unscaled, hdu_index=0)
         elif os.path.exists(flat+'.fz'):
-            hdu = fits.open(flat+'.fz')
-            mflat = CCDData(hdu[1].data, header=hdu[1].header, unit=u.electron)
+            mflat = _read_calibration_ccd(flat+'.fz', u.dimensionless_unscaled, hdu_index=1)
         else:
             raise Exception(f'Could not find flat: {flat}')
         return(mflat)
@@ -484,10 +494,9 @@ class Instrument(object):
         """
         sky = self.get_msky_name(paths, fil, amp, binn)
         if os.path.exists(sky):
-            msky = CCDData.read(sky)
+            msky = _read_calibration_ccd(sky, u.dimensionless_unscaled, hdu_index=0)
         elif os.path.exists(sky+'.fz'):
-            hdu = fits.open(sky+'.fz')
-            msky = CCDData(hdu[1].data, header=hdu[1].header, unit=u.electron)
+            msky = _read_calibration_ccd(sky+'.fz', u.dimensionless_unscaled, hdu_index=1)
         else:
             raise Exception(f'Could not find sky frame: {sky}')
         return(msky)
