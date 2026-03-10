@@ -24,7 +24,7 @@ affiliations:
  - name: Max-Planck-Institut für Astronomie, Königstuhl 17, 69117 Heidelberg, Germany
    index: 2
 
-date: 2 Sep 2025
+date: 10 Mar 2026
 
 bibliography: paper.bib
 
@@ -32,13 +32,13 @@ bibliography: paper.bib
 
 # Summary
 
-This pipeline was developed for the reduction and stacking of imaging data for a number of telescopes and instruments in the optical and near-infrared (NIR) bands. The purpose of the pipeline is to provide an automated way to reduce imaging data, create a median stack with reliable astrometry and photometric calibration, and perform aperture and PSF photometry on sources within the stacked image.
+The Pipeline for Optical/infrared Telescopes in Python for Reducing Images (POTPyRI) was developed for the reduction and stacking of imaging data for a number of telescopes and instruments in the optical and near-infrared (NIR) bands. The purpose of the pipeline is to provide an automated way to reduce imaging data, create a median stack with reliable astrometry and photometric calibration, and perform aperture and Point Spread Function (PSF) photometry on sources within the stacked image.
 
 # Statement of need
 
-The pipeline is written in Python (currently deployed and tested on Python 3.12) and uses packages from Astropy [@astropy:2013;@astropy:2018], ccdproc, astroquery [@Ginsburg2019] and photutils [@photutils:2024]; with the additional use of external dependencies including SExtractor [@Bertin1996] and Astrometry.net [@Lang2010]. The code is available on GitHub at https://github.com/CIERA-Transients/POTPyRI, where instructions on the installation and detailed use can be found. The code is also installable with pip and is release at PyPI at https://pypi.org/p/potpyri.
+POTPyRI is written in Python (currently deployed and tested on Python 3.12) and uses packages from Astropy [@astropy:2013;@astropy:2018], ccdproc, astroquery [@Ginsburg2019] and photutils [@photutils:2024]; with the additional use of external dependencies including SExtractor [@Bertin1996] and Astrometry.net [@Lang2010]. The code is available on GitHub at https://github.com/CIERA-Transients/POTPyRI, where instructions on the installation and detailed use can be found. The code is also installable with pip and is release at PyPI at https://pypi.org/p/potpyri.
 
-Currently available instruments (as of June 2025 - see the GitHub for the most recent list) include:
+Currently available instruments (as of March 2026 - see the GitHub for the most recent list) include:
 - MMIRS (MMT) [@McLeod2012]
 - Binospec (MMT) [@Fabricant2019]
 - MOSFIRE (Keck) [@McLean2008]
@@ -49,11 +49,19 @@ Currently available instruments (as of June 2025 - see the GitHub for the most r
 - FourStar (Magellan) [@Persson2013]
 - IMACS (Magellan) [@Bigelow2003]
 
-Since the pipeline is meant to provide the community with a way to reduce imaging data from these instruments; science applications include the rapid reduction and identification of transients, such as Gamma-Ray Burst (GRB) afterglows, as well as the reduction and stacking of follow-up observations of transients to identify potential host galaxies for associated and in depth study (see [@Paterson2020;@Rastinejad2021;@Fong2021;@Rastinejad2025;@Caleb2025]).
+POTPyRI is meant to provide the community with a way to reduce imaging data from these instruments in a streamlined manner, using easily accessible code.
+
+# State of the field
+
+Given the more complex suite of reductions often needed for spectroscopic data, many pipelines have been developed to reduced spectroscopic data from many intruments. However, at the start of developemnet, no other automated pipeline was available to reduced images from a number of theses intruments, with only guidelines and recipes often decribed. As the main research undertaken by the developers and collaborators often used data from these instruments, a need to have a way to quickly and automatically reduce these data to provide infomation on subsequent follow-up obseravtions was born. While Gemmi has since setup the Data Reduction for Astronomy from Gemini Observatory North and South (DRAGONS) [@DRAGONS] to try and bring about a uniform way to reduce data from their facility, including imaging, most other pipelines available still focus on spectroscopic data reduction. Even now, POTPyRI still provides additional functionality beyond the reduction and stacking of images, including additional astrometric fitting to ensure accurate astrometry on the stacks, photometric calibration, and both aperture and PSF photometry on all detected sources in the stack.
+
+# Software design
+
+POTPyRI was developed in Python, to take advantage of the increased use and development of Python based reduction of astronomy data, and move away from older "blackbox" and lisenced programs. Through the use of other community supported packages, the pipeline builts on already supported packages without duplication of effort. POTPyRI is hosted on GitHub, to promote users to provide feedback, ask for help, or contribute to the pipeline itself.
 
 # Method
 
-The pipeline requires two parameters to run. The first is the name of the instrument in order to load the correct settings file. This settings file allows new and user instruments to be added as needed. The second is the full data path to the data to be reduced. The data are expected to be in a particular format, including the file name and the number of extensions, as specified in the setting file. For example, for Keck, the pipeline expects the data in the format in which it is download from the Keck Observatory Archive.  In this case, the user can specify that the input data conform to the archive format using *--proc archive*. The details on data formats, including scripts to download and sort data, can be found on GitHub. 
+POTPyRI requires two parameters to run. The first is the name of the instrument in order to load the correct settings file. This settings file allows new and user instruments to be added as needed. The second is the full data path to the data to be reduced. The data are expected to be in a particular format, including the file name and the number of extensions, as specified in the setting file. For example, for Keck, the pipeline expects the data in the format in which it is download from the Keck Observatory Archive.  In this case, the user can specify that the input data conform to the archive format using *--proc archive*. The details on data formats, including scripts to download and sort data, can be found on GitHub. 
 
 ![Flow diagram showing the basic steps taken by the pipeline. The dashed box shows all steps taken under the process science function, while all steps after the calibration creation is done per target.\label{fig:flow}](../images/Pipeline_flow_diagram.pdf){height="450pt"}
 
@@ -61,7 +69,7 @@ Figure \autoref{fig:flow} shows the basic pipeline operations. The pipeline will
 
 After solving for all the astrometry, the pipeline will remove any images which high astrometric dispersion (i.e. images that have dispersion $>5\sigma$ either in RA or DEC), except if the user specified the *--keep\_all\_astro* option, before stacking images. Images are median stacked, using the uncertainty masks and exposure times as weights, and a final stack mask is created (see Figure \autoref{fig:stacks} for examples of median stacks from MOSFIRE, MMIRS, LRIS (blue channel), BINOSPEC (left side) and DEIMOS).
 
-The pipeline will then perform both aperture and Point Spread Function (PSF) photometry on sources in the stacked image. For the aperture photometry, the pipeline will detect sources within the image and determine statistics within a fiducial aperture radius, which is written as an extension to the stacked image. For the PSF photometry, the PSF is determined using a list of bright unsaturated stars, determined based on cuts on roundness, Full Width Half Maximum (FWHM), and signal-to-noise.
+The pipeline will then perform both aperture and PSF photometry on sources in the stacked image. For the aperture photometry, the pipeline will detect sources within the image and determine statistics within a fiducial aperture radius, which is written as an extension to the stacked image. For the PSF photometry, the PSF is determined using a list of bright unsaturated stars, determined based on cuts on roundness, Full Width Half Maximum (FWHM), and signal-to-noise.
 Next, the pipeline uses the PSF to calculate PSF photometry for all the originally extracted sources. After the PSF photometry has been calculated, the pipeline will then calculate a zero point based on aperture photometry by downloading a catalog of standard stars. Currently supported catalogs are the Sloan Digital Sky Survey DR12 [@Eisenstein2011], Pan-STARRS [@Tonry2012], SkyMapper [@Onken2024],  and 2MASS [@Skrutskie2006] covering most optical and infrared bands in the north and south. The zero point is then transformed to the AB system and written to the header.
 
 In addition, an approximate limiting magnitude is calculated for each stack using the FWHM and the approximate standard deviation in the sky background per pixel.  These values are propagated into the image header as 3-, 5-, and 10-$\sigma$ limiting magnitudes as *M3SIGMA*, *M5SIGMA*, and *M10SIGMA*.
@@ -71,6 +79,14 @@ For more detailed instructions on running the pipeline and a description of pipe
 While the pipeline runs, the pipeline will also created a detailed log of operations. Along with the log, the pipeline will also write information such as the readnoise, effective gain, and zero point to the stack. The pipeline also produces a number of other output files, including source catalogs, star lists, error plots etc. For more details on these outputs, refer to the documentation of the GitHub.
 
 ![Examples of stacks produced by the pipeline from MOSFIRE, MMIRS, LRIS (blue side), BINOSPEC (left side) and DEIMOS data. The position of Gaia DR3 stars are shown by the green circles.\label{fig:stacks}](../images/Stack_examples.pdf)
+
+# Research impact statement
+
+POTPyRI has science applications in areas where deep stacked imaging, with accuray astrometry and phtotometry is required. This includes the rapid reduction and identification of transients, such as Gamma-Ray Burst (GRB) afterglows, as well as the reduction and stacking of follow-up observations of transients to identify potential host galaxies for association and in-depth study. Examples of such work can by found in [@Paterson2020;@Rastinejad2021;@Fong2021;@Rastinejad2025;@Caleb2025]), while the pipeline continues to be improved while under use in ongoing projects by the developers and their collaborators.
+
+# AI usage disclosure
+
+No AI tools were used in the building and preparation of this pipeline.
 
 # Acknowledgements
 
