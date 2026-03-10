@@ -82,7 +82,7 @@ While the pipeline runs, the pipeline will also create a detailed log of operati
 
 # Research impact statement
 
-POTPyRI has been used to reduce and stack imaging in published and in-preparation work on transient follow-up and host galaxy association, including Paterson et al. (2020), Rastinejad et al. (2021), Fong et al. (2021), Rastinejad et al. (2025), and Caleb et al. (2025) [@Paterson2020;@Rastinejad2021;@Fong2021;@Rastinejad2025;@Caleb2025]. Applications include rapid reduction and identification of transients such as Gamma-Ray Burst (GRB) afterglows, and reduction and stacking of follow-up observations to identify host galaxies for association and study. The package is available on PyPI and is developed openly on GitHub with contributions from multiple developers. The pipeline continues to be improved while in use in ongoing projects by the developers and their collaborators.
+POTPyRI has been used to reduce and stack imaging in published and in-preparation work on transient follow-up and host galaxy association, including @Paterson2020, @Rastinejad2021, @Fong2021, @Rastinejad2025, and @Caleb2025. Applications include rapid reduction and identification of transients such as Gamma-Ray Burst (GRB) afterglows, and reduction and stacking of follow-up observations to identify host galaxies for association and study. The package is available on PyPI and is developed openly on GitHub with contributions from multiple developers. The pipeline continues to be improved while in use in ongoing projects by the developers and their collaborators.
 
 # AI usage disclosure
 
