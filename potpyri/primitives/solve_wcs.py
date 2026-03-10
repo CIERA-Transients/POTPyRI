@@ -1,8 +1,10 @@
-"Python script for WCS solution."
-"Authors: Kerry Paterson, Charlie Kilpatrick"
+"""WCS solution using astrometry.net and Gaia DR3 alignment.
 
-# Last updated 10/24/2024
-__version__ = "2.1"
+Provides coarse solution via solve-field and fine alignment by matching
+detected sources to Gaia. Writes RADISP/DEDISP and updated WCS to FITS.
+Authors: Kerry Paterson, Charlie Kilpatrick.
+"""
+from potpyri._version import __version__
 
 import numpy as np
 import subprocess
@@ -20,30 +22,51 @@ from astroquery.vizier import Vizier
 import astropy.units as u
 from astropy.stats import sigma_clipped_stats
 from astropy.io import fits
-from astropy.io import ascii
 from astropy.coordinates import SkyCoord
 from astropy.coordinates import match_coordinates_sky
-from astropy.table import Table, Column
+from astropy.table import Column
+from astropy.table import Table
 from astropy.utils.exceptions import AstropyWarning
 from astropy.wcs import WCS
 from astropy.wcs.utils import fit_wcs_from_points
 
 # Internal dependency
 from potpyri.utils import utilities
-from potpyri.stages import photometry
+from potpyri.primitives import photometry
 
 #turn Astropy warnings off
 import warnings
 warnings.simplefilter('ignore', category=AstropyWarning)
 
 def get_gaia_catalog(input_file, log=None):
+    """Query Gaia DR3 for stars in the field; return filtered catalog table.
 
-    hdu = fits.open(input_file)
-    data = hdu[0].data
-    header = hdu[0].header
+    Uses header RA/DEC to define field; filters by PSS, Plx, PM.
+
+    Parameters
+    ----------
+    input_file : str
+        Path to FITS file; header used for CRVAL1/CRVAL2 or RA/DEC.
+    log : ColoredLogger, optional
+        Logger for progress and errors.
+
+    Returns
+    -------
+    astropy.table.Table or None or False
+        Filtered Gaia DR3 table (PSS>0.99, Plx<20, PM<10), or None if empty,
+        or False if coordinates could not be parsed.
+
+    Raises
+    ------
+    Exception
+        If Gaia query fails after retries.
+    """
+    with fits.open(input_file) as hdu:
+        data = hdu[0].data
+        header = hdu[0].header
     hkeys = list(header.keys())
 
-    check_pairs = [('RA','DEC'),('CRVAL1','CRVAL2'),('OBJCTRA','OBJCTDEC')]
+    check_pairs = [('CRVAL1','CRVAL2'),('RA','DEC'),('OBJCTRA','OBJCTDEC')]
     coord = None
 
     for pair in check_pairs:
@@ -55,7 +78,7 @@ def get_gaia_catalog(input_file, log=None):
                 break
 
     if not coord:
-        if log: log.error(f'Could not parse RA/DEC from header of {file}')
+        if log: log.error(f'Could not parse RA/DEC from header of {input_file}')
         return(False)
 
     vizier = Vizier(columns=['RA_ICRS', 'DE_ICRS', 'Plx', 'PSS','PM'])
@@ -67,7 +90,10 @@ def get_gaia_catalog(input_file, log=None):
         try:
             cat = vizier.query_region(coord, width=20 * u.arcmin, 
                 catalog='I/355/gaiadr3')
-            break
+            if cat is None:
+                if log: log.error(f'Gaia did not return catalog.  Try #{tries+1}')
+            else:
+                break
         except requests.exceptions.ReadTimeout:
             if log: log.error(f'Gaia catalog timeout.  Try #{tries+1}')
             tries += 1
@@ -86,6 +112,21 @@ def get_gaia_catalog(input_file, log=None):
     return(cat)
 
 def clean_up_astrometry(directory, file, exten):
+    """Remove astrometry.net temporary files (.axy, .corr, .solved, .wcs, etc.).
+
+    Parameters
+    ----------
+    directory : str
+        Directory containing the files.
+    file : str
+        Base filename (with extension); exten is replaced to form temp names.
+    exten : str
+        File extension (e.g. '.fits') to replace with .axy, .corr, etc.
+
+    Returns
+    -------
+    None
+    """
     filelist = [file.replace(exten,'.axy'),
                 file.replace(exten,'.corr'),
                 file.replace(exten,'-indx.xyls'),
@@ -100,9 +141,36 @@ def clean_up_astrometry(directory, file, exten):
         if os.path.exists(f):
             os.remove(f)
 
-def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True, 
+def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
     shift_only=False, index=None, log=None):
+    """Run astrometry.net (solve-field) to get coarse WCS; optionally use custom index.
 
+    Parameters
+    ----------
+    file : str
+        Path to FITS file to solve.
+    tel : Instrument
+        Instrument instance (name, get_pixscale).
+    binn : str
+        Binning string (e.g. '22') for pixel scale.
+    paths : dict
+        Paths dict (source_extractor key for solve-field).
+    radius : float, optional
+        Search radius in degrees. Default is 0.5.
+    replace : bool, optional
+        If True, write WCS into original file; else write .solved.fits.
+    shift_only : bool, optional
+        If True, only update CRPIX/CRVAL. Default is False.
+    index : str, optional
+        Path to custom index file or directory for solve-field.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    bool
+        True if solve succeeded, False otherwise.
+    """
     # Starting solve, print file and directory for reference
     fullfile = os.path.abspath(file)
     directory = os.path.dirname(file)
@@ -115,9 +183,9 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
     if not os.path.exists(fullfile):
         return(False)
 
-    hdu = fits.open(fullfile)
-    data = hdu[0].data
-    header = hdu[0].header
+    with fits.open(fullfile) as hdu:
+        data = hdu[0].data
+        header = hdu[0].header
     hkeys = list(header.keys())
 
     exten = '.'+file.split('.')[-1]
@@ -131,7 +199,12 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
 
     exten = '.'+file.split('.')[-1]
 
-    check_pairs = [('RA','DEC'),('CRVAL1','CRVAL2'),('OBJCTRA','OBJCTDEC')]
+    if tel.name.upper=='BINOSPEC':
+        check_pairs = [('CRVAL1','CRVAL2'),('RA','DEC'),('OBJCTRA','OBJCTDEC')]
+    else:
+        check_pairs = [('RA','DEC'),('OBJCTRA','OBJCTDEC'),('TARGRA','TARGDEC'),
+            ('CRVAL1','CRVAL2')]
+
     coord = None
 
     for pair in check_pairs:
@@ -195,8 +268,8 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
 
     tries = 1
     good = False
-    while tries < 4 and not good:
-        input_args = args + extra_opts
+    while tries < 6 and not good:
+        input_args = f'{args} {extra_opts}'
 
         if log: 
             log.info(f'Try #{tries} with astrometry.net...')
@@ -210,22 +283,37 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
         else:
             print(' '.join(process))
 
-        FNULL = open(os.devnull, 'w')
-
-        p = subprocess.Popen(process, stdout=FNULL, stderr=subprocess.STDOUT)
-        try:
-            p.wait(90)
-        except subprocess.TimeoutExpired:
-            p.kill()
+        with open(os.devnull, 'w') as FNULL:
+            p = subprocess.Popen(process, stdout=FNULL, stderr=subprocess.STDOUT)
+            try:
+                p.wait(90)
+            except subprocess.TimeoutExpired:
+                p.kill()
 
         if os.path.exists(newfile):
             good = True
         else:
             tries += 1
             if tries==2:
-                extra_opts='--objs 15'
+                extra_opts='--objs 15 --no-verify'
             elif tries==3:
-                extra_opts=''
+                extra_opts='--no-verify'
+            elif tries==4:
+                # Try without source extractor
+                extra_opts='--no-verify'
+                args = '--scale-units arcsecperpix '
+                args += f'--scale-low {scale_low} --scale-high {scale_high} '
+                args += f'--no-plots -T '
+                args += f'--overwrite -N {newfile} --dir {directory} '
+                args += f'--ra {ra} --dec {dec} '
+                args += f' --radius {radius} '
+            elif tries==5:
+                # Try with no constraint on RA/Dec
+                args = '--scale-units arcsecperpix '
+                args += f'--scale-low {scale_low} --scale-high {scale_high} '
+                args += f'--no-plots -T '
+                args += f'--overwrite -N {newfile} --dir {directory} '
+                extra_opts='--no-verify'
 
 
     file_exists=os.path.exists(newfile)
@@ -248,57 +336,54 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
 
             # astrometry.net replaces extra extensions, so instead of renaming
             # copy the new header into the old file
-            newhdu = fits.open(newfile)
-            hdu = fits.open(output_file)
-
-            if shift_only:
-                hdu[0].header['CRPIX1'] = newhdu[0].header['CRPIX1']
-                hdu[0].header['CRPIX2'] = newhdu[0].header['CRPIX2']
-                hdu[0].header['CRVAL1'] = newhdu[0].header['CRVAL1']
-                hdu[0].header['CRVAL2'] = newhdu[0].header['CRVAL2']
-            else:
-                hdu[0].header = newhdu[0].header
-                
-            hdu.writeto(output_file, overwrite=True, output_verify='silentfix')
+            with fits.open(newfile) as newhdu:
+                with fits.open(output_file) as hdu:
+                    if shift_only:
+                        hdu[0].header['CRPIX1'] = newhdu[0].header['CRPIX1']
+                        hdu[0].header['CRPIX2'] = newhdu[0].header['CRPIX2']
+                        hdu[0].header['CRVAL1'] = newhdu[0].header['CRVAL1']
+                        hdu[0].header['CRVAL2'] = newhdu[0].header['CRVAL2']
+                    else:
+                        hdu[0].header = newhdu[0].header
+                    hdu.writeto(output_file, overwrite=True, output_verify='silentfix')
             os.remove(newfile)
         else:
             output_file = fullfile.replace(exten,'.solved.fits')
 
-        hdu = fits.open(output_file)
-        for i,h in enumerate(hdu):
+        with fits.open(output_file) as hdu:
+            for i,h in enumerate(hdu):
+                if 'COMMENT' in hdu[i].header.keys():
+                    del hdu[i].header['COMMENT']
+                if 'HISTORY' in hdu[i].header.keys():
+                    del hdu[i].header['HISTORY']
 
-            if 'COMMENT' in hdu[i].header.keys():
-                del hdu[i].header['COMMENT']
-            if 'HISTORY' in hdu[i].header.keys():
-                del hdu[i].header['HISTORY']
+                # Delete other WCS header keys
+                wcs_key = ['CSYER1','CSYER2','CRDER1','CRDER2','CD1_1','CD1_2',
+                    'CD2_1','CD2_2','CRPIX1','CRPIX2','CUNIT1','CUNIT2','EQUINOX',
+                    'RADESYS','CNAME1','CNAME2','CTYPE1','CTYPE2','WCSNAME',
+                    'CRVAL1','CRVAL2']
 
-            # Delete other WCS header keys
-            wcs_key = ['CSYER1','CSYER2','CRDER1','CRDER2','CD1_1','CD1_2',
-                'CD2_1','CD2_2','CRPIX1','CRPIX2','CUNIT1','CUNIT2','EQUINOX',
-                'RADESYS','CNAME1','CNAME2','CTYPE1','CTYPE2','WCSNAME',
-                'CRVAL1','CRVAL2']
+                for key in [w + 'C' for w in wcs_key]:
+                    if key in list(hdu[i].header.keys()):
+                        del hdu[i].header[key]
 
-            for key in [w + 'C' for w in wcs_key]:
-                if key in list(hdu[i].header.keys()):
-                    del hdu[i].header[key]
+                for key in [w + 'S' for w in wcs_key]:
+                    if key in list(hdu[i].header.keys()):
+                        del hdu[i].header[key]
 
-            for key in [w + 'S' for w in wcs_key]:
-                if key in list(hdu[i].header.keys()):
-                    del hdu[i].header[key]
+                # Delete old WCS keywords starting with '_'
+                for key in list(hdu[i].header.keys()):
+                    if key.startswith('_'):
+                        del hdu[i].header[key]
 
-            # Delete old WCS keywords starting with '_'
-            for key in list(hdu[i].header.keys()):
-                if key.startswith('_'):
-                    del hdu[i].header[key]
-
-        try:
-            hdu.writeto(output_file, overwrite=True, output_verify='silentfix')
-        except TypeError:
-            if log: 
-                log.error(f'FAILURE: could not save file {fullfile}')
-            else:
-                print(f'FAILURE: could not save file {fullfile}')
-            return(False)
+            try:
+                hdu.writeto(output_file, overwrite=True, output_verify='silentfix')
+            except TypeError:
+                if log: 
+                    log.error(f'FAILURE: could not save file {fullfile}')
+                else:
+                    print(f'FAILURE: could not save file {fullfile}')
+                return(False)
 
         return(True)
 
@@ -311,8 +396,31 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
         return(False)
 
 def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
-    save_centroids=False, log=None):
+    save_centroids=False, min_gaia_match=7, log=None):
+    """Refine WCS by matching detected sources to Gaia DR3 and fitting WCS.
 
+    Parameters
+    ----------
+    file : str
+        Path to FITS file with WCS (e.g. after solve_astrometry).
+    tel : Instrument
+        Instrument instance.
+    radius : float, optional
+        Gaia query radius in degrees. Default is 0.5.
+    max_search_radius : astropy.units.Quantity, optional
+        Match radius for source-Gaia matching. Default is 5 arcsec.
+    save_centroids : bool, optional
+        If True, save centroid table. Default is False.
+    min_gaia_match : int, optional
+        Minimum number of Gaia matches required. Default is 7.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    bool
+        True if alignment succeeded and WCS was updated, False otherwise.
+    """
     cat = get_gaia_catalog(file, log=log)
 
     if cat is None or len(cat)==0:
@@ -329,7 +437,7 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
 
     # Estimate sources that land within the image using WCS from header
     hdu = fits.open(file)
-    w = WCS(hdu[0].header)
+    w = WCS(hdu[0].header, relax=True)
     naxis1 = hdu[0].header['NAXIS1']
     naxis2 = hdu[0].header['NAXIS2']
 
@@ -348,6 +456,7 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
             log.error(f'No stars found in {file}')
         else:
             print(f'No stars found in {file}')
+        hdu.close()
         return(False)
 
     if log: 
@@ -355,7 +464,7 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
     else:
         print(f'Found {len(cat)} stars in the image')
 
-    if len(cat)<7:
+    if len(cat)<min_gaia_match:
         if log:
             log.info(f'Too few stars in {file}.  Skipping Gaia alignment...')
         else:
@@ -366,7 +475,7 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
         hdu[0].header['DEDISP']=(1.0, 'Dispersion in Decl. of WCS [Arcsec]')
 
         hdu.writeto(file, overwrite=True, output_verify='silentfix')
-
+        hdu.close()
         return(True)
 
 
@@ -414,8 +523,12 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
 
         central_coo = w.pixel_to_world(*central_pix)
         try:
-            w = fit_wcs_from_points(xy, coords, proj_point=central_coo,
-                sip_degree=sip_degree)
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore", category=RuntimeWarning,
+                    message=".*cdelt will be ignored since cd is present.*")
+                w = fit_wcs_from_points(xy, coords, proj_point=central_coo,
+                    sip_degree=sip_degree)
             succeeded = True
         except ValueError:
             # Try with next iteration
@@ -426,6 +539,7 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
             log.error(f'Could not converge on fine WCS solution for: {file}')
         else:
             print(f'Could not converge on fine WCS solution for: {file}')
+        hdu.close()
         return(False)
 
 
@@ -441,12 +555,27 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
             log.error(f'Could not centroid on any stars in {file}')
         else:
             print(f'Could not centroid on any stars in {file}')
+        hdu.close()
         return(False)
     else:
         if log:
             log.info(f'Matched to {len(cat_coords_match)} coordinates')
         else:
             print(f'Matched to {len(cat_coords_match)} coordinates')
+
+    if len(cat_coords_match)<min_gaia_match:
+        if log:
+            log.info(f'Too few matched stars in {file}.  Skipping Gaia alignment...')
+        else:
+            print(f'Too few matched stars in {file}.  Skipping Gaia alignment...')
+
+        # Set these values to some default so pipeline won't break
+        hdu[0].header['RADISP']=(1.0, 'Dispersion in R.A. of WCS [Arcsec]')
+        hdu[0].header['DEDISP']=(1.0, 'Dispersion in Decl. of WCS [Arcsec]')
+
+        hdu.writeto(file, overwrite=True, output_verify='silentfix')
+        hdu.close()
+        return(True)
 
     # Bootstrap WCS solution and get center pixel
     ra_cent = [] ; de_cent = []
@@ -472,7 +601,11 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
         c = coords[idxs]
 
         central_coo = w.pixel_to_world(*central_pix)
-        new_wcs = fit_wcs_from_points(xy, c, projection=w)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore", category=RuntimeWarning,
+                message=".*cdelt will be ignored since cd is present.*")
+            new_wcs = fit_wcs_from_points(xy, c, projection=w)
 
         cent_coord = new_wcs.pixel_to_world(*central_pix)
         ra_cent.append(cent_coord.ra.degree)
@@ -541,5 +674,5 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
     hdu[0].header['DEDISP']=(de_disp, 'Dispersion in Decl. of WCS [Arcsec]')
 
     hdu.writeto(file, overwrite=True, output_verify='silentfix')
-
+    hdu.close()
     return(True)

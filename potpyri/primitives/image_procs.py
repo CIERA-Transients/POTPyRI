@@ -1,12 +1,13 @@
-"Functions for calibrating, masking, creating error images, and stacking images."
-"Authors: Charlie Kilpatrick"
+"""Image calibration, masking, error arrays, alignment, and stacking.
 
-# Last updated on 09/29/2024
-__version__ = "2.1"
+Provides WCS handling, alignment to a common grid, cosmic-ray rejection,
+satellite masking, master calibration combination, and stacked science
+output. Authors: Charlie Kilpatrick.
+"""
+from potpyri._version import __version__
 
-import os 
+import os
 import time
-import importlib
 import numpy as np
 import logging
 import sys
@@ -17,6 +18,7 @@ import copy
 import acstools
 
 import astropy.units as u
+from astropy.coordinates import SkyCoord
 from astropy.io import fits, ascii
 from astropy.stats import sigma_clipped_stats
 from astropy.wcs import WCS
@@ -27,11 +29,23 @@ from ccdproc import combine
 from ccdproc import cosmicray_lacosmic
 
 # Internal dependencies
-from potpyri.stages import solve_wcs
+from potpyri.primitives import photometry
+from potpyri.primitives import solve_wcs
 from potpyri.utils import utilities
 
 def remove_pv_distortion(header):
+    """Remove PV* distortion keywords from a FITS header (modifies in place).
 
+    Parameters
+    ----------
+    header : astropy.io.fits.Header
+        Header to modify.
+
+    Returns
+    -------
+    astropy.io.fits.Header
+        The same header reference (modified in place).
+    """
     done = False
     while not done:
         bad_key = False
@@ -46,19 +60,30 @@ def remove_pv_distortion(header):
     return(header)
 
 def get_fieldcenter(images):
+    """Compute mean RA/Dec of image centers from a list of FITS files.
 
-    ras=[] ; des = []
+    Parameters
+    ----------
+    images : list of str
+        Paths to FITS files with WCS in primary header.
+
+    Returns
+    -------
+    list
+        [mean_ra_deg, mean_dec_deg].
+    """
+    ras = [] ; des = []
     for file in images:
-        hdu = fits.open(file)
-        w = WCS(hdu[0].header)
+        with fits.open(file) as hdu:
+            w = WCS(hdu[0].header)
 
-        data_shape = hdu[0].data.shape
-        center_pix = (data_shape[1]/2., data_shape[0]/2.)
+            data_shape = hdu[0].data.shape
+            center_pix = (data_shape[1]/2., data_shape[0]/2.)
 
-        coord = w.pixel_to_world(*center_pix)
+            coord = w.pixel_to_world(*center_pix)
 
-        ras.append(coord.ra.degree)
-        des.append(coord.dec.degree)
+            ras.append(coord.ra.degree)
+            des.append(coord.dec.degree)
 
     mean_ra = np.mean(ras)
     mean_de = np.mean(des)
@@ -66,7 +91,24 @@ def get_fieldcenter(images):
     return([mean_ra, mean_de])
 
 def generate_wcs(tel, binn, fieldcenter, out_size):
+    """Build a TAN WCS for a given field center and output size.
 
+    Parameters
+    ----------
+    tel : Instrument
+        Instrument instance (for pixel scale).
+    binn : str
+        Binning string (e.g. '22').
+    fieldcenter : sequence
+        [ra_deg, dec_deg] or parseable coordinate.
+    out_size : int
+        Output image size (out_size x out_size pixels).
+
+    Returns
+    -------
+    astropy.wcs.WCS
+        WCS instance.
+    """
     w = {'NAXES':2, 'NAXIS1': out_size, 'NAXIS2': out_size,
         'EQUINOX': 2000.0, 'LONPOLE': 180.0, 'LATPOLE': 0.0}
 
@@ -95,7 +137,39 @@ def generate_wcs(tel, binn, fieldcenter, out_size):
 
 def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None,
     out_size=None, skip_gaia=False, keep_all_astro=False, log=None):
+    """Solve WCS and align reduced images to a common grid.
 
+    Runs astrometry.net and optionally Gaia alignment, then reprojects to
+    a common WCS.
+
+    Parameters
+    ----------
+    reduced_files : list of str
+        Paths to reduced FITS files.
+    paths : dict
+        Paths dict from options.add_paths.
+    tel : Instrument
+        Instrument instance.
+    binn : str
+        Binning string.
+    use_wcs : astropy.wcs.WCS, optional
+        If provided, use this WCS instead of solving.
+    fieldcenter : sequence, optional
+        [ra, dec] for generating WCS.
+    out_size : int, optional
+        Output image size.
+    skip_gaia : bool, optional
+        If True, skip Gaia alignment. Default is False.
+    keep_all_astro : bool, optional
+        If True, keep all images regardless of astrometric dispersion.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    tuple or None
+        (aligned_data, masks, errors) as lists, or None if no images aligned.
+    """
     solved_images = []
     aligned_images = []
     aligned_data = []
@@ -138,8 +212,11 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
 
             if log:
                 log.info('Rejecting the following images for high astrometric dispersion:')
-                for i,m in enumerate(mask):
-                    if not m: log.info(solved_images[i])
+                if np.all(mask):
+                    log.info('No images rejected')
+                else:
+                    for i,m in enumerate(mask):
+                        if not m: log.info(solved_images[i])
 
             solved_images = np.array(solved_images)[mask]
     else:
@@ -188,9 +265,50 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
 
     return(aligned_images, aligned_data)
 
-def image_proc(image_data, tel, paths, skip_skysub=False, 
+def image_proc(image_data, tel, paths, skip_skysub=False,
     fieldcenter=None, out_size=None, satellites=True, cosmic_ray=True,
-    skip_gaia=False, keep_all_astro=False, log=None):
+    skip_gaia=False, keep_all_astro=False, relative_calibration=False,
+    log=None):
+    """Full image processing: align, mask, stack, and optionally detrend.
+
+    Orchestrates WCS solving, alignment, satellite/cosmic-ray masking,
+    stacking, and optional sky subtraction. Optionally calibrates frames
+    to each other using SExtractor catalogs and RA/Dec cross-matching before stacking.
+
+    Parameters
+    ----------
+    image_data : astropy.table.Table
+        File table subset (e.g. one TargType) with 'File' column.
+    tel : Instrument
+        Instrument instance.
+    paths : dict
+        Paths dict from options.add_paths.
+    skip_skysub : bool, optional
+        If True, skip sky subtraction. Default is False.
+    fieldcenter : sequence, optional
+        [ra, dec] for alignment.
+    out_size : int, optional
+        Output image size.
+    satellites : bool, optional
+        If True, mask satellite trails. Default is True.
+    cosmic_ray : bool, optional
+        If True, run cosmic-ray rejection. Default is True.
+    skip_gaia : bool, optional
+        If True, skip Gaia alignment. Default is False.
+    keep_all_astro : bool, optional
+        If True, keep all images regardless of astrometric dispersion.
+    relative_calibration : bool, optional
+        If True, run SExtractor on each aligned frame, cross-match sources in
+        RA/Dec, and use relative fluxes to set scale factors for the stack
+        combine. Default is False.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    str or None
+        Path to stacked output FITS, or None if processing failed.
+    """
 
     wavelength = tel.wavelength
 
@@ -349,11 +467,19 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
     
     if log: log.info('Creating median stack.')
     if len(aligned_data)>1:
-        sci_med = stack_data(aligned_data, tel, masks, errors, log=log)
+        relative_scales = None
+        if relative_calibration:
+            exptimes = np.array([tel.get_exptime(d.header) for d in aligned_data])
+            relative_scales = compute_relative_scales(data_images, paths, exptimes, log=log)
+        sci_med = stack_data(aligned_data, tel, masks, errors, log=log,
+            relative_scales=relative_scales)
         sci_med = add_stack_mask(sci_med, aligned_data)
 
         if tel.detrend:
+            if log: log.info('Detrending stack')
             sci_med = detrend_stack(sci_med)
+        else:
+            if log: log.info('Skipping detrending')
 
     else:
         sci_med = fits.open(data_images[0])
@@ -418,16 +544,29 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
     return(stackname)
 
 def detrend_stack(stack):
+    """Remove row and column median from stack science data (detrend).
 
+    Parameters
+    ----------
+    stack : astropy.io.fits.HDUList
+        HDU list with [0]=SCI, [1]=MASK. Modified in place.
+
+    Returns
+    -------
+    astropy.io.fits.HDUList
+        The same stack reference (modified in place).
+    """
     data = stack[0].data
     mask = stack[1].data.astype(bool)
 
-    mean, med, stddev = sigma_clipped_stats(data, mask=mask, axis=1)
+    mean, med, stddev = sigma_clipped_stats(data, mask=mask, axis=1,
+        sigma_upper=2.5)
     data = data - med[:,None]
 
     row_med = np.nanmedian(med)
 
-    mean, med, stddev = sigma_clipped_stats(data, mask=mask, axis=0)
+    mean, med, stddev = sigma_clipped_stats(data, mask=mask, axis=0,
+        sigma_upper=2.5)
     data = data - med[None,:]
 
     col_med = np.nanmedian(med)
@@ -440,8 +579,163 @@ def detrend_stack(stack):
 
     return(stack)
 
-def stack_data(stacking_data, tel, masks, errors, mem_limit=8.0e9, log=None):
+def compute_relative_scales(data_images, paths, exptimes, log=None,
+        match_radius_arcsec=2.0, min_sources=5, min_rel_err=0.01):
+    """Compute relative flux scale factors from SExtractor catalogs and RA/Dec cross-matching.
 
+    Runs Source Extractor on each aligned science image, cross-matches sources
+    between frames in RA/Dec, and uses the inverse-variance-weighted mean of
+    flux ratios (using FLUXERR_AUTO) to define scale factors so that combine()
+    can stack on a common flux scale. For frames where matching fails (too few
+    matches), the scale is set to 1.0/exptime for that frame.
+
+    Parameters
+    ----------
+    data_images : list of str
+        Paths to FITS with SCI extension (e.g. *_data.fits from image_proc).
+    paths : dict
+        Paths dict; paths.get('source_extractor') used for SExtractor binary.
+    exptimes : array-like
+        Exposure time in seconds for each image (same order as data_images).
+    log : ColoredLogger, optional
+        Logger for progress.
+    match_radius_arcsec : float, optional
+        Match radius in arcsec for cross-matching sources. Default 2.0.
+    min_sources : int, optional
+        Minimum matched sources per frame to compute scale. Default 5.
+    min_rel_err : float, optional
+        Minimum relative flux error (err/flux) used in variance of ratio to
+        avoid zero variance. Default 0.01.
+
+    Returns
+    -------
+    np.ndarray or None
+        Relative scale factors, one per image (reference frame scale = 1.0).
+        Frames that fail get scale = 1.0/exptime. None if catalogs cannot be
+        built at all (caller should use exposure-time-only scaling).
+    """
+    nimg = len(data_images)
+    if nimg < 2:
+        return None
+    exptimes = np.atleast_1d(np.asarray(exptimes, dtype=float))
+    if len(exptimes) != nimg:
+        if log:
+            log.warning('Relative calibration: exptimes length does not match data_images.')
+        return None
+
+    sextractor_path = paths.get('source_extractor')
+    def _col(cat, name):
+        """Get column by case-insensitive name."""
+        for c in cat.colnames:
+            if c.upper() == name.upper():
+                return c
+        return None
+
+    catalogs = []
+    for p in data_images:
+        cat = photometry.run_sextractor(p, log=log, sextractor_path=sextractor_path)
+        if cat is None or len(cat) < min_sources:
+            if log:
+                log.warning(f'Relative calibration: insufficient catalog for {p}, skipping.')
+            return None
+        ra_col = _col(cat, 'ALPHA_J2000')
+        dec_col = _col(cat, 'DELTA_J2000')
+        flux_col = _col(cat, 'FLUX_AUTO')
+        fluxerr_col = _col(cat, 'FLUXERR_AUTO')
+        if not (ra_col and dec_col and flux_col):
+            if log:
+                log.warning('Relative calibration: catalog missing RA/Dec or FLUX_AUTO.')
+            return None
+        catalogs.append((cat, ra_col, dec_col, flux_col, fluxerr_col))
+
+    # Reference = frame with most sources
+    ref_idx = int(np.argmax([len(c[0]) for c in catalogs]))
+    ref, ref_ra, ref_dec, ref_flux, ref_fluxerr = catalogs[ref_idx]
+    ref_coords = SkyCoord(ref[ref_ra], ref[ref_dec], unit='deg')
+
+    match_radius = match_radius_arcsec * u.arcsec
+    relative_scales = np.ones(nimg, dtype=float)
+    # Reference frame scale = 1.0; failed frames will get 1.0/exptime
+    for i in range(nimg):
+        if i == ref_idx:
+            continue
+        cat, ra_col, dec_col, flux_col, fluxerr_col = catalogs[i]
+        coords = SkyCoord(cat[ra_col], cat[dec_col], unit='deg')
+        # For each source in this frame, find nearest in reference
+        idx_ref, d2d, _ = coords.match_to_catalog_sky(ref_coords)
+        keep = d2d < match_radius
+        n_match = np.sum(keep)
+        if n_match < min_sources:
+            if log:
+                log.warning(f'Relative calibration: frame {i} has {n_match} matches (< {min_sources}), using 1/exptime.')
+            relative_scales[i] = 1.0 / exptimes[i]
+            continue
+        flux_ref = np.array(ref[ref_flux][idx_ref[keep]], dtype=float)
+        flux_i = np.array(cat[flux_col][keep], dtype=float)
+        # Flux errors: use FLUXERR_AUTO if present, else fall back to unweighted
+        if ref_fluxerr and fluxerr_col:
+            err_ref = np.array(ref[ref_fluxerr][idx_ref[keep]], dtype=float)
+            err_i = np.array(cat[fluxerr_col][keep], dtype=float)
+        else:
+            err_ref = err_i = None
+        # Avoid zeros and negatives in flux
+        valid = (flux_i > 0) & (flux_ref > 0)
+        if np.sum(valid) < min_sources:
+            if log:
+                log.warning(f'Relative calibration: frame {i} has too few valid flux pairs, using 1/exptime.')
+            relative_scales[i] = 1.0 / exptimes[i]
+            continue
+        ratio = flux_ref[valid] / flux_i[valid]
+        if err_ref is not None and err_i is not None:
+            err_ref = err_ref[valid]
+            err_i = err_i[valid]
+            # Relative errors with floor to avoid zero variance
+            rel_err_ref = np.maximum(np.abs(err_ref) / np.maximum(flux_ref[valid], 1e-30), min_rel_err)
+            rel_err_i = np.maximum(np.abs(err_i) / np.maximum(flux_i[valid], 1e-30), min_rel_err)
+            # Variance of ratio R = A/B: var(R) ≈ R^2 * ( (σ_A/A)^2 + (σ_B/B)^2 )
+            var_ratio = ratio ** 2 * (rel_err_ref ** 2 + rel_err_i ** 2)
+            var_ratio = np.maximum(var_ratio, 1e-30)
+            weight = 1.0 / var_ratio
+            relative_scales[i] = float(np.average(ratio, weights=weight))
+        else:
+            relative_scales[i] = float(np.median(ratio))
+
+    if log:
+        log.info(f'Relative calibration: scales (ref frame {ref_idx} = 1.0): {relative_scales}')
+    return relative_scales
+
+
+def stack_data(stacking_data, tel, masks, errors, mem_limit=8.0e9, log=None,
+        relative_scales=None):
+    """Combine aligned CCDData list with exposure scaling (median or average).
+
+    Masks are applied (masked pixels set to nan) before combination.
+    Optionally uses relative flux scales from source cross-matching so that
+    frames are combined on a common flux scale.
+
+    Parameters
+    ----------
+    stacking_data : list of ccdproc.CCDData
+        Aligned science images.
+    tel : Instrument
+        Instrument instance (for stack_method and get_exptime).
+    masks : list of astropy.io.fits.ImageHDU
+        Per-image masks.
+    errors : list of astropy.io.fits.ImageHDU
+        Per-image error arrays.
+    mem_limit : float, optional
+        Memory limit in bytes for ccdproc.combine. Default is 8e9.
+    log : ColoredLogger, optional
+        Logger for progress.
+    relative_scales : np.ndarray, optional
+        Relative flux scale factors (one per image; reference = 1.0). If
+        provided, scale = relative_scales (exposure-time scaling is not applied).
+
+    Returns
+    -------
+    astropy.io.fits.HDUList
+        HDU list [science, mask, error] (mask/error from first image).
+    """
     stack_method = tel.stack_method
     if not stack_method:
         if log:
@@ -451,79 +745,42 @@ def stack_data(stacking_data, tel, masks, errors, mem_limit=8.0e9, log=None):
         else:
             raise Exception('Could not get stacking method for these images')
 
-    weights = []
-    for i,error in enumerate(errors):
-        ivar = 1./error.data**2
-        mask = masks[i]
-        ivar[mask.data.astype(bool)]=0.
-        weights.append(ivar)
-    weights=np.array(weights)
-
-    new_data = []
     exptimes = []
     for i,stk in enumerate(stacking_data):
         mask = masks[i].data.astype(bool)
         stacking_data[i].data[mask] = np.nan
         exptimes.append(float(tel.get_exptime(stk.header)))
-
+    
     exptimes = np.array(exptimes)
-    scale = 1./exptimes
-
-    all_data = np.array([s.data for s in stacking_data])
+    scale = 1.0 / exptimes
+    if relative_scales is not None:
+        scale = np.asarray(relative_scales, dtype=float)
 
     if len(scale)==1:
         stack_method='average'
 
-    # Determine if intermediate stacks are needed
-    # Get size of individual frame, account for data, noise, and mask
-    exdata = stacking_data[0].data
-    size = 64.0/8.0 * exdata.shape[0]*exdata.shape[1] * 2 + exdata.shape[0]*exdata.shape[1]
-
-    if log:
-        log.info(f'Image size is {size}')
-    else:
-        print(f'Image size is {size}')
-
-    # Get maximum size of chunk
-    max_chunk = int(np.floor(mem_limit / 4.0 / (size)))
-    if max_chunk==0: max_chunk=1
-
-    if len(stacking_data)<=max_chunk:
-        sci_med = combine(stacking_data, weights=weights, scale=scale,
+    sci_med = combine(stacking_data, scale=scale,
             method=stack_method, mem_limit=mem_limit)
-    else:
-        nimgs = len(stacking_data) * 1.0
-        nchunks = int(np.ceil(nimgs/(1.0*max_chunk)))
-
-        if log:
-            log.info(f'Splitting stacking into {nchunks} chunks')
-        else:
-            print(f'Splitting stacking into {nchunks} chunks')
-
-        inter_med = []
-        for i in np.arange(nchunks):
-            if log:
-                log.info(f'Stacking chunk {i+1}/{nchunks}')
-            else:
-                print(f'Stacking chunk {i+1}/{nchunks}')
-            start = i*max_chunk
-            end = (i+1)*max_chunk
-            if end>len(stacking_data): end=None
-
-            sci_med = combine(stacking_data[start:end], 
-                weights=weights[start:end], scale=scale[start:end],
-                method=stack_method, mem_limit=mem_limit)
-
-            inter_med.append(sci_med)
-
-        sci_med = combine(inter_med, method=stack_method)
 
     sci_med = sci_med.to_hdu()
 
     return(sci_med)
 
 def add_stack_mask(stack, stacking_data):
+    """Update stack mask from per-image masks and saturation; set masked pixels to 0.
 
+    Parameters
+    ----------
+    stack : astropy.io.fits.HDUList
+        HDU list with [0]=SCI, [1]=MASK, [2]=ERROR. Modified in place.
+    stacking_data : list of ccdproc.CCDData
+        Per-image data (headers used for SATURATE).
+
+    Returns
+    -------
+    astropy.io.fits.HDUList
+        The same stack reference (modified in place).
+    """
     data = stack[0].data
     mask = stack[1].data
     error = stack[2].data
@@ -559,7 +816,21 @@ def add_stack_mask(stack, stacking_data):
     return(stack)
 
 def mask_satellites(images, filenames, log=None):
+    """Detect and mask satellite trails in science images using acstools.satdet.
 
+    Parameters
+    ----------
+    images : list of ccdproc.CCDData
+        Science images; data is modified in place (trail pixels set to nan).
+    filenames : list of str
+        Paths corresponding to images (used for temp files).
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    None
+    """
     out_data = []
     for i,science_data in enumerate(images):
 
@@ -602,10 +873,46 @@ def mask_satellites(images, filenames, log=None):
 
         os.remove(tmpfile)
 
-def create_mask(science_data, saturation, rdnoise, sigclip=3.5, 
-    sigfrac=0.2, objlim=4.5, niter=6, outpath='', grow=0, satellites=True,
-    cosmic_ray=True, log=None):
+def create_mask(science_data, saturation, rdnoise, sigclip=3.0,
+    sigfrac=0.10, objlim=4.0, niter=6, outpath='', grow=0, cosmic_ray=True,
+    fsmode='convolve', cleantype='medmask', log=None):
+    """Build a bad-pixel/saturation/cosmic-ray mask using LACosmic and optional growth.
 
+    Parameters
+    ----------
+    science_data : str
+        Path to science FITS file.
+    saturation : float
+        Saturation level (ADU); pixels above this get flag 4.
+    rdnoise : float
+        Read noise for LACosmic (electrons).
+    sigclip : float, optional
+        LACosmic sigma clipping. Default is 3.0.
+    sigfrac : float, optional
+        LACosmic sigfrac. Default is 0.10.
+    objlim : float, optional
+        LACosmic objlim. Default is 4.0.
+    niter : int, optional
+        LACosmic iterations. Default is 6.
+    outpath : str, optional
+        Output path for debug files. Default is ''.
+    grow : int, optional
+        Pixels to grow mask (adds flag 8). Default is 0.
+    cosmic_ray : bool, optional
+        If True, run LACosmic. Default is True.
+    fsmode : str, optional
+        LACosmic fsmode. Default is 'convolve'.
+    cleantype : str, optional
+        LACosmic cleantype. Default is 'medmask'.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    tuple
+        (cleaned_data_ndarray, mask_ImageHDU). Mask uses additive flags:
+        1=bad, 2=cosmic ray, 4=saturated, 8=neighbor.
+    """
     t_start = time.time()
     
     if log:
@@ -615,6 +922,18 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
 
     hdu = fits.open(science_data)
     data = np.ascontiguousarray(hdu[0].data.astype(np.float32))
+
+    # Estimate FWHM size for LACosmic
+    table = photometry.run_sextractor(science_data, log=log)
+    if table is not None:
+        # Clip fwhm_stars by fwhm
+        fwhm, meanfwhm, stdfwhm = sigma_clipped_stats(table['FWHM_IMAGE'])
+        if log: 
+            log.info(f'Using FWHM for cosmic rays: {fwhm}')
+        else:
+            print(f'Using FWHM for cosmic rays: {fwhm}')
+    else:
+        fwhm = 3.5
 
     # Astroscrappy requires added sky background, so add this value back
     # Set the sky background to some nominal value if it is too low for CR rej
@@ -631,14 +950,15 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
         else:
             print('Setting sky background to 2000.0')
 
+    # This needs to be done before data is modified to preserve bad pixels
+    mask_bp = (data==0.0) | np.isnan(data)
+
     # Set data background to skybkg
     data = data + skybkg
     # Also need to adjust the saturation level by SKYBKG for saturated pixels
     saturation += skybkg
     
     if log: log.info('Masking saturated pixels.')
-
-    mask_bp = (data==0.0) | np.isnan(data)
 
     mask_sat = np.zeros(data.shape).astype(bool) # create empty mask
     mask_sat = mask_sat.astype(np.uint8) #set saturated star mask type
@@ -655,10 +975,15 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
     mask_cr = np.zeros(data.shape)
     mask_cr = mask_cr.astype(np.uint8)
 
+    psfsize = int(np.round(2.5*fwhm))
+    if psfsize%2==0: psfsize+=1
+
     if cosmic_ray:
         newdata, mask_cr = cosmicray_lacosmic(data,
             readnoise=rdnoise, satlevel=saturation, verbose=True,
-            sigclip=sigclip, sigfrac=sigfrac, objlim=objlim, niter=niter)
+            sigclip=sigclip, sigfrac=sigfrac, objlim=objlim, niter=niter,
+            psffwhm=fwhm, psfsize=psfsize, fsmode=fsmode,
+            cleantype=cleantype)
 
         mask_cr = mask_cr.astype(np.uint8) #set cosmic ray mask type
     else:
@@ -691,7 +1016,7 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
     nsat = np.sum(mask & 4 == 4)
     ngrow = np.sum(mask & 8 == 8)
     
-    mask_hdu = fits.PrimaryHDU(mask) #create mask Primary HDU
+    mask_hdu = fits.ImageHDU(mask) #create mask Primary HDU
     mask_hdu.header['VER'] = (__version__, 
         'Version of image procedures used.') #name of log file
     mask_hdu.header['USE'] = 'Complex mask using additive flags.'#header comment
@@ -724,25 +1049,53 @@ def create_mask(science_data, saturation, rdnoise, sigclip=3.5,
 
 
 def create_error(science_data, mask_data, rdnoise):
+    """Compute per-pixel error array from science image, mask, and read noise.
 
-    hdu = fits.open(science_data)
-    img_data = hdu[0].data.astype(np.float32)
-    mask = mask_data.data.astype(bool)
+    Error = sqrt(poisson + rms^2 + rdnoise^2). Masked pixels are excluded
+    from RMS estimation. science_data can be a path or HDU; mask_data is
+    an HDU with mask array.
 
-    # Check for issue with all of the file being masked
-    if np.all(mask):
-        rms = hdu[0].header['SATURATE']
-    else:
-        rms = 0.5 * (
-            np.percentile(img_data[~mask], 84.13)
-            - np.percentile(img_data[~mask], 15.86)
-        )
+    Parameters
+    ----------
+    science_data : str or astropy.io.fits.HDUList
+        Path to science FITS or open HDU list.
+    mask_data : astropy.io.fits.PrimaryHDU or ImageHDU
+        HDU containing boolean or integer mask (masked pixels excluded from rms).
+    rdnoise : float
+        Read noise in electrons.
 
-    poisson = img_data
-    poisson[poisson<0.]=0.
-    error = np.sqrt(poisson + rms**2 + rdnoise)
+    Returns
+    -------
+    astropy.io.fits.PrimaryHDU
+        Error array in electrons (BUNIT='ELECTRONS').
+    """
+    with fits.open(science_data) as hdu:
+        img_data = hdu[0].data.astype(np.float32)
+        mask = mask_data.data.astype(bool)
 
-    error_hdu = fits.PrimaryHDU(error) #create mask Primary HDU
+        # Check for issue with all of the file being masked
+        if np.all(mask):
+            rms = hdu[0].header['SATURATE']
+        else:
+            rms = 0.5 * (
+                np.percentile(img_data[~mask], 84.13)
+                - np.percentile(img_data[~mask], 15.86)
+            )
+
+        poisson = img_data.copy()
+        poisson[poisson < 0.] = 0.
+        error = np.sqrt(poisson + rms**2 + rdnoise)
+
+        # Sanitize error array
+        mask = np.isnan(error)
+        error[mask] = np.nanmedian(error)
+        mask = error < 0.0
+        error[mask] = np.nanmedian(error)
+        maxval = np.float32(hdu[0].header['SATURATE'])
+        mask = np.isinf(error)
+        error[mask] = maxval
+
+    error_hdu = fits.PrimaryHDU(error)  # create mask Primary HDU
     error_hdu.header['VER'] = (__version__, 
         'Version of image procedures used used.')
     error_hdu.header['USE'] = 'Error array for Poisson, read, and RMS noise'

@@ -1,6 +1,5 @@
-# Parameter file for GMOS/Gemini
-
-__version__ = "2.1" # Last edited 09/29/2024
+"""GMOS/Gemini instrument configuration and reduction parameters."""
+from potpyri._version import __version__
 
 import os
 import ccdproc
@@ -18,6 +17,7 @@ from astropy.time import Time
 from . import instrument
 
 class GMOS(instrument.Instrument):
+    """GMOS at Gemini: optical imaging with bias and flat calibration."""
 
     def __init__(self):
 

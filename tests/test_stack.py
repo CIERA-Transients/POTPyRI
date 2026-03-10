@@ -1,6 +1,8 @@
+"""Tests for image_procs.stack_data (median stack of synthetic MMIRS images)."""
 from potpyri.utils import options
 from potpyri.utils import logger
-from potpyri.stages import image_procs
+from potpyri.primitives import image_procs
+from potpyri.instruments import instrument_getter
 
 import numpy as np
 import os
@@ -14,12 +16,14 @@ from astropy import units as u
 from . import utils
 
 def test_stack(tmp_path):
-
+    """Stack synthetic MMIRS images and assert median value in stacked science."""
     instrument = 'MMIRS'
+    file_list_name = 'files.txt'
     nims = 5
 
     # Science file (just tellurics)
-    paths, tel = options.initialize_telescope(instrument, tmp_path)
+    tel = instrument_getter(instrument)
+    paths = options.add_paths(tmp_path, file_list_name, tel)
 
     # Generate log file in corresponding directory for log
     log = logger.get_log(paths['log'])
@@ -43,6 +47,9 @@ def test_stack(tmp_path):
         masks.append(fits.ImageHDU(maskim))
         errors.append(fits.ImageHDU(errimg))
 
-    sci_med = image_procs.stack_data(aligned_data, tel, masks, errors, log=log)
+    try:
+        sci_med = image_procs.stack_data(aligned_data, tel, masks, errors, log=log)
+    finally:
+        log.close()
 
     np.testing.assert_array_equal(sci_med[0].data, np.median(np.arange(nims)+1))

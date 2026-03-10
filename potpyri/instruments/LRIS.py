@@ -1,6 +1,5 @@
-# Parameter file for LRIS/Keck
-
-__version__ = "2.1" # Last edited 05/16/2025
+"""LRIS/Keck instrument configuration and reduction parameters."""
+from potpyri._version import __version__
 
 import os
 import ccdproc
@@ -17,6 +16,7 @@ from astropy.nddata import CCDData
 from . import instrument
 
 class LRIS(instrument.Instrument):
+    """LRIS at Keck: optical imaging with bias and flat calibration."""
 
     def __init__(self):
 

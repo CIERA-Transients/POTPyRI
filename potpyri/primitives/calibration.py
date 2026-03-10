@@ -1,8 +1,9 @@
-"Wrapper methods for creating bias, dark, and flat images from pipeline data."
-"Authors: Charlie Kilpatrick"
+"""Master bias, dark, and flat creation from pipeline file tables.
 
-# Initial version tracking on 09/29/2024
-__version__ = "1.1"
+Orchestrates grouping by CalType and calling instrument-specific
+create_bias/create_dark/create_flat. Authors: Charlie Kilpatrick.
+"""
+from potpyri._version import __version__
 
 import os
 import time
@@ -10,15 +11,34 @@ import logging
 import numpy as np
 import sys
 
-def do_bias(bias_table, tel, paths, nmin_images=3, log=None):
+def do_bias(file_table, tel, paths, nmin_images=3, log=None):
+    """Build master bias frames from file_table; skip if instrument has no bias.
 
+    Parameters
+    ----------
+    file_table : astropy.table.Table
+        File list from sort_files (Type, CalType, File, Amp, Binning).
+    tel : Instrument
+        Instrument instance (bias, match_type_keywords, create_bias, get_mbias_name).
+    paths : dict
+        Paths dict from options.add_paths.
+    nmin_images : int, optional
+        Minimum images per CalType to build master. Default is 3.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    None
+        Master bias FITS written to paths; exits if no bias and instrument requires it.
+    """
     # Exit if telescope does not require bias
     if not tel.bias:
-        if log:
-            log.info('No bias is required.')
-        else:
-            print('No bias is required.')
         return(None)
+
+    kwds = tel.filetype_keywords
+    bias_match = tel.match_type_keywords(kwds['BIAS'], file_table)
+    bias_table = file_table[bias_match]
 
     bias_num = 0
     for cal_type in np.unique(bias_table['CalType']):
@@ -61,11 +81,34 @@ def do_bias(bias_table, tel, paths, nmin_images=3, log=None):
         logging.shutdown()
         sys.exit(-1)
 
-def do_dark(dark_table, tel, paths, nmin_images=3, log=None):
+def do_dark(file_table, tel, paths, nmin_images=3, log=None):
+    """Build master dark frames from file_table; skip if instrument has no dark.
 
+    Parameters
+    ----------
+    file_table : astropy.table.Table
+        File list from sort_files.
+    tel : Instrument
+        Instrument instance (dark, bias, load_bias, create_dark, get_mdark_name).
+    paths : dict
+        Paths dict from options.add_paths.
+    nmin_images : int, optional
+        Minimum images per CalType to build master. Default is 3.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    None
+        Master dark FITS written to paths.
+    """
     # Exit if telescope does not require dark
     if not tel.dark:
         return(None)
+
+    kwds = tel.filetype_keywords
+    dark_match = tel.match_type_keywords(kwds['DARK'], file_table)
+    dark_table = file_table[dark_match]
 
     for cal_type in np.unique(dark_table['CalType']):
         mask = dark_table['CalType']==cal_type
@@ -111,10 +154,38 @@ def do_dark(dark_table, tel, paths, nmin_images=3, log=None):
             t2 = time.time()
             if log: log.info(f'Master dark creation completed in {t2-t1} sec.')
 
-def do_flat(flat_table, tel, paths, nmin_images=3, log=None):
+def do_flat(file_table, tel, paths, nmin_images=3, log=None):
+    """Build master flat frames from file_table; skip if instrument has no flat.
 
+    Parameters
+    ----------
+    file_table : astropy.table.Table
+        File list from sort_files.
+    tel : Instrument
+        Instrument instance (flat, match_type_keywords, create_flat, get_mflat_name).
+    paths : dict
+        Paths dict from options.add_paths.
+    nmin_images : int, optional
+        Minimum images per (filter, amp, binning) to build master. Default is 3.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    None
+        Master flat FITS written to paths.
+    """
     # Exit if telescope does not require dark
     if not tel.flat:
+        return(None)
+
+    kwds = tel.filetype_keywords
+    flat_match = tel.match_type_keywords(kwds['FLAT'], file_table)
+    flat_table = file_table[flat_match]
+
+    # If there are no files for flats, then return without doing anything
+    if tel.flat and len(flat_table)==0:
+        paths['cal'] = paths['caldb']
         return(None)
 
     for cal_type in np.unique(flat_table['CalType']):

@@ -1,6 +1,5 @@
-# Parameter file for MOSFIRE/Keck
-
-__version__ = "2.0" # Last edited 09/21/2024
+"""MOSFIRE/Keck instrument configuration and reduction parameters."""
+from potpyri._version import __version__
 
 import os
 import ccdproc
@@ -15,6 +14,7 @@ from astropy.nddata import CCDData
 from . import instrument
 
 class MOSFIRE(instrument.Instrument):
+    """MOSFIRE at Keck: NIR imaging with flat calibration."""
 
     def __init__(self):
 
@@ -33,7 +33,7 @@ class MOSFIRE(instrument.Instrument):
         self.min_exptime = 1.0
 
         # Run dark/bias/flat calibration?
-        self.dark = False
+        self.dark = True
         self.bias = False
         self.flat = True
 
@@ -92,7 +92,7 @@ class MOSFIRE(instrument.Instrument):
         return(hdr['SATURATE']*hdr['SYSGAIN'])
 
     def raw_format(self, proc):
-        return('MF.*.fits.gz')
+        return('*.fits.gz')
 
     def get_filter(self, hdr):
         filt = hdr['FILTER'].replace(' ','').split('_')[0]
@@ -117,7 +117,13 @@ class MOSFIRE(instrument.Instrument):
 
     def import_image(self, filename, amp, log=None):
 
-        raw = CCDData.read(filename, unit=u.adu)
+        with fits.open(filename) as hdr:
+            header = hdr['SCI'].header
+            data = hdr['SCI'].data
+
+        del header['BUNIT']
+
+        raw = CCDData(data, header=header, unit=u.adu)
         red = ccdproc.ccd_process(raw, 
             gain=self.get_gain(raw.header)*u.electron/u.adu, 
             readnoise=self.get_rdnoise(raw.header)*u.electron)

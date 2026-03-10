@@ -1,15 +1,10 @@
-from potpyri.scripts import main_pipeline
+"""Tests for instrument initialization (instrument_getter for all supported instruments)."""
 from potpyri.utils import options
-from potpyri.utils import logger
-from potpyri.stages import sort_files
+from potpyri.instruments import instrument_getter
 
-import numpy as np
-import astropy.utils.data
-import importlib
-import os
 
 def test_init(tmp_path):
-
+    """Check that instrument_getter returns an instance with correct name for each CLI instrument."""
     # Parse allowed instruments directly from options so this test matches
     # to values that the argument parser allows as input
     instruments = []
@@ -20,5 +15,5 @@ def test_init(tmp_path):
 
     # Test initialization of each POTPyRI instrument
     for instrument in instruments:
-        paths, tel = options.initialize_telescope(instrument, tmp_path)
+        tel = instrument_getter(instrument)
         assert tel.name.upper()==instrument.upper()
