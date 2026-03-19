@@ -38,6 +38,70 @@ from potpyri.primitives import photometry
 import warnings
 warnings.simplefilter('ignore', category=AstropyWarning)
 
+def _log_gaia(log, level, message):
+    """Small helper to keep Gaia-stage logging consistent."""
+    if log:
+        getattr(log, level)(message)
+    else:
+        print(message)
+
+def _write_gaia_fallback_header(hdu, file, reason, log=None, disp_arcsec=1.0):
+    """Write fallback astrometric dispersion values when Gaia refinement fails.
+
+    This preserves a coarse astrometry.net WCS solution while making the
+    failure mode explicit in the header and logs.
+    """
+    _log_gaia(log, 'warning',
+        f'Gaia alignment fallback for {file}: {reason}. '
+        f'Keeping coarse astrometry.net WCS.')
+    hdu[0].header['RADISP'] = (disp_arcsec, 'Dispersion in R.A. of WCS [Arcsec]')
+    hdu[0].header['DEDISP'] = (disp_arcsec, 'Dispersion in Decl. of WCS [Arcsec]')
+    hdu[0].header['GAIAFAIL'] = (reason[:32], 'Gaia fallback reason')
+    hdu.writeto(file, overwrite=True, output_verify='silentfix')
+
+def _validate_refined_wcs(w, header, tel, log=None):
+    """Validate refined WCS against expected pixel scale and anisotropy.
+
+    Returns
+    -------
+    tuple
+        (is_valid, reason_string)
+    """
+    try:
+        m = np.asarray(w.pixel_scale_matrix, dtype=float)
+        _, s, _ = np.linalg.svd(m)
+        # singular-value pixel scales in arcsec/pixel
+        scales_arcsec = s * 3600.0
+        max_scale = float(np.max(scales_arcsec))
+        min_scale = float(np.min(scales_arcsec))
+        aniso = float(max_scale / max(min_scale, 1e-12))
+        det = float(np.linalg.det(m))
+    except Exception:
+        return (False, 'could not compute WCS pixel-scale matrix diagnostics')
+
+    # Expected scale from instrument + binning in header
+    try:
+        binn = tel.get_binning(header)
+        expected = float(tel.get_pixscale() * int(str(binn)[0]))
+    except Exception:
+        expected = None
+
+    _log_gaia(log, 'info',
+        f'Gaia WCS diagnostics: scales={scales_arcsec}, anisotropy={aniso:.3f}, det={det:.3e}, expected_scale={expected}')
+
+    # Basic physical sanity
+    if min_scale <= 0.0 or max_scale <= 0.0:
+        return (False, 'non-positive WCS pixel scale')
+    if aniso > 3.0:
+        return (False, f'excessive WCS anisotropy ({aniso:.2f} > 3.0)')
+    if expected is not None:
+        if min_scale < 0.5 * expected:
+            return (False, f'WCS min scale too small ({min_scale:.4f} < {0.5*expected:.4f} arcsec/pix)')
+        if max_scale > 1.5 * expected:
+            return (False, f'WCS max scale too large ({max_scale:.4f} > {1.5*expected:.4f} arcsec/pix)')
+
+    return (True, '')
+
 def get_gaia_catalog(input_file, log=None):
     """Query Gaia DR3 for stars in the field; return filtered catalog table.
 
@@ -423,256 +487,253 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
     """
     cat = get_gaia_catalog(file, log=log)
 
-    if cat is None or len(cat)==0:
-        if log:
-            log.error(f'Could not get Gaia catalog or no stars for {file}')
-        else:
-            print(f'Could not get Gaia catalog or no stars for {file}')
-        return(False)
+    with fits.open(file) as hdu:
+        header = hdu[0].header
 
-    if log: 
-        log.info(f'Got {len(cat)} Gaia DR3 alignment stars')
-    else:
-        print(f'Got {len(cat)} Gaia DR3 alignment stars')
+        if cat is False:
+            _write_gaia_fallback_header(hdu, file,
+                'could not parse coordinate keywords', log=log)
+            return(True)
+        if cat is None or len(cat)==0:
+            _write_gaia_fallback_header(hdu, file,
+                'Gaia query returned no alignment stars', log=log)
+            return(True)
 
-    # Estimate sources that land within the image using WCS from header
-    hdu = fits.open(file)
-    w = WCS(hdu[0].header, relax=True)
-    naxis1 = hdu[0].header['NAXIS1']
-    naxis2 = hdu[0].header['NAXIS2']
+        _log_gaia(log, 'info', f'Got {len(cat)} Gaia DR3 alignment stars')
 
-    # Get pixel coordinates of all stars in image
-    coords = SkyCoord(cat['RA_ICRS'], cat['DE_ICRS'], unit=(u.deg, u.deg))
-    x_pix, y_pix = w.world_to_pixel(coords)
+        # Estimate sources that land within the image using WCS from header
+        w = WCS(header, relax=True)
+        naxis1 = header['NAXIS1']
+        naxis2 = header['NAXIS2']
 
-    # Mask to stars that are nominally in image
-    mask = (x_pix > 0) & (x_pix < naxis1) & (y_pix > 0) & (y_pix < naxis2)
-    x_pix = x_pix[mask] ; y_pix = y_pix[mask]
-    # Also mask catalog
-    cat = cat[mask]
+        # Get pixel coordinates of all stars in image
+        gaia_coords = SkyCoord(cat['RA_ICRS'], cat['DE_ICRS'], unit=(u.deg, u.deg))
+        x_pix, y_pix = w.world_to_pixel(gaia_coords)
 
-    if cat is None or len(cat)==0:
-        if log: 
-            log.error(f'No stars found in {file}')
-        else:
-            print(f'No stars found in {file}')
-        hdu.close()
-        return(False)
+        # Mask to stars that are nominally in image
+        mask = (x_pix > 0) & (x_pix < naxis1) & (y_pix > 0) & (y_pix < naxis2)
+        x_pix = x_pix[mask] ; y_pix = y_pix[mask]
+        # Also mask catalog and coordinates
+        cat = cat[mask]
+        gaia_coords = gaia_coords[mask]
 
-    if log: 
-        log.info(f'Found {len(cat)} stars in the image')
-    else:
-        print(f'Found {len(cat)} stars in the image')
+        if cat is None or len(cat)==0:
+            _write_gaia_fallback_header(hdu, file,
+                'no Gaia stars project into image bounds', log=log)
+            return(True)
 
-    if len(cat)<min_gaia_match:
-        if log:
-            log.info(f'Too few stars in {file}.  Skipping Gaia alignment...')
-        else:
-            print(f'Too few stars in {file}.  Skipping Gaia alignment...')
+        _log_gaia(log, 'info',
+            f'Gaia stars projected into image bounds: {len(cat)} (of {len(mask)})')
 
-        # Set these values to some default so pipeline won't break
-        hdu[0].header['RADISP']=(1.0, 'Dispersion in R.A. of WCS [Arcsec]')
-        hdu[0].header['DEDISP']=(1.0, 'Dispersion in Decl. of WCS [Arcsec]')
+        if len(cat)<min_gaia_match:
+            _write_gaia_fallback_header(hdu, file,
+                f'too few in-frame Gaia stars ({len(cat)} < {min_gaia_match})',
+                log=log)
+            return(True)
 
-        hdu.writeto(file, overwrite=True, output_verify='silentfix')
-        hdu.close()
-        return(True)
+        sky_cat = photometry.run_sextractor(file, log=log)
+        if sky_cat is None or len(sky_cat) == 0:
+            _write_gaia_fallback_header(hdu, file,
+                'Source Extractor returned no sources for Gaia alignment', log=log)
+            return(True)
+        _log_gaia(log, 'info', f'SExtractor sources available for matching: {len(sky_cat)}')
 
-
-    sky_cat = photometry.run_sextractor(file, log=log)
-
-    # Get central coordinate of image based on centroiding
-    central_pix = (float(naxis1)/2., float(naxis2)/2.)
-    central_coo = w.pixel_to_world(*central_pix)
-
-    if log:
-        log.info(f'Converging on fine WCS solution')
-    else:
-        print(f'Converging on fine WCS solution')
-
-    bar = progressbar.ProgressBar(maxval=10)
-    bar.start()
-    succeeded = False
-    for i in np.arange(10):
-        bar.update(i+1)
-
-        cat_coords = w.pixel_to_world(sky_cat['X_IMAGE'], sky_cat['Y_IMAGE'])
-
-        idx, d2d, d3d = match_coordinates_sky(coords, cat_coords)
-
-        sep_mask = d2d < max_search_radius
-        sky_coords_match = coords[sep_mask]
-        cat_coords_match = sky_cat[idx[sep_mask]]
-
-        sip_degree = 0
-        if len(cat_coords_match)>100:
-            sip_degree = 2
-        if len(cat_coords_match)>500:
-            sip_degree = 4
-        if len(cat_coords_match)>2000:
-            sip_degree = 6
-
-        cat_coords_match.add_column(Column(sky_coords_match.ra.degree, 
-            name='RA_ICRS'))
-        cat_coords_match.add_column(Column(sky_coords_match.dec.degree, 
-            name='DE_ICRS'))
-
-        xy = (cat_coords_match['X_IMAGE'], cat_coords_match['Y_IMAGE'])
-        coords = SkyCoord(cat_coords_match['RA_ICRS'], 
-            cat_coords_match['DE_ICRS'], unit=(u.deg, u.deg))
-
+        # Get central coordinate of image based on centroiding
+        central_pix = (float(naxis1)/2., float(naxis2)/2.)
         central_coo = w.pixel_to_world(*central_pix)
-        try:
+
+        _log_gaia(log, 'info', 'Converging on fine WCS solution')
+
+        bar = progressbar.ProgressBar(maxval=10)
+        bar.start()
+        succeeded = False
+        cat_coords_match = None
+        best_n_match = 0
+        best_iter = -1
+        n_iter_no_match = 0
+        for i in np.arange(10):
+            bar.update(i+1)
+
+            cat_coords = w.pixel_to_world(sky_cat['X_IMAGE'], sky_cat['Y_IMAGE'])
+
+            idx, d2d, d3d = match_coordinates_sky(gaia_coords, cat_coords)
+
+            sep_mask = d2d < max_search_radius
+            n_match = int(np.sum(sep_mask))
+            if n_match > best_n_match:
+                best_n_match = n_match
+                best_iter = int(i + 1)
+            if n_match == 0:
+                n_iter_no_match += 1
+                continue
+
+            sky_coords_match = gaia_coords[sep_mask]
+            cat_coords_match = sky_cat[idx[sep_mask]]
+
+            sip_degree = 0
+            if len(cat_coords_match)>100:
+                sip_degree = 2
+            if len(cat_coords_match)>500:
+                sip_degree = 4
+            if len(cat_coords_match)>2000:
+                sip_degree = 6
+
+            # Make a fresh table each iteration; avoid duplicate-column failures
+            cat_coords_match = Table(cat_coords_match)
+            cat_coords_match['RA_ICRS'] = sky_coords_match.ra.degree
+            cat_coords_match['DE_ICRS'] = sky_coords_match.dec.degree
+            fit_coords = SkyCoord(cat_coords_match['RA_ICRS'],
+                cat_coords_match['DE_ICRS'], unit=(u.deg, u.deg))
+
+            xy = (cat_coords_match['X_IMAGE'], cat_coords_match['Y_IMAGE'])
+            central_coo = w.pixel_to_world(*central_pix)
+            try:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings(
+                        "ignore", category=RuntimeWarning,
+                        message=".*cdelt will be ignored since cd is present.*")
+                    w = fit_wcs_from_points(xy, fit_coords, proj_point=central_coo,
+                        sip_degree=sip_degree)
+                succeeded = True
+            except ValueError:
+                # Try with next iteration
+                continue
+
+        bar.finish()
+        _log_gaia(log, 'info',
+            f'Gaia match summary for {file}: '
+            f'best matches={best_n_match} at iter={best_iter}, '
+            f'iters with zero matches={n_iter_no_match}/10, '
+            f'min required={min_gaia_match}, match radius={max_search_radius}.')
+
+        if not succeeded:
+            _write_gaia_fallback_header(hdu, file,
+                'fine WCS fit failed during iterative Gaia matching', log=log)
+            return(True)
+
+        _log_gaia(log, 'info', f'Solved with SIP degree = {sip_degree}')
+
+        if cat_coords_match is None or len(cat_coords_match)==0:
+            _write_gaia_fallback_header(hdu, file,
+                'zero matched Gaia/SExtractor sources after iterations', log=log)
+            return(True)
+        else:
+            _log_gaia(log, 'info', f'Matched to {len(cat_coords_match)} coordinates')
+
+        if len(cat_coords_match)<min_gaia_match:
+            _write_gaia_fallback_header(hdu, file,
+                f'too few matched stars ({len(cat_coords_match)} < {min_gaia_match})',
+                log=log)
+            return(True)
+
+        # If matching collapsed on most iterations and only barely met threshold,
+        # this fit is often unstable; prefer coarse astrometry in that case.
+        if n_iter_no_match >= 8 and len(cat_coords_match) <= (min_gaia_match + 1):
+            _write_gaia_fallback_header(hdu, file,
+                f'unstable Gaia matching (zero-match iters={n_iter_no_match}/10, matched={len(cat_coords_match)})',
+                log=log)
+            return(True)
+
+        # Bootstrap WCS solution and get center pixel
+        ra_cent = [] ; de_cent = []
+        coords = SkyCoord(cat_coords_match['RA_ICRS'], cat_coords_match['DE_ICRS'],
+            unit=(u.deg, u.deg))
+
+        bar = progressbar.ProgressBar(maxval=1000)
+        bar.start()
+
+        idx = np.arange(len(cat_coords_match))
+        for i in np.arange(1000):
+            bar.update(i+1)
+
+            if len(idx)>200:
+                size = 100
+            else:
+                size = int(len(idx)/2)
+
+            idxs = np.random.choice(idx, size=size, replace=False)
+
+            xy = (cat_coords_match['X_IMAGE'][idxs],
+                  cat_coords_match['Y_IMAGE'][idxs])
+            c = coords[idxs]
+
+            central_coo = w.pixel_to_world(*central_pix)
             with warnings.catch_warnings():
                 warnings.filterwarnings(
                     "ignore", category=RuntimeWarning,
                     message=".*cdelt will be ignored since cd is present.*")
-                w = fit_wcs_from_points(xy, coords, proj_point=central_coo,
-                    sip_degree=sip_degree)
-            succeeded = True
-        except ValueError:
-            # Try with next iteration
-            pass
+                new_wcs = fit_wcs_from_points(xy, c, projection=w)
 
-    if not succeeded:
-        if log: 
-            log.error(f'Could not converge on fine WCS solution for: {file}')
-        else:
-            print(f'Could not converge on fine WCS solution for: {file}')
-        hdu.close()
-        return(False)
+            cent_coord = new_wcs.pixel_to_world(*central_pix)
+            ra_cent.append(cent_coord.ra.degree)
+            de_cent.append(cent_coord.dec.degree)
 
+        bar.finish()
 
-    bar.finish()
+        ra_cent = np.array(ra_cent)
+        de_cent = np.array(de_cent)
 
-    if log:
-        log.info(f'Solved with SIP degree = {sip_degree}')
-    else:
-        print(f'Solved with SIP degree = {sip_degree}')
+        # Estimate systematic precision of new WCS
+        mean_ra, med_ra, std_ra = sigma_clipped_stats(ra_cent, maxiters=11,
+            sigma=3)
+        mean_de, med_de, std_de = sigma_clipped_stats(de_cent, maxiters=11,
+            sigma=3)
 
-    if cat_coords_match is None or len(cat_coords_match)==0:
-        if log:
-            log.error(f'Could not centroid on any stars in {file}')
-        else:
-            print(f'Could not centroid on any stars in {file}')
-        hdu.close()
-        return(False)
-    else:
-        if log:
-            log.info(f'Matched to {len(cat_coords_match)} coordinates')
-        else:
-            print(f'Matched to {len(cat_coords_match)} coordinates')
+        mask = (np.abs(ra_cent-med_ra)<3*std_ra) & (np.abs(de_cent-med_de)<3*std_de)
 
-    if len(cat_coords_match)<min_gaia_match:
-        if log:
-            log.info(f'Too few matched stars in {file}.  Skipping Gaia alignment...')
-        else:
-            print(f'Too few matched stars in {file}.  Skipping Gaia alignment...')
+        # Create a scatter plot of the centroid values to validate the astrometry
+        if save_centroids:
+            fig, ax = plt.subplots()
+            ax.scatter(ra_cent[mask], de_cent[mask])
+            plt.savefig(file.replace('.fits','_centroids.png'))
 
-        # Set these values to some default so pipeline won't break
-        hdu[0].header['RADISP']=(1.0, 'Dispersion in R.A. of WCS [Arcsec]')
-        hdu[0].header['DEDISP']=(1.0, 'Dispersion in Decl. of WCS [Arcsec]')
+        header = w.to_header()
+        header['CRPIX1']=central_pix[0]
+        header['CRPIX2']=central_pix[1]
+        header['CRVAL1']=med_ra
+        header['CRVAL2']=med_de
+        header['CUNIT1']='deg'
+        header['CUNIT2']='deg'
+        if sip_degree>0:
+            header['CTYPE1']='RA---TAN-SIP'
+            header['CTYPE2']='DEC--TAN-SIP'
+            for kw, val in w._write_sip_kw().items():
+                header[kw] = val
+
+        # Validate refined WCS; if pathological, fall back to coarse solution.
+        is_valid, reason = _validate_refined_wcs(w, hdu[0].header, tel, log=log)
+        if not is_valid:
+            _write_gaia_fallback_header(hdu, file, f'pathological refined WCS: {reason}', log=log)
+            return(True)
+
+        # Delete all old WCS keys
+        delkeys = ['WCSNAME','CUNIT1','CUNIT2','CTYPE1','CTYPE2','CRPIX1','CRPIX2',
+            'CRVAL1','CRVAL2','CD1_1','CD1_2','CD2_1','CD2_2','RADECSYS',
+            'PC1_1','PC1_2','PC2_1','PC2_2','LONPOLE','LATPOLE','CDELT1','CDELT2']
+        while True:
+            found_key = False
+            for key in hdu[0].header.keys():
+                if any([k in key for k in delkeys]):
+                    found_key=True
+                    del hdu[0].header[key]
+            if not found_key:
+                break
+
+        hdu[0].header.update(header)
+
+        ra_disp = std_ra*3600.0*np.cos(np.pi/180.0 * mean_de)
+        de_disp = std_de*3600.0
+
+        ra_disp = float('%.6f'%ra_disp)
+        de_disp = float('%.6f'%de_disp)
+
+        _log_gaia(log, 'info', f'R.A. dispersion ={ra_disp}\", Decl. dispersion={de_disp}\"')
+
+        # Add header variables for dispersion in WCS solution
+        hdu[0].header['RADISP']=(ra_disp, 'Dispersion in R.A. of WCS [Arcsec]')
+        hdu[0].header['DEDISP']=(de_disp, 'Dispersion in Decl. of WCS [Arcsec]')
+        if 'GAIAFAIL' in hdu[0].header:
+            del hdu[0].header['GAIAFAIL']
 
         hdu.writeto(file, overwrite=True, output_verify='silentfix')
-        hdu.close()
-        return(True)
-
-    # Bootstrap WCS solution and get center pixel
-    ra_cent = [] ; de_cent = []
-    coords = SkyCoord(cat_coords_match['RA_ICRS'], cat_coords_match['DE_ICRS'], 
-        unit=(u.deg, u.deg))
-
-    bar = progressbar.ProgressBar(maxval=1000)
-    bar.start()
-
-    idx = np.arange(len(cat_coords_match))
-    for i in np.arange(1000):
-        bar.update(i+1)
-
-        if len(idx)>200:
-            size = 100
-        else:
-            size = int(len(idx)/2)
-
-        idxs = np.random.choice(idx, size=size, replace=False)
-
-        xy = (cat_coords_match['X_IMAGE'][idxs], 
-              cat_coords_match['Y_IMAGE'][idxs])
-        c = coords[idxs]
-
-        central_coo = w.pixel_to_world(*central_pix)
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore", category=RuntimeWarning,
-                message=".*cdelt will be ignored since cd is present.*")
-            new_wcs = fit_wcs_from_points(xy, c, projection=w)
-
-        cent_coord = new_wcs.pixel_to_world(*central_pix)
-        ra_cent.append(cent_coord.ra.degree)
-        de_cent.append(cent_coord.dec.degree)
-
-    bar.finish()
-
-    ra_cent = np.array(ra_cent)
-    de_cent = np.array(de_cent)
-
-    # Estimate systematic precision of new WCS
-    mean_ra, med_ra, std_ra = sigma_clipped_stats(ra_cent, maxiters=11,
-        sigma=3)
-    mean_de, med_de, std_de = sigma_clipped_stats(de_cent, maxiters=11,
-        sigma=3)
-
-    mask = (np.abs(ra_cent-med_ra)<3*std_ra) & (np.abs(de_cent-med_de)<3*std_de)
-
-    # Create a scatter plot of the centroid values to validate the astrometry
-    if save_centroids:
-        fig, ax = plt.subplots()
-        ax.scatter(ra_cent[mask], de_cent[mask])
-        plt.savefig(file.replace('.fits','_centroids.png'))
-
-    header = w.to_header()
-    header['CRPIX1']=central_pix[0]
-    header['CRPIX2']=central_pix[1]
-    header['CRVAL1']=med_ra
-    header['CRVAL2']=med_de
-    header['CUNIT1']='deg'
-    header['CUNIT2']='deg'
-    if sip_degree>0:
-        header['CTYPE1']='RA---TAN-SIP'
-        header['CTYPE2']='DEC--TAN-SIP'
-        for kw, val in w._write_sip_kw().items():
-            header[kw] = val
-
-    # Delete all old WCS keys
-    delkeys = ['WCSNAME','CUNIT1','CUNIT2','CTYPE1','CTYPE2','CRPIX1','CRPIX2',
-        'CRVAL1','CRVAL2','CD1_1','CD1_2','CD2_1','CD2_2','RADECSYS',
-        'PC1_1','PC1_2','PC2_1','PC2_2','LONPOLE','LATPOLE','CDELT1','CDELT2']
-    while True:
-        found_key = False
-        for key in hdu[0].header.keys():
-            if any([k in key for k in delkeys]):
-                found_key=True
-                del hdu[0].header[key]
-        if not found_key:
-            break
-
-    hdu[0].header.update(header)
-
-    ra_disp = std_ra*3600.0*np.cos(np.pi/180.0 * mean_de)
-    de_disp = std_de*3600.0
-
-    ra_disp = float('%.6f'%ra_disp)
-    de_disp = float('%.6f'%de_disp)
-
-    if log:
-        log.info(f'R.A. dispersion ={ra_disp}", Decl. dispersion={de_disp}"')
-    else:
-        print(f'R.A. dispersion ={ra_disp}", Decl. dispersion={de_disp}"')
-
-    # Add header variables for dispersion in WCS solution
-    hdu[0].header['RADISP']=(ra_disp, 'Dispersion in R.A. of WCS [Arcsec]')
-    hdu[0].header['DEDISP']=(de_disp, 'Dispersion in Decl. of WCS [Arcsec]')
-
-    hdu.writeto(file, overwrite=True, output_verify='silentfix')
-    hdu.close()
     return(True)
