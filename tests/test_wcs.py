@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 import requests
 from astropy.io import fits
+from astropy.table import Table
 
 from potpyri.utils import options, logger
 from potpyri.primitives import solve_wcs
@@ -109,3 +110,68 @@ def test_clean_up_astrometry(tmp_path):
     for f in to_create:
         path = os.path.join(tmp_path, f)
         assert not os.path.exists(path), f'{f} should have been removed'
+
+
+def test_align_to_gaia_fallback_when_no_gaia_catalog(tmp_path, monkeypatch):
+    """align_to_gaia falls back to coarse WCS and returns True when Gaia catalog is unavailable."""
+    file_path = os.path.join(tmp_path, 'test_no_gaia.fits')
+    hdu = fits.PrimaryHDU(data=np.zeros((40, 40), dtype=np.float32))
+    hdu.header['NAXIS1'] = 40
+    hdu.header['NAXIS2'] = 40
+    hdu.header['CRPIX1'] = 20.0
+    hdu.header['CRPIX2'] = 20.0
+    hdu.header['CRVAL1'] = 30.0
+    hdu.header['CRVAL2'] = -30.0
+    hdu.header['CTYPE1'] = 'RA---TAN'
+    hdu.header['CTYPE2'] = 'DEC--TAN'
+    hdu.header['CD1_1'] = -2.2e-5
+    hdu.header['CD1_2'] = 0.0
+    hdu.header['CD2_1'] = 0.0
+    hdu.header['CD2_2'] = 2.2e-5
+    hdu.writeto(file_path, overwrite=True)
+
+    monkeypatch.setattr(solve_wcs, 'get_gaia_catalog', lambda *args, **kwargs: None)
+    tel = instrument_getter('GMOS')
+    ok = solve_wcs.align_to_gaia(file_path, tel, log=None)
+    assert ok is True
+    with fits.open(file_path) as out:
+        assert out[0].header['RADISP'] == 1.0
+        assert out[0].header['DEDISP'] == 1.0
+        assert 'GAIAFAIL' in out[0].header
+
+
+def test_align_to_gaia_fallback_when_no_sextractor_sources(tmp_path, monkeypatch):
+    """align_to_gaia falls back and returns True when SExtractor has no detections."""
+    file_path = os.path.join(tmp_path, 'test_no_sex.fits')
+    hdu = fits.PrimaryHDU(data=np.zeros((40, 40), dtype=np.float32))
+    hdu.header['NAXIS1'] = 40
+    hdu.header['NAXIS2'] = 40
+    hdu.header['CRPIX1'] = 20.0
+    hdu.header['CRPIX2'] = 20.0
+    hdu.header['CRVAL1'] = 30.0
+    hdu.header['CRVAL2'] = -30.0
+    hdu.header['CTYPE1'] = 'RA---TAN'
+    hdu.header['CTYPE2'] = 'DEC--TAN'
+    hdu.header['CD1_1'] = -2.2e-5
+    hdu.header['CD1_2'] = 0.0
+    hdu.header['CD2_1'] = 0.0
+    hdu.header['CD2_2'] = 2.2e-5
+    hdu.writeto(file_path, overwrite=True)
+
+    cat = Table()
+    # Coordinates close to CRVAL so stars project in-frame with the test WCS.
+    cat['RA_ICRS'] = [30.0, 30.0001, 29.9999, 30.0002, 29.9998, 30.00005, 29.99995, 30.00015]
+    cat['DE_ICRS'] = [-30.0, -29.9999, -30.0001, -29.9998, -30.0002, -29.99995, -30.00005, -29.99985]
+    cat['PSS'] = [1.0] * 8
+    cat['Plx'] = [1.0] * 8
+    cat['PM'] = [1.0] * 8
+    monkeypatch.setattr(solve_wcs, 'get_gaia_catalog', lambda *args, **kwargs: cat)
+    monkeypatch.setattr(solve_wcs.photometry, 'run_sextractor', lambda *args, **kwargs: None)
+
+    tel = instrument_getter('GMOS')
+    ok = solve_wcs.align_to_gaia(file_path, tel, log=None)
+    assert ok is True
+    with fits.open(file_path) as out:
+        assert out[0].header['RADISP'] == 1.0
+        assert out[0].header['DEDISP'] == 1.0
+        assert 'GAIAFAIL' in out[0].header
