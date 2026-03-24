@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+
+<html :class="{ 'dark' : darkMode === true }" data-content_root="../../" lang="en" x-data="{ darkMode: $persist(window.matchMedia('(prefers-color-scheme: dark)').matches), activeSection: ''}">
+<head>
+<script>
+    (function () {
+      // Set initial color scheme
+      if ((localStorage.getItem("_x_darkMode") === "true") || (window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+        document.documentElement.classList.add("dark");
+      }
+
+      // Watch for media preference changes
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (event) => {
+        localStorage.setItem("_x_darkMode", event.matches);
+        document.documentElement.classList.toggle("dark", event.matches);
+      });
+    })();
+  </script>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta charset="utf-8"/>
+<meta content="#ffffff" media="(prefers-color-scheme: light)" name="theme-color"/>
+<meta content="#030711" media="(prefers-color-scheme: dark)" name="theme-color"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>potpyri.primitives.image_procs | POTPyRI  documentation</title>
+<meta content="potpyri.primitives.image_procs | POTPyRI  documentation" property="og:title"/>
+<meta content="potpyri.primitives.image_procs | POTPyRI  documentation" name="twitter:title"/>
+<link href="../../_static/pygments.css?v=d862e8e8" rel="stylesheet" type="text/css"/>
+<link href="../../_static/theme.css?v=73505e79" rel="stylesheet" type="text/css"/>
+<link href="../../_static/custom.css" rel="stylesheet" type="text/css"/>
+<link href="https://CIERA-Transients.github.io/POTPyRI/api/generated/potpyri.primitives.image_procs.html" rel="canonical"/>
+<link href="../../search.html" rel="search" title="Search"/>
+<link href="../../genindex.html" rel="index" title="Index"/>
+<link href="potpyri.primitives.photometry.html" rel="next" title="potpyri.primitives.photometry"/>
+<link href="potpyri.primitives.calibration.html" rel="prev" title="potpyri.primitives.calibration"/>
+</head>
+<body :class="{ 'overflow-hidden': showSidebar }" class="min-h-screen font-sans antialiased bg-background text-foreground" x-data="{ showSidebar: false, showScrollTop: false }">
+<div @click.self="showSidebar = false" class="fixed inset-0 z-50 overflow-hidden bg-background/80 backdrop-blur-sm md:hidden" x-cloak="" x-show="showSidebar"></div><div class="relative flex flex-col min-h-screen" id="page"><a class="absolute top-0 left-0 z-[100] block bg-background p-4 text-xl transition -translate-x-full opacity-0 focus:translate-x-0 focus:opacity-100" href="#content">
+      Skip to content
+    </a><header class="sticky top-0 z-40 w-full border-b shadow-xs border-border bg-background/90 backdrop-blur"><div class="container flex items-center h-14">
+<div class="hidden mr-4 md:flex">
+<a class="flex items-center mr-6" href="../../index.html"><span class="hidden font-bold sm:inline-block text-clip whitespace-nowrap">POTPyRI  documentation</span>
+</a></div><button @click="showSidebar = true" class="inline-flex items-center justify-center h-10 px-0 py-2 mr-2 text-base font-medium transition-colors rounded-md hover:text-accent-foreground hover:bg-transparent md:hidden" type="button">
+<svg aria-hidden="true" fill="currentColor" height="24" viewbox="0 96 960 960" width="24" xmlns="http://www.w3.org/2000/svg">
+<path d="M152.587 825.087q-19.152 0-32.326-13.174t-13.174-32.326q0-19.152 13.174-32.326t32.326-13.174h440q19.152 0 32.326 13.174t13.174 32.326q0 19.152-13.174 32.326t-32.326 13.174h-440Zm0-203.587q-19.152 0-32.326-13.174T107.087 576q0-19.152 13.174-32.326t32.326-13.174h320q19.152 0 32.326 13.174T518.087 576q0 19.152-13.174 32.326T472.587 621.5h-320Zm0-203.587q-19.152 0-32.326-13.174t-13.174-32.326q0-19.152 13.174-32.326t32.326-13.174h440q19.152 0 32.326 13.174t13.174 32.326q0 19.152-13.174 32.326t-32.326 13.174h-440ZM708.913 576l112.174 112.174q12.674 12.674 12.674 31.826t-12.674 31.826Q808.413 764.5 789.261 764.5t-31.826-12.674l-144-144Q600 594.391 600 576t13.435-31.826l144-144q12.674-12.674 31.826-12.674t31.826 12.674q12.674 12.674 12.674 31.826t-12.674 31.826L708.913 576Z"></path>
+</svg>
+<span class="sr-only">Toggle navigation menu</span>
+</button>
+<div class="flex items-center justify-between flex-1 gap-2 sm:gap-4 md:justify-end">
+<div class="flex-1 w-full md:w-auto md:flex-none"><form @keydown.k.window.meta="$refs.search.focus()" action="../../search.html" class="relative flex items-center group" id="searchbox" method="get">
+<input aria-label="Search the docs" class="inline-flex items-center font-medium transition-colors bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background border border-input hover:bg-accent focus:bg-accent hover:text-accent-foreground focus:text-accent-foreground hover:placeholder-accent-foreground py-2 px-4 relative h-9 w-full justify-start rounded-[0.5rem] text-sm text-muted-foreground sm:pr-12 md:w-40 lg:w-64" id="search-input" name="q" placeholder="Search ..." type="search" x-ref="search"/>
+<kbd class="pointer-events-none absolute right-1.5 top-2 hidden h-5 select-none text-muted-foreground items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex group-hover:bg-accent group-hover:text-accent-foreground">
+<span class="text-xs">⌘</span>
+    K
+  </kbd>
+</form>
+</div>
+<nav class="flex items-center gap-1">
+<button @click="darkMode = !darkMode" class="relative inline-flex items-center justify-center px-0 text-sm font-medium transition-colors rounded-md hover:bg-accent hover:text-accent-foreground h-9 w-9" title="Toggle color scheme" type="button">
+<svg class="absolute transition-all scale-100 rotate-0 dark:-rotate-90 dark:scale-0" fill="currentColor" height="16" viewbox="0 96 960 960" width="16" xmlns="http://www.w3.org/2000/svg">
+<path d="M480 685q45.456 0 77.228-31.772Q589 621.456 589 576q0-45.456-31.772-77.228Q525.456 467 480 467q-45.456 0-77.228 31.772Q371 530.544 371 576q0 45.456 31.772 77.228Q434.544 685 480 685Zm0 91q-83 0-141.5-58.5T280 576q0-83 58.5-141.5T480 376q83 0 141.5 58.5T680 576q0 83-58.5 141.5T480 776ZM80 621.5q-19.152 0-32.326-13.174T34.5 576q0-19.152 13.174-32.326T80 530.5h80q19.152 0 32.326 13.174T205.5 576q0 19.152-13.174 32.326T160 621.5H80Zm720 0q-19.152 0-32.326-13.174T754.5 576q0-19.152 13.174-32.326T800 530.5h80q19.152 0 32.326 13.174T925.5 576q0 19.152-13.174 32.326T880 621.5h-80Zm-320-320q-19.152 0-32.326-13.174T434.5 256v-80q0-19.152 13.174-32.326T480 130.5q19.152 0 32.326 13.174T525.5 176v80q0 19.152-13.174 32.326T480 301.5Zm0 720q-19.152 0-32.326-13.17Q434.5 995.152 434.5 976v-80q0-19.152 13.174-32.326T480 850.5q19.152 0 32.326 13.174T525.5 896v80q0 19.152-13.174 32.33-13.174 13.17-32.326 13.17ZM222.174 382.065l-43-42Q165.5 327.391 166 308.239t13.174-33.065q13.435-13.674 32.587-13.674t32.065 13.674l42.239 43q12.674 13.435 12.555 31.706-.12 18.272-12.555 31.946-12.674 13.674-31.445 13.413-18.772-.261-32.446-13.174Zm494 494.761-42.239-43q-12.674-13.435-12.674-32.087t12.674-31.565Q686.609 756.5 705.38 757q18.772.5 32.446 13.174l43 41.761Q794.5 824.609 794 843.761t-13.174 33.065Q767.391 890.5 748.239 890.5t-32.065-13.674Zm-42-494.761Q660.5 369.391 661 350.62q.5-18.772 13.174-32.446l41.761-43Q728.609 261.5 747.761 262t33.065 13.174q13.674 13.435 13.674 32.587t-13.674 32.065l-43 42.239q-13.435 12.674-31.706 12.555-18.272-.12-31.946-12.555Zm-495 494.761Q165.5 863.391 165.5 844.239t13.674-32.065l43-42.239q13.435-12.674 32.087-12.674t31.565 12.674Q299.5 782.609 299 801.38q-.5 18.772-13.174 32.446l-41.761 43Q231.391 890.5 212.239 890t-33.065-13.174ZM480 576Z"></path>
+</svg>
+<svg class="absolute transition-all scale-0 rotate-90 dark:rotate-0 dark:scale-100" fill="currentColor" height="16" viewbox="0 96 960 960" width="16" xmlns="http://www.w3.org/2000/svg">
+<path d="M480 936q-151 0-255.5-104.5T120 576q0-138 90-239.5T440 218q25-3 39 18t-1 44q-17 26-25.5 55t-8.5 61q0 90 63 153t153 63q31 0 61.5-9t54.5-25q21-14 43-1.5t19 39.5q-14 138-117.5 229T480 936Zm0-80q88 0 158-48.5T740 681q-20 5-40 8t-40 3q-123 0-209.5-86.5T364 396q0-20 3-40t8-40q-78 32-126.5 102T200 576q0 116 82 198t198 82Zm-10-270Z"></path>
+</svg>
+</button>
+</nav>
+</div>
+</div>
+</header>
+<div class="flex-1"><div class="container md:grid md:grid-cols-[220px_minmax(0,1fr)] md:gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-10"><aside :aria-hidden="!showSidebar" :class="{ 'translate-x-0': showSidebar }" class="fixed inset-y-0 left-0 md:top-14 z-50 md:z-30 bg-background md:bg-transparent transition-all duration-100 -translate-x-full md:translate-x-0 ml-0 p-6 md:p-0 md:-ml-2 md:h-[calc(100vh-3.5rem)] w-5/6 md:w-full overflow-y-auto border-r border-border md:sticky" id="left-sidebar">
+<a class="justify-start text-sm md:!hidden bg-background" href="../../index.html"><span class="font-bold text-clip whitespace-nowrap">POTPyRI  documentation</span>
+</a>
+<div class="relative overflow-hidden md:overflow-auto my-4 md:my-0">
+<div class="overflow-y-auto h-full w-full relative pr-6"><nav class="table w-full min-w-full my-6 lg:my-8">
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1 current" x-data="{ expanded: $el.classList.contains('current') ? true : false }"><a :class="{ 'expanded' : expanded }" @click="expanded = !expanded" class="reference internal expandable" href="../index.html">API Reference<button @click.prevent.stop="expanded = !expanded" type="button" x-cloak=""><span class="sr-only"></span><svg fill="currentColor" height="18px" stroke="none" viewbox="0 0 24 24" width="18px" xmlns="http://www.w3.org/2000/svg"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"></path></svg></button></a><ul class="current" x-show="expanded">
+<li class="toctree-l2"><a class="reference internal" href="../instruments.html">Instruments</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../primitives.html">Primitives</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils.html">Utilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../scripts.html">Scripts</a></li>
+</ul>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+<button @click="showSidebar = false" class="absolute md:hidden right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100" type="button">
+<svg class="h-4 w-4" fill="currentColor" height="24" stroke="none" viewbox="0 96 960 960" width="24" xmlns="http://www.w3.org/2000/svg">
+<path d="M480 632 284 828q-11 11-28 11t-28-11q-11-11-11-28t11-28l196-196-196-196q-11-11-11-28t11-28q11-11 28-11t28 11l196 196 196-196q11-11 28-11t28 11q11 11 11 28t-11 28L536 576l196 196q11 11 11 28t-11 28q-11 11-28 11t-28-11L480 632Z"></path>
+</svg>
+</button>
+</aside>
+<main class="relative py-6 lg:gap-10 lg:py-8 xl:grid xl:grid-cols-[1fr_300px]">
+<div class="w-full min-w-0 mx-auto">
+<nav aria-label="breadcrumbs" class="flex items-center mb-4 space-x-1 text-sm text-muted-foreground">
+<a class="overflow-hidden text-ellipsis whitespace-nowrap hover:text-foreground" href="../../index.html">
+<span class="hidden md:inline">POTPyRI  documentation</span>
+<svg aria-label="Home" class="md:hidden" fill="currentColor" height="18" stroke="none" viewbox="0 96 960 960" width="18" xmlns="http://www.w3.org/2000/svg">
+<path d="M240 856h120V616h240v240h120V496L480 316 240 496v360Zm-80 80V456l320-240 320 240v480H520V696h-80v240H160Zm320-350Z"></path>
+</svg>
+</a>
+<div class="mr-1">/</div><a class="hover:text-foreground overflow-hidden text-ellipsis whitespace-nowrap" href="../index.html">API Reference</a>
+<div class="mr-1">/</div><a class="hover:text-foreground overflow-hidden text-ellipsis whitespace-nowrap" href="../primitives.html">Primitives</a>
+<div class="mr-1">/</div><span aria-current="page" class="font-medium text-foreground overflow-hidden text-ellipsis whitespace-nowrap">potpyri.primitives.image_procs</span>
+</nav>
+<div id="content" role="main">
+<section id="module-potpyri.primitives.image_procs">
+<span id="potpyri-primitives-image-procs"></span><h1>potpyri.primitives.image_procs<a class="headerlink" href="#module-potpyri.primitives.image_procs" title="Link to this heading"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></h1>
+<p>Image calibration, masking, error arrays, alignment, and stacking.</p>
+<p>Provides WCS handling, alignment to a common grid, cosmic-ray rejection,
+satellite masking, master calibration combination, and stacked science
+output. Authors: Charlie Kilpatrick.</p>
+<p class="rubric">Functions</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#potpyri.primitives.image_procs.add_stack_mask" title="potpyri.primitives.image_procs.add_stack_mask"><code class="xref py py-obj docutils literal notranslate"><span class="pre">add_stack_mask</span></code></a>(stack, stacking_data)</p></td>
+<td><p>Update stack mask from per-image masks and saturation; set masked pixels to 0.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#potpyri.primitives.image_procs.align_images" title="potpyri.primitives.image_procs.align_images"><code class="xref py py-obj docutils literal notranslate"><span class="pre">align_images</span></code></a>(reduced_files, paths, tel, binn)</p></td>
+<td><p>Solve WCS and align reduced images to a common grid.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#potpyri.primitives.image_procs.compute_relative_scales" title="potpyri.primitives.image_procs.compute_relative_scales"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_relative_scales</span></code></a>(data_images, paths, ...)</p></td>
+<td><p>Compute relative flux scale factors from SExtractor catalogs and RA/Dec cross-matching.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#potpyri.primitives.image_procs.create_error" title="potpyri.primitives.image_procs.create_error"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create_error</span></code></a>(science_data, mask_data, rdnoise)</p></td>
+<td><p>Compute per-pixel error array from science image, mask, and read noise.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#potpyri.primitives.image_procs.create_mask" title="potpyri.primitives.image_procs.create_mask"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create_mask</span></code></a>(science_data, saturation, rdnoise)</p></td>
+<td><p>Build a bad-pixel/saturation/cosmic-ray mask using LACosmic and optional growth.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#potpyri.primitives.image_procs.detrend_stack" title="potpyri.primitives.image_procs.detrend_stack"><code class="xref py py-obj docutils literal notranslate"><span class="pre">detrend_stack</span></code></a>(stack)</p></td>
+<td><p>Remove row and column median from stack science data (detrend).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#potpyri.primitives.image_procs.generate_wcs" title="potpyri.primitives.image_procs.generate_wcs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">generate_wcs</span></code></a>(tel, binn, fieldcenter, out_size)</p></td>
+<td><p>Build a TAN WCS for a given field center and output size.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#potpyri.primitives.image_procs.get_fieldcenter" title="potpyri.primitives.image_procs.get_fieldcenter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_fieldcenter</span></code></a>(images)</p></td>
+<td><p>Compute mean RA/Dec of image centers from a list of FITS files.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#potpyri.primitives.image_procs.image_proc" title="potpyri.primitives.image_procs.image_proc"><code class="xref py py-obj docutils literal notranslate"><span class="pre">image_proc</span></code></a>(image_data, tel, paths[, ...])</p></td>
+<td><p>Full image processing: align, mask, stack, and optionally detrend.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#potpyri.primitives.image_procs.mask_satellites" title="potpyri.primitives.image_procs.mask_satellites"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mask_satellites</span></code></a>(images, filenames[, log])</p></td>
+<td><p>Detect and mask satellite trails in science images using acstools.satdet.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#potpyri.primitives.image_procs.remove_pv_distortion" title="potpyri.primitives.image_procs.remove_pv_distortion"><code class="xref py py-obj docutils literal notranslate"><span class="pre">remove_pv_distortion</span></code></a>(header)</p></td>
+<td><p>Remove PV* distortion keywords from a FITS header (modifies in place).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#potpyri.primitives.image_procs.stack_data" title="potpyri.primitives.image_procs.stack_data"><code class="xref py py-obj docutils literal notranslate"><span class="pre">stack_data</span></code></a>(stacking_data, tel, masks, errors)</p></td>
+<td><p>Combine aligned CCDData list with exposure scaling (median or average).</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py function">
+<dt class="sig sig-object py" id="potpyri.primitives.image_procs.add_stack_mask">
+<span class="sig-prename descclassname"><span class="pre">potpyri.primitives.image_procs.</span></span><span class="sig-name descname"><span class="pre">add_stack_mask</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stack</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stacking_data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/primitives/image_procs.html#add_stack_mask"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.primitives.image_procs.add_stack_mask" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.primitives.image_procs.add_stack_mask'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Update stack mask from per-image masks and saturation; set masked pixels to 0.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>stack</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.io.fits.HDUList</span></code>) – HDU list with [0]=SCI, [1]=MASK, [2]=ERROR. Modified in place.</p></li>
+<li><p><strong>stacking_data</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> of <code class="xref py py-class docutils literal notranslate"><span class="pre">ccdproc.CCDData</span></code>) – Per-image data (headers used for SATURATE).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The same stack reference (modified in place).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.io.fits.HDUList</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py function">
+<dt class="sig sig-object py" id="potpyri.primitives.image_procs.align_images">
+<span class="sig-prename descclassname"><span class="pre">potpyri.primitives.image_procs.</span></span><span class="sig-name descname"><span class="pre">align_images</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reduced_files</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">binn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_wcs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fieldcenter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">out_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_gaia</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_all_astro</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/primitives/image_procs.html#align_images"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.primitives.image_procs.align_images" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.primitives.image_procs.align_images'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Solve WCS and align reduced images to a common grid.</p>
+<p>Runs astrometry.net and optionally Gaia alignment, then reprojects to
+a common WCS.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>reduced_files</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> of <code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Paths to reduced FITS files.</p></li>
+<li><p><strong>paths</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>) – Paths dict from options.add_paths.</p></li>
+<li><p><strong>tel</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Instrument</span></code>) – Instrument instance.</p></li>
+<li><p><strong>binn</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Binning string.</p></li>
+<li><p><strong>use_wcs</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.wcs.WCS</span></code>, <em>optional</em>) – If provided, use this WCS instead of solving.</p></li>
+<li><p><strong>fieldcenter</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">sequence</span></code>, <em>optional</em>) – [ra, dec] for generating WCS.</p></li>
+<li><p><strong>out_size</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <em>optional</em>) – Output image size.</p></li>
+<li><p><strong>skip_gaia</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code>, <em>optional</em>) – If True, skip Gaia alignment. Default is False.</p></li>
+<li><p><strong>keep_all_astro</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code>, <em>optional</em>) – If True, keep all images regardless of astrometric dispersion.</p></li>
+<li><p><strong>log</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ColoredLogger</span></code>, <em>optional</em>) – Logger for progress.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>(aligned_data, masks, errors) as lists, or None if no images aligned.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code> or <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py function">
+<dt class="sig sig-object py" id="potpyri.primitives.image_procs.compute_relative_scales">
+<span class="sig-prename descclassname"><span class="pre">potpyri.primitives.image_procs.</span></span><span class="sig-name descname"><span class="pre">compute_relative_scales</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_images</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exptimes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">match_radius_arcsec</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_sources</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_rel_err</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/primitives/image_procs.html#compute_relative_scales"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.primitives.image_procs.compute_relative_scales" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.primitives.image_procs.compute_relative_scales'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Compute relative flux scale factors from SExtractor catalogs and RA/Dec cross-matching.</p>
+<p>Runs Source Extractor on each aligned science image, cross-matches sources
+between frames in RA/Dec, and uses the inverse-variance-weighted mean of
+flux ratios (using FLUXERR_AUTO) to define scale factors so that combine()
+can stack on a common flux scale. For frames where matching fails (too few
+matches), the scale is set to 1.0/exptime for that frame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data_images</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> of <code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Paths to FITS with SCI extension (e.g. <a href="#id1"><span class="problematic" id="id2">*</span></a>_data.fits from image_proc).</p></li>
+<li><p><strong>paths</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>) – Paths dict; paths.get(‘source_extractor’) used for SExtractor binary.</p></li>
+<li><p><strong>exptimes</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">array-like</span></code>) – Exposure time in seconds for each image (same order as data_images).</p></li>
+<li><p><strong>log</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ColoredLogger</span></code>, <em>optional</em>) – Logger for progress.</p></li>
+<li><p><strong>match_radius_arcsec</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>, <em>optional</em>) – Match radius in arcsec for cross-matching sources. Default 2.0.</p></li>
+<li><p><strong>min_sources</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <em>optional</em>) – Minimum matched sources per frame to compute scale. Default 5.</p></li>
+<li><p><strong>min_rel_err</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>, <em>optional</em>) – Minimum relative flux error (err/flux) used in variance of ratio to
+avoid zero variance. Default 0.01.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Relative scale factors, one per image (reference frame scale = 1.0).
+Frames that fail get scale = 1.0/exptime. None if catalogs cannot be
+built at all (caller should use exposure-time-only scaling).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">np.ndarray</span></code> or <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py function">
+<dt class="sig sig-object py" id="potpyri.primitives.image_procs.create_error">
+<span class="sig-prename descclassname"><span class="pre">potpyri.primitives.image_procs.</span></span><span class="sig-name descname"><span class="pre">create_error</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">science_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rdnoise</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/primitives/image_procs.html#create_error"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.primitives.image_procs.create_error" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.primitives.image_procs.create_error'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Compute per-pixel error array from science image, mask, and read noise.</p>
+<p>Error = sqrt(poisson + rms^2 + rdnoise^2). Masked pixels are excluded
+from RMS estimation. science_data can be a path or HDU; mask_data is
+an HDU with mask array.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>science_data</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code> or <code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.io.fits.HDUList</span></code>) – Path to science FITS or open HDU list.</p></li>
+<li><p><strong>mask_data</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.io.fits.PrimaryHDU</span></code> or <code class="xref py py-class docutils literal notranslate"><span class="pre">ImageHDU</span></code>) – HDU containing boolean or integer mask (masked pixels excluded from rms).</p></li>
+<li><p><strong>rdnoise</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>) – Read noise in electrons.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Error array in electrons (BUNIT=’ELECTRONS’).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.io.fits.PrimaryHDU</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py function">
+<dt class="sig sig-object py" id="potpyri.primitives.image_procs.create_mask">
+<span class="sig-prename descclassname"><span class="pre">potpyri.primitives.image_procs.</span></span><span class="sig-name descname"><span class="pre">create_mask</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">science_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">saturation</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rdnoise</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigclip</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigfrac</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">objlim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">niter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outpath</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grow</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cosmic_ray</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fsmode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'convolve'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cleantype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'medmask'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/primitives/image_procs.html#create_mask"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.primitives.image_procs.create_mask" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.primitives.image_procs.create_mask'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Build a bad-pixel/saturation/cosmic-ray mask using LACosmic and optional growth.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>science_data</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Path to science FITS file.</p></li>
+<li><p><strong>saturation</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>) – Saturation level (ADU); pixels above this get flag 4.</p></li>
+<li><p><strong>rdnoise</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>) – Read noise for LACosmic (electrons).</p></li>
+<li><p><strong>sigclip</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>, <em>optional</em>) – LACosmic sigma clipping. Default is 3.0.</p></li>
+<li><p><strong>sigfrac</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>, <em>optional</em>) – LACosmic sigfrac. Default is 0.10.</p></li>
+<li><p><strong>objlim</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>, <em>optional</em>) – LACosmic objlim. Default is 4.0.</p></li>
+<li><p><strong>niter</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <em>optional</em>) – LACosmic iterations. Default is 6.</p></li>
+<li><p><strong>outpath</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <em>optional</em>) – Output path for debug files. Default is ‘’.</p></li>
+<li><p><strong>grow</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <em>optional</em>) – Pixels to grow mask (adds flag 8). Default is 0.</p></li>
+<li><p><strong>cosmic_ray</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code>, <em>optional</em>) – If True, run LACosmic. Default is True.</p></li>
+<li><p><strong>fsmode</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <em>optional</em>) – LACosmic fsmode. Default is ‘convolve’.</p></li>
+<li><p><strong>cleantype</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <em>optional</em>) – LACosmic cleantype. Default is ‘medmask’.</p></li>
+<li><p><strong>log</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ColoredLogger</span></code>, <em>optional</em>) – Logger for progress.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>(cleaned_data_ndarray, mask_ImageHDU). Mask uses additive flags:
+1=bad, 2=cosmic ray, 4=saturated, 8=neighbor.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py function">
+<dt class="sig sig-object py" id="potpyri.primitives.image_procs.detrend_stack">
+<span class="sig-prename descclassname"><span class="pre">potpyri.primitives.image_procs.</span></span><span class="sig-name descname"><span class="pre">detrend_stack</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stack</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/primitives/image_procs.html#detrend_stack"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.primitives.image_procs.detrend_stack" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.primitives.image_procs.detrend_stack'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Remove row and column median from stack science data (detrend).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>stack</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.io.fits.HDUList</span></code>) – HDU list with [0]=SCI, [1]=MASK. Modified in place.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The same stack reference (modified in place).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.io.fits.HDUList</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py function">
+<dt class="sig sig-object py" id="potpyri.primitives.image_procs.generate_wcs">
+<span class="sig-prename descclassname"><span class="pre">potpyri.primitives.image_procs.</span></span><span class="sig-name descname"><span class="pre">generate_wcs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">binn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fieldcenter</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">out_size</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/primitives/image_procs.html#generate_wcs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.primitives.image_procs.generate_wcs" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.primitives.image_procs.generate_wcs'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Build a TAN WCS for a given field center and output size.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>tel</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Instrument</span></code>) – Instrument instance (for pixel scale).</p></li>
+<li><p><strong>binn</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Binning string (e.g. ‘22’).</p></li>
+<li><p><strong>fieldcenter</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">sequence</span></code>) – [ra_deg, dec_deg] or parseable coordinate.</p></li>
+<li><p><strong>out_size</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>) – Output image size (out_size x out_size pixels).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>WCS instance.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.wcs.WCS</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py function">
+<dt class="sig sig-object py" id="potpyri.primitives.image_procs.get_fieldcenter">
+<span class="sig-prename descclassname"><span class="pre">potpyri.primitives.image_procs.</span></span><span class="sig-name descname"><span class="pre">get_fieldcenter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">images</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/primitives/image_procs.html#get_fieldcenter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.primitives.image_procs.get_fieldcenter" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.primitives.image_procs.get_fieldcenter'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Compute mean RA/Dec of image centers from a list of FITS files.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>images</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> of <code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Paths to FITS files with WCS in primary header.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>[mean_ra_deg, mean_dec_deg].</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py function">
+<dt class="sig sig-object py" id="potpyri.primitives.image_procs.image_proc">
+<span class="sig-prename descclassname"><span class="pre">potpyri.primitives.image_procs.</span></span><span class="sig-name descname"><span class="pre">image_proc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">image_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_skysub</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fieldcenter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">out_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">satellites</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cosmic_ray</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_gaia</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keep_all_astro</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">relative_calibration</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/primitives/image_procs.html#image_proc"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.primitives.image_procs.image_proc" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.primitives.image_procs.image_proc'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Full image processing: align, mask, stack, and optionally detrend.</p>
+<p>Orchestrates WCS solving, alignment, satellite/cosmic-ray masking,
+stacking, and optional sky subtraction. Optionally calibrates frames
+to each other using SExtractor catalogs and RA/Dec cross-matching before stacking.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>image_data</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.table.Table</span></code>) – File table subset (e.g. one TargType) with ‘File’ column.</p></li>
+<li><p><strong>tel</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Instrument</span></code>) – Instrument instance.</p></li>
+<li><p><strong>paths</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>) – Paths dict from options.add_paths.</p></li>
+<li><p><strong>skip_skysub</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code>, <em>optional</em>) – If True, skip sky subtraction. Default is False.</p></li>
+<li><p><strong>fieldcenter</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">sequence</span></code>, <em>optional</em>) – [ra, dec] for alignment.</p></li>
+<li><p><strong>out_size</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <em>optional</em>) – Output image size.</p></li>
+<li><p><strong>satellites</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code>, <em>optional</em>) – If True, mask satellite trails. Default is True.</p></li>
+<li><p><strong>cosmic_ray</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code>, <em>optional</em>) – If True, run cosmic-ray rejection. Default is True.</p></li>
+<li><p><strong>skip_gaia</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code>, <em>optional</em>) – If True, skip Gaia alignment. Default is False.</p></li>
+<li><p><strong>keep_all_astro</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code>, <em>optional</em>) – If True, keep all images regardless of astrometric dispersion.</p></li>
+<li><p><strong>relative_calibration</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code>, <em>optional</em>) – If True, run SExtractor on each aligned frame, cross-match sources in
+RA/Dec, and use relative fluxes to set scale factors for the stack
+combine. Default is False.</p></li>
+<li><p><strong>log</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ColoredLogger</span></code>, <em>optional</em>) – Logger for progress.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Path to stacked output FITS, or None if processing failed.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code> or <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py function">
+<dt class="sig sig-object py" id="potpyri.primitives.image_procs.mask_satellites">
+<span class="sig-prename descclassname"><span class="pre">potpyri.primitives.image_procs.</span></span><span class="sig-name descname"><span class="pre">mask_satellites</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">images</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/primitives/image_procs.html#mask_satellites"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.primitives.image_procs.mask_satellites" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.primitives.image_procs.mask_satellites'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Detect and mask satellite trails in science images using acstools.satdet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>images</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> of <code class="xref py py-class docutils literal notranslate"><span class="pre">ccdproc.CCDData</span></code>) – Science images; data is modified in place (trail pixels set to nan).</p></li>
+<li><p><strong>filenames</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> of <code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Paths corresponding to images (used for temp files).</p></li>
+<li><p><strong>log</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ColoredLogger</span></code>, <em>optional</em>) – Logger for progress.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py function">
+<dt class="sig sig-object py" id="potpyri.primitives.image_procs.remove_pv_distortion">
+<span class="sig-prename descclassname"><span class="pre">potpyri.primitives.image_procs.</span></span><span class="sig-name descname"><span class="pre">remove_pv_distortion</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">header</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/primitives/image_procs.html#remove_pv_distortion"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.primitives.image_procs.remove_pv_distortion" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.primitives.image_procs.remove_pv_distortion'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Remove PV* distortion keywords from a FITS header (modifies in place).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>header</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.io.fits.Header</span></code>) – Header to modify.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The same header reference (modified in place).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.io.fits.Header</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py function">
+<dt class="sig sig-object py" id="potpyri.primitives.image_procs.stack_data">
+<span class="sig-prename descclassname"><span class="pre">potpyri.primitives.image_procs.</span></span><span class="sig-name descname"><span class="pre">stack_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stacking_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tel</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">masks</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">errors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mem_limit</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">8000000000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">relative_scales</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/primitives/image_procs.html#stack_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.primitives.image_procs.stack_data" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.primitives.image_procs.stack_data'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Combine aligned CCDData list with exposure scaling (median or average).</p>
+<p>Masks are applied (masked pixels set to nan) before combination.
+Optionally uses relative flux scales from source cross-matching so that
+frames are combined on a common flux scale.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>stacking_data</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> of <code class="xref py py-class docutils literal notranslate"><span class="pre">ccdproc.CCDData</span></code>) – Aligned science images.</p></li>
+<li><p><strong>tel</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Instrument</span></code>) – Instrument instance (for stack_method and get_exptime).</p></li>
+<li><p><strong>masks</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> of <code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.io.fits.ImageHDU</span></code>) – Per-image masks.</p></li>
+<li><p><strong>errors</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> of <code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.io.fits.ImageHDU</span></code>) – Per-image error arrays.</p></li>
+<li><p><strong>mem_limit</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>, <em>optional</em>) – Memory limit in bytes for ccdproc.combine. Default is 8e9.</p></li>
+<li><p><strong>log</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ColoredLogger</span></code>, <em>optional</em>) – Logger for progress.</p></li>
+<li><p><strong>relative_scales</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">np.ndarray</span></code>, <em>optional</em>) – Relative flux scale factors (one per image; reference = 1.0). If
+provided, scale = relative_scales (exposure-time scaling is not applied).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>HDU list [science, mask, error] (mask/error from first image).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.io.fits.HDUList</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+</section>
+</div></div><aside class="hidden text-sm xl:block" id="right-sidebar">
+<div class="sticky top-16 -mt-10 max-h-[calc(100vh-5rem)] h-full overflow-y-auto pt-6 space-y-2"><p class="font-medium">On this page</p>
+<ul>
+<li><a :data-current="activeSection === '#potpyri.primitives.image_procs.add_stack_mask'" class="reference internal" href="#potpyri.primitives.image_procs.add_stack_mask"><code class="docutils literal notranslate"><span class="pre">add_stack_mask()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.primitives.image_procs.align_images'" class="reference internal" href="#potpyri.primitives.image_procs.align_images"><code class="docutils literal notranslate"><span class="pre">align_images()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.primitives.image_procs.compute_relative_scales'" class="reference internal" href="#potpyri.primitives.image_procs.compute_relative_scales"><code class="docutils literal notranslate"><span class="pre">compute_relative_scales()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.primitives.image_procs.create_error'" class="reference internal" href="#potpyri.primitives.image_procs.create_error"><code class="docutils literal notranslate"><span class="pre">create_error()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.primitives.image_procs.create_mask'" class="reference internal" href="#potpyri.primitives.image_procs.create_mask"><code class="docutils literal notranslate"><span class="pre">create_mask()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.primitives.image_procs.detrend_stack'" class="reference internal" href="#potpyri.primitives.image_procs.detrend_stack"><code class="docutils literal notranslate"><span class="pre">detrend_stack()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.primitives.image_procs.generate_wcs'" class="reference internal" href="#potpyri.primitives.image_procs.generate_wcs"><code class="docutils literal notranslate"><span class="pre">generate_wcs()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.primitives.image_procs.get_fieldcenter'" class="reference internal" href="#potpyri.primitives.image_procs.get_fieldcenter"><code class="docutils literal notranslate"><span class="pre">get_fieldcenter()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.primitives.image_procs.image_proc'" class="reference internal" href="#potpyri.primitives.image_procs.image_proc"><code class="docutils literal notranslate"><span class="pre">image_proc()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.primitives.image_procs.mask_satellites'" class="reference internal" href="#potpyri.primitives.image_procs.mask_satellites"><code class="docutils literal notranslate"><span class="pre">mask_satellites()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.primitives.image_procs.remove_pv_distortion'" class="reference internal" href="#potpyri.primitives.image_procs.remove_pv_distortion"><code class="docutils literal notranslate"><span class="pre">remove_pv_distortion()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.primitives.image_procs.stack_data'" class="reference internal" href="#potpyri.primitives.image_procs.stack_data"><code class="docutils literal notranslate"><span class="pre">stack_data()</span></code></a></li>
+</ul>
+</div>
+</aside>
+</main>
+</div>
+</div><footer class="py-6 border-t border-border md:py-0">
+<div class="container flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row">
+<div class="flex flex-col items-center gap-4 px-8 md:flex-row md:gap-2 md:px-0">
+<p class="text-sm leading-loose text-center text-muted-foreground md:text-left">© 2025, POTPyRI Team Built with <a class="font-medium underline underline-offset-4" href="https://www.sphinx-doc.org" rel="noreferrer">Sphinx 8.1.3</a></p>
+</div>
+</div>
+</footer>
+</div>
+<script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+<script src="../../_static/doctools.js?v=9bcbadda"></script>
+<script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+<script defer="defer" src="../../_static/theme.js?v=582b20c5"></script>
+<script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+</body>
+</html>

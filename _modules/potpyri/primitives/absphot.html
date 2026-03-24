@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en" data-content_root="../../../"
+  x-data="{ darkMode: $persist(window.matchMedia('(prefers-color-scheme: dark)').matches), activeSection: ''}"
+  :class="{ 'dark' : darkMode === true }">
+
+<head>
+  <script>
+    (function () {
+      // Set initial color scheme
+      if ((localStorage.getItem("_x_darkMode") === "true") || (window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+        document.documentElement.classList.add("dark");
+      }
+
+      // Watch for media preference changes
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (event) => {
+        localStorage.setItem("_x_darkMode", event.matches);
+        document.documentElement.classList.toggle("dark", event.matches);
+      });
+    })();
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#030711" />
+  
+  <title>potpyri.primitives.absphot | POTPyRI  documentation</title>
+  <meta property="og:title" content="potpyri.primitives.absphot | POTPyRI  documentation" />
+  <meta name="twitter:title" content="potpyri.primitives.absphot | POTPyRI  documentation" />
+  <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d862e8e8" />
+  <link rel="stylesheet" type="text/css" href="../../../_static/theme.css?v=73505e79" />
+  <link rel="stylesheet" type="text/css" href="../../../_static/custom.css" />
+  <link rel="canonical" href="https://CIERA-Transients.github.io/POTPyRI/_modules/potpyri/primitives/absphot.html" />
+  <link rel="search" title="Search" href="../../../search.html" />
+  <link rel="index" title="Index" href="../../../genindex.html" />
+</head>
+
+<body x-data="{ showSidebar: false, showScrollTop: false }"
+  class="min-h-screen font-sans antialiased bg-background text-foreground" :class="{ 'overflow-hidden': showSidebar }">
+  <div x-cloak x-show="showSidebar"
+    class="fixed inset-0 z-50 overflow-hidden bg-background/80 backdrop-blur-sm md:hidden"
+    @click.self="showSidebar = false"></div><div id="page" class="relative flex flex-col min-h-screen"><a href="#content"
+      class="absolute top-0 left-0 z-[100] block bg-background p-4 text-xl transition -translate-x-full opacity-0 focus:translate-x-0 focus:opacity-100">
+      Skip to content
+    </a><header class="sticky top-0 z-40 w-full border-b shadow-xs border-border bg-background/90 backdrop-blur"><div class="container flex items-center h-14">
+    <div class="hidden mr-4 md:flex">
+      <a href="../../../index.html" class="flex items-center mr-6"><span class="hidden font-bold sm:inline-block text-clip whitespace-nowrap">POTPyRI  documentation</span>
+      </a></div><button
+      class="inline-flex items-center justify-center h-10 px-0 py-2 mr-2 text-base font-medium transition-colors rounded-md hover:text-accent-foreground hover:bg-transparent md:hidden"
+      type="button" @click="showSidebar = true">
+      <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 96 960 960" aria-hidden="true"
+        fill="currentColor">
+        <path
+          d="M152.587 825.087q-19.152 0-32.326-13.174t-13.174-32.326q0-19.152 13.174-32.326t32.326-13.174h440q19.152 0 32.326 13.174t13.174 32.326q0 19.152-13.174 32.326t-32.326 13.174h-440Zm0-203.587q-19.152 0-32.326-13.174T107.087 576q0-19.152 13.174-32.326t32.326-13.174h320q19.152 0 32.326 13.174T518.087 576q0 19.152-13.174 32.326T472.587 621.5h-320Zm0-203.587q-19.152 0-32.326-13.174t-13.174-32.326q0-19.152 13.174-32.326t32.326-13.174h440q19.152 0 32.326 13.174t13.174 32.326q0 19.152-13.174 32.326t-32.326 13.174h-440ZM708.913 576l112.174 112.174q12.674 12.674 12.674 31.826t-12.674 31.826Q808.413 764.5 789.261 764.5t-31.826-12.674l-144-144Q600 594.391 600 576t13.435-31.826l144-144q12.674-12.674 31.826-12.674t31.826 12.674q12.674 12.674 12.674 31.826t-12.674 31.826L708.913 576Z" />
+      </svg>
+      <span class="sr-only">Toggle navigation menu</span>
+    </button>
+    <div class="flex items-center justify-between flex-1 gap-2 sm:gap-4 md:justify-end">
+      <div class="flex-1 w-full md:w-auto md:flex-none"><form id="searchbox"
+      action="../../../search.html"
+      method="get"
+      class="relative flex items-center group"
+      @keydown.k.window.meta="$refs.search.focus()">
+  <input x-ref="search"
+          name="q"
+          id="search-input"
+          type="search"
+          aria-label="Search the docs"
+          placeholder="Search ..."
+          class="inline-flex items-center font-medium transition-colors bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background border border-input hover:bg-accent focus:bg-accent hover:text-accent-foreground focus:text-accent-foreground hover:placeholder-accent-foreground py-2 px-4 relative h-9 w-full justify-start rounded-[0.5rem] text-sm text-muted-foreground sm:pr-12 md:w-40 lg:w-64" />
+  <kbd class="pointer-events-none absolute right-1.5 top-2 hidden h-5 select-none text-muted-foreground items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex group-hover:bg-accent group-hover:text-accent-foreground">
+    <span class="text-xs">⌘</span>
+    K
+  </kbd>
+</form>
+      </div>
+      <nav class="flex items-center gap-1">
+        <button @click="darkMode = !darkMode"
+          class="relative inline-flex items-center justify-center px-0 text-sm font-medium transition-colors rounded-md hover:bg-accent hover:text-accent-foreground h-9 w-9"
+          type="button"
+          title="Toggle color scheme">
+          <svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 96 960 960" fill="currentColor"
+            class="absolute transition-all scale-100 rotate-0 dark:-rotate-90 dark:scale-0">
+            <path
+              d="M480 685q45.456 0 77.228-31.772Q589 621.456 589 576q0-45.456-31.772-77.228Q525.456 467 480 467q-45.456 0-77.228 31.772Q371 530.544 371 576q0 45.456 31.772 77.228Q434.544 685 480 685Zm0 91q-83 0-141.5-58.5T280 576q0-83 58.5-141.5T480 376q83 0 141.5 58.5T680 576q0 83-58.5 141.5T480 776ZM80 621.5q-19.152 0-32.326-13.174T34.5 576q0-19.152 13.174-32.326T80 530.5h80q19.152 0 32.326 13.174T205.5 576q0 19.152-13.174 32.326T160 621.5H80Zm720 0q-19.152 0-32.326-13.174T754.5 576q0-19.152 13.174-32.326T800 530.5h80q19.152 0 32.326 13.174T925.5 576q0 19.152-13.174 32.326T880 621.5h-80Zm-320-320q-19.152 0-32.326-13.174T434.5 256v-80q0-19.152 13.174-32.326T480 130.5q19.152 0 32.326 13.174T525.5 176v80q0 19.152-13.174 32.326T480 301.5Zm0 720q-19.152 0-32.326-13.17Q434.5 995.152 434.5 976v-80q0-19.152 13.174-32.326T480 850.5q19.152 0 32.326 13.174T525.5 896v80q0 19.152-13.174 32.33-13.174 13.17-32.326 13.17ZM222.174 382.065l-43-42Q165.5 327.391 166 308.239t13.174-33.065q13.435-13.674 32.587-13.674t32.065 13.674l42.239 43q12.674 13.435 12.555 31.706-.12 18.272-12.555 31.946-12.674 13.674-31.445 13.413-18.772-.261-32.446-13.174Zm494 494.761-42.239-43q-12.674-13.435-12.674-32.087t12.674-31.565Q686.609 756.5 705.38 757q18.772.5 32.446 13.174l43 41.761Q794.5 824.609 794 843.761t-13.174 33.065Q767.391 890.5 748.239 890.5t-32.065-13.674Zm-42-494.761Q660.5 369.391 661 350.62q.5-18.772 13.174-32.446l41.761-43Q728.609 261.5 747.761 262t33.065 13.174q13.674 13.435 13.674 32.587t-13.674 32.065l-43 42.239q-13.435 12.674-31.706 12.555-18.272-.12-31.946-12.555Zm-495 494.761Q165.5 863.391 165.5 844.239t13.674-32.065l43-42.239q13.435-12.674 32.087-12.674t31.565 12.674Q299.5 782.609 299 801.38q-.5 18.772-13.174 32.446l-41.761 43Q231.391 890.5 212.239 890t-33.065-13.174ZM480 576Z" />
+          </svg>
+          <svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 96 960 960" fill="currentColor"
+            class="absolute transition-all scale-0 rotate-90 dark:rotate-0 dark:scale-100">
+            <path
+              d="M480 936q-151 0-255.5-104.5T120 576q0-138 90-239.5T440 218q25-3 39 18t-1 44q-17 26-25.5 55t-8.5 61q0 90 63 153t153 63q31 0 61.5-9t54.5-25q21-14 43-1.5t19 39.5q-14 138-117.5 229T480 936Zm0-80q88 0 158-48.5T740 681q-20 5-40 8t-40 3q-123 0-209.5-86.5T364 396q0-20 3-40t8-40q-78 32-126.5 102T200 576q0 116 82 198t198 82Zm-10-270Z" />
+          </svg>
+        </button>
+      </nav>
+    </div>
+  </div>
+</header>
+
+    <div class="flex-1"><div
+        class="container md:grid md:grid-cols-[220px_minmax(0,1fr)] md:gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-10"><aside id="left-sidebar"
+  class="fixed inset-y-0 left-0 md:top-14 z-50 md:z-30 bg-background md:bg-transparent transition-all duration-100 -translate-x-full md:translate-x-0 ml-0 p-6 md:p-0 md:-ml-2 md:h-[calc(100vh-3.5rem)] w-5/6 md:w-full overflow-y-auto border-r border-border md:sticky"
+  :aria-hidden="!showSidebar" :class="{ 'translate-x-0': showSidebar }">
+
+    <a href="../../../index.html" class="justify-start text-sm md:!hidden bg-background"><span class="font-bold text-clip whitespace-nowrap">POTPyRI  documentation</span>
+    </a>
+
+    <div class="relative overflow-hidden md:overflow-auto my-4 md:my-0">
+      <div class="overflow-y-auto h-full w-full relative pr-6"><nav class="table w-full min-w-full my-6 lg:my-8">
+  <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/index.html">API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/instruments.html">Instruments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/primitives.html">Primitives</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/utils.html">Utilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../api/scripts.html">Scripts</a></li>
+</ul>
+</li>
+</ul>
+
+</nav>
+      </div>
+    </div>
+    <button type="button" @click="showSidebar = false"
+      class="absolute md:hidden right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100">
+      <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 96 960 960" fill="currentColor"
+        stroke="none" class="h-4 w-4">
+        <path
+          d="M480 632 284 828q-11 11-28 11t-28-11q-11-11-11-28t11-28l196-196-196-196q-11-11-11-28t11-28q11-11 28-11t28 11l196 196 196-196q11-11 28-11t28 11q11 11 11 28t-11 28L536 576l196 196q11 11 11 28t-11 28q-11 11-28 11t-28-11L480 632Z" />
+      </svg>
+    </button>
+  </aside>
+          <main class="relative py-6 lg:gap-10 lg:py-8 xl:grid xl:grid-cols-[1fr_300px]">
+<div class="w-full min-w-0 mx-auto">
+<nav aria-label="breadcrumbs"
+     class="flex items-center mb-4 space-x-1 text-sm text-muted-foreground">
+  <a class="overflow-hidden text-ellipsis whitespace-nowrap hover:text-foreground"
+     href="../../../index.html">
+    <span class="hidden md:inline">POTPyRI  documentation</span>
+    <svg xmlns="http://www.w3.org/2000/svg"
+         height="18"
+         width="18"
+         viewBox="0 96 960 960"
+         aria-label="Home"
+         fill="currentColor"
+         stroke="none"
+         class="md:hidden">
+      <path d="M240 856h120V616h240v240h120V496L480 316 240 496v360Zm-80 80V456l320-240 320 240v480H520V696h-80v240H160Zm320-350Z" />
+    </svg>
+  </a>
+  
+<div class="mr-1">/</div><a class="hover:text-foreground overflow-hidden text-ellipsis whitespace-nowrap"
+       href="../../index.html">Module code</a>
+    
+<div class="mr-1">/</div><span aria-current="page"
+        class="font-medium text-foreground overflow-hidden text-ellipsis whitespace-nowrap">potpyri.primitives.absphot</span>
+</nav>
+
+    <div id="content" role="main">
+      <h1>Source code for potpyri.primitives.absphot</h1><div class="highlight"><pre>
+<span></span><code><span id="line-1"><span class="sd">&quot;&quot;&quot;Absolute photometry zeropoint calibration using catalog magnitudes.</span>
+</span><span id="line-2">
+</span><span id="line-3"><span class="sd">Queries Vizier (e.g. PS1), matches sources, and fits zeropoint via</span>
+</span><span id="line-4"><span class="sd">iterative ODR. Writes ZPTMAG and related keywords to the stack header.</span>
+</span><span id="line-5"><span class="sd">Uses multiple Vizier mirrors (CDS, Tokyo, CfA, INASAN, IUCAA, IDIA) with</span>
+</span><span id="line-6"><span class="sd">fallback when the first attempt fails.</span>
+</span><span id="line-7"><span class="sd">Authors: Kerry Paterson, Charlie Kilpatrick.</span>
+</span><span id="line-8"><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="line-9"><span class="kn">from</span><span class="w"> </span><span class="nn">potpyri._version</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span>
+</span><span id="line-10">
+</span><span id="line-11"><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+</span><span id="line-12">
+</span><span id="line-13"><span class="kn">from</span><span class="w"> </span><span class="nn">astroquery.vizier</span><span class="w"> </span><span class="kn">import</span> <span class="n">Vizier</span>
+</span><span id="line-14"><span class="kn">from</span><span class="w"> </span><span class="nn">astropy</span><span class="w"> </span><span class="kn">import</span> <span class="n">units</span> <span class="k">as</span> <span class="n">u</span>
+</span><span id="line-15">
+</span><span id="line-16"><span class="c1"># Vizier mirror servers (hostnames only); tried in order when a query fails.</span>
+</span><span id="line-17"><span class="n">VIZIER_MIRRORS</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="line-18">    <span class="s1">&#39;vizier.cds.unistra.fr&#39;</span><span class="p">,</span>   <span class="c1"># CDS / Strasbourg, France</span>
+</span><span id="line-19">    <span class="s1">&#39;vizier.nao.ac.jp&#39;</span><span class="p">,</span>        <span class="c1"># ADAC / Tokyo, Japan</span>
+</span><span id="line-20">    <span class="s1">&#39;vizier.cfa.harvard.edu&#39;</span><span class="p">,</span>  <span class="c1"># CfA / Harvard, USA</span>
+</span><span id="line-21">    <span class="s1">&#39;vizier.inasan.ru&#39;</span><span class="p">,</span>        <span class="c1"># INASAN / Moscow, Russia</span>
+</span><span id="line-22">    <span class="s1">&#39;vizier.iucaa.in&#39;</span><span class="p">,</span>         <span class="c1"># IUCAA / Pune, India</span>
+</span><span id="line-23">    <span class="s1">&#39;vizier.idia.ac.za&#39;</span><span class="p">,</span>       <span class="c1"># IDIA / South Africa</span>
+</span><span id="line-24"><span class="p">]</span>
+</span><span id="line-25"><span class="kn">from</span><span class="w"> </span><span class="nn">astropy.coordinates</span><span class="w"> </span><span class="kn">import</span> <span class="n">SkyCoord</span>
+</span><span id="line-26"><span class="kn">from</span><span class="w"> </span><span class="nn">astropy.table</span><span class="w"> </span><span class="kn">import</span> <span class="n">Table</span>
+</span><span id="line-27"><span class="kn">from</span><span class="w"> </span><span class="nn">astropy.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">fits</span>
+</span><span id="line-28">
+</span><span id="line-29"><span class="c1"># Internal dependency</span>
+</span><span id="line-30"><span class="kn">from</span><span class="w"> </span><span class="nn">potpyri.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">utilities</span>
+</span><span id="line-31">
+<div class="viewcode-block" id="absphot">
+<a class="viewcode-back" href="../../../api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.absphot">[docs]</a>
+</span><span id="line-32"><span class="k">class</span><span class="w"> </span><span class="nc">absphot</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+</span><span id="line-33"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Zeropoint fitter using catalog magnitudes and iterative sigma clipping.&quot;&quot;&quot;</span>
+</span><span id="line-34">
+</span><span id="line-35">    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">iterations</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
+</span><span id="line-36"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize zeropoint fitter.</span>
+</span><span id="line-37">
+</span><span id="line-38"><span class="sd">        Parameters</span>
+</span><span id="line-39"><span class="sd">        ----------</span>
+</span><span id="line-40"><span class="sd">        iterations : int, optional</span>
+</span><span id="line-41"><span class="sd">            Number of sigma-clip iterations. Default is 5.</span>
+</span><span id="line-42"><span class="sd">        sigma : float, optional</span>
+</span><span id="line-43"><span class="sd">            Sigma threshold for clipping. Default is 5.</span>
+</span><span id="line-44"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="line-45">        <span class="bp">self</span><span class="o">.</span><span class="n">iterations</span> <span class="o">=</span> <span class="n">iterations</span>
+</span><span id="line-46">        <span class="bp">self</span><span class="o">.</span><span class="n">sigma</span> <span class="o">=</span> <span class="n">sigma</span>
+</span><span id="line-47">
+</span><span id="line-48">        <span class="bp">self</span><span class="o">.</span><span class="n">odr_iter</span> <span class="o">=</span> <span class="mi">2</span>
+</span><span id="line-49">
+<div class="viewcode-block" id="absphot.get_zeropoint">
+<a class="viewcode-back" href="../../../api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.absphot.get_zeropoint">[docs]</a>
+</span><span id="line-50">    <span class="k">def</span><span class="w"> </span><span class="nf">get_zeropoint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">flux</span><span class="p">,</span> <span class="n">fluxerr</span><span class="p">,</span> <span class="n">mag</span><span class="p">,</span> <span class="n">magerr</span><span class="p">):</span>
+</span><span id="line-51"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Fit zeropoint (and error) from flux/mag arrays using ODR.</span>
+</span><span id="line-52">
+</span><span id="line-53"><span class="sd">        Parameters</span>
+</span><span id="line-54"><span class="sd">        ----------</span>
+</span><span id="line-55"><span class="sd">        flux : array-like</span>
+</span><span id="line-56"><span class="sd">            Object fluxes (e.g. from aperture photometry).</span>
+</span><span id="line-57"><span class="sd">        fluxerr : array-like</span>
+</span><span id="line-58"><span class="sd">            Flux errors.</span>
+</span><span id="line-59"><span class="sd">        mag : array-like</span>
+</span><span id="line-60"><span class="sd">            Catalog magnitudes.</span>
+</span><span id="line-61"><span class="sd">        magerr : array-like</span>
+</span><span id="line-62"><span class="sd">            Catalog magnitude errors.</span>
+</span><span id="line-63">
+</span><span id="line-64"><span class="sd">        Returns</span>
+</span><span id="line-65"><span class="sd">        -------</span>
+</span><span id="line-66"><span class="sd">        tuple of float</span>
+</span><span id="line-67"><span class="sd">            (zeropoint, zeropoint_error).</span>
+</span><span id="line-68"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="line-69">        <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+</span><span id="line-70">        <span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">():</span>
+</span><span id="line-71">            <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="n">message</span><span class="o">=</span><span class="sa">r</span><span class="s1">&#39;.*scipy\.odr.*&#39;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">DeprecationWarning</span><span class="p">)</span>
+</span><span id="line-72">            <span class="kn">from</span><span class="w"> </span><span class="nn">scipy.odr</span><span class="w"> </span><span class="kn">import</span> <span class="n">ODR</span>
+</span><span id="line-73">            <span class="kn">from</span><span class="w"> </span><span class="nn">scipy.odr</span><span class="w"> </span><span class="kn">import</span> <span class="n">Model</span>
+</span><span id="line-74">            <span class="kn">from</span><span class="w"> </span><span class="nn">scipy.odr</span><span class="w"> </span><span class="kn">import</span> <span class="n">RealData</span>
+</span><span id="line-75">        
+</span><span id="line-76">        <span class="k">def</span><span class="w"> </span><span class="nf">magnitude</span><span class="p">(</span><span class="n">zpt</span><span class="p">,</span> <span class="n">flux</span><span class="p">):</span>
+</span><span id="line-77">            <span class="k">return</span><span class="p">(</span><span class="n">zpt</span> <span class="o">-</span> <span class="mf">2.5</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">flux</span><span class="p">))</span>
+</span><span id="line-78">
+</span><span id="line-79">        <span class="n">zpt_guess</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmedian</span><span class="p">(</span><span class="n">mag</span> <span class="o">+</span> <span class="mf">2.5</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">flux</span><span class="p">))</span>
+</span><span id="line-80">
+</span><span id="line-81">        <span class="n">data</span> <span class="o">=</span> <span class="n">RealData</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">flux</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">),</span>
+</span><span id="line-82">                        <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">mag</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">),</span> 
+</span><span id="line-83">                        <span class="n">sx</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">fluxerr</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">),</span>
+</span><span id="line-84">                        <span class="n">sy</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">magerr</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">))</span>
+</span><span id="line-85">
+</span><span id="line-86">        <span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">(</span><span class="n">magnitude</span><span class="p">)</span>
+</span><span id="line-87">        <span class="n">odr</span> <span class="o">=</span> <span class="n">ODR</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">beta0</span><span class="o">=</span><span class="p">[</span><span class="n">zpt_guess</span><span class="p">],</span> <span class="n">maxit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">odr_iter</span><span class="p">)</span>
+</span><span id="line-88">
+</span><span id="line-89">        <span class="n">output</span> <span class="o">=</span> <span class="n">odr</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</span><span id="line-90">
+</span><span id="line-91">        <span class="n">zpt</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">beta</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="line-92">        <span class="n">zpterr</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">sd_beta</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="line-93">
+</span><span id="line-94">        <span class="k">return</span><span class="p">(</span><span class="n">zpt</span><span class="p">,</span> <span class="n">zpterr</span><span class="p">)</span></div>
+
+</span><span id="line-95">
+<div class="viewcode-block" id="absphot.zpt_iteration">
+<a class="viewcode-back" href="../../../api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.absphot.zpt_iteration">[docs]</a>
+</span><span id="line-96">    <span class="k">def</span><span class="w"> </span><span class="nf">zpt_iteration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">flux</span><span class="p">,</span> <span class="n">fluxerr</span><span class="p">,</span> <span class="n">mag</span><span class="p">,</span> <span class="n">magerr</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span id="line-97"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Iteratively sigma-clip and fit zeropoint via ODR.</span>
+</span><span id="line-98">
+</span><span id="line-99"><span class="sd">        Parameters</span>
+</span><span id="line-100"><span class="sd">        ----------</span>
+</span><span id="line-101"><span class="sd">        flux : array-like</span>
+</span><span id="line-102"><span class="sd">            Object fluxes.</span>
+</span><span id="line-103"><span class="sd">        fluxerr : array-like</span>
+</span><span id="line-104"><span class="sd">            Flux errors.</span>
+</span><span id="line-105"><span class="sd">        mag : array-like</span>
+</span><span id="line-106"><span class="sd">            Catalog magnitudes.</span>
+</span><span id="line-107"><span class="sd">        magerr : array-like</span>
+</span><span id="line-108"><span class="sd">            Catalog magnitude errors.</span>
+</span><span id="line-109"><span class="sd">        log : ColoredLogger, optional</span>
+</span><span id="line-110"><span class="sd">            Logger for progress.</span>
+</span><span id="line-111">
+</span><span id="line-112"><span class="sd">        Returns</span>
+</span><span id="line-113"><span class="sd">        -------</span>
+</span><span id="line-114"><span class="sd">        tuple</span>
+</span><span id="line-115"><span class="sd">            (zeropoint, zeropoint_error, master_mask). master_mask is boolean</span>
+</span><span id="line-116"><span class="sd">            array of sources used in final fit.</span>
+</span><span id="line-117"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="line-118">        <span class="n">flux</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">flux</span><span class="p">)</span>
+</span><span id="line-119">        <span class="n">fluxerr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">fluxerr</span><span class="p">)</span>
+</span><span id="line-120">        <span class="n">mag</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">mag</span><span class="p">)</span>
+</span><span id="line-121">        <span class="n">magerr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">magerr</span><span class="p">)</span>
+</span><span id="line-122">
+</span><span id="line-123">        <span class="n">nobj_orig</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">mag</span><span class="p">)</span>
+</span><span id="line-124">        <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">nobj_orig</span><span class="p">)</span>
+</span><span id="line-125">
+</span><span id="line-126">        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">iterations</span><span class="p">):</span>
+</span><span id="line-127">
+</span><span id="line-128">            <span class="n">nobj</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">flux</span><span class="p">)</span>
+</span><span id="line-129">            <span class="n">zpt</span><span class="p">,</span> <span class="n">zpterr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_zeropoint</span><span class="p">(</span><span class="n">flux</span><span class="p">,</span> <span class="n">fluxerr</span><span class="p">,</span> <span class="n">mag</span><span class="p">,</span> <span class="n">magerr</span><span class="p">)</span>
+</span><span id="line-130">
+</span><span id="line-131">            <span class="n">mag_deriv</span> <span class="o">=</span> <span class="o">-</span><span class="mf">2.5</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">flux</span><span class="p">)</span><span class="o">+</span><span class="n">zpt</span>
+</span><span id="line-132">            <span class="n">magerr_deriv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="mf">2.5</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span> <span class="o">*</span> <span class="n">fluxerr</span><span class="o">/</span><span class="n">flux</span><span class="p">)</span>
+</span><span id="line-133">
+</span><span id="line-134">            <span class="n">total_err</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">magerr</span><span class="o">**</span><span class="mi">2</span><span class="o">+</span><span class="n">magerr_deriv</span><span class="o">**</span><span class="mi">2</span><span class="o">+</span><span class="n">zpterr</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+</span><span id="line-135">
+</span><span id="line-136">            <span class="n">mask</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">mag</span> <span class="o">-</span> <span class="n">mag_deriv</span><span class="p">)</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigma</span> <span class="o">*</span> <span class="n">total_err</span>
+</span><span id="line-137">            <span class="n">idx</span> <span class="o">=</span> <span class="n">idx</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span>
+</span><span id="line-138">
+</span><span id="line-139">            <span class="n">flux</span><span class="o">=</span><span class="n">flux</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span> <span class="p">;</span> <span class="n">fluxerr</span><span class="o">=</span><span class="n">fluxerr</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span>
+</span><span id="line-140">            <span class="n">mag</span><span class="o">=</span><span class="n">mag</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span> <span class="p">;</span> <span class="n">magerr</span><span class="o">=</span><span class="n">magerr</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span>
+</span><span id="line-141">
+</span><span id="line-142">            <span class="n">zpt</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%.6f</span><span class="s1">&#39;</span><span class="o">%</span><span class="n">zpt</span><span class="p">)</span>
+</span><span id="line-143">            <span class="n">zpterr</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%.6f</span><span class="s1">&#39;</span><span class="o">%</span><span class="n">zpterr</span><span class="p">)</span>
+</span><span id="line-144">
+</span><span id="line-145">            <span class="n">message</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;Iteration </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s1">/</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">iterations</span><span class="si">}</span><span class="s1">: </span><span class="si">{</span><span class="n">nobj</span><span class="si">}</span><span class="s1"> obj, &#39;</span>
+</span><span id="line-146">            <span class="n">message</span> <span class="o">+=</span> <span class="sa">f</span><span class="s1">&#39;zpt=</span><span class="si">{</span><span class="n">zpt</span><span class="si">}</span><span class="s1">+/-</span><span class="si">{</span><span class="n">zpterr</span><span class="si">}</span><span class="s1">, &#39;</span>
+</span><span id="line-147">            <span class="n">message</span> <span class="o">+=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">sigma</span><span class="si">}</span><span class="s1">-sigma clip to </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">flux</span><span class="p">)</span><span class="si">}</span><span class="s1"> obj&#39;</span>
+</span><span id="line-148">            <span class="k">if</span> <span class="n">log</span><span class="p">:</span> 
+</span><span id="line-149">                <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+</span><span id="line-150">            <span class="k">else</span><span class="p">:</span>
+</span><span id="line-151">                <span class="nb">print</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+</span><span id="line-152">        
+</span><span id="line-153">        <span class="k">if</span> <span class="n">log</span><span class="p">:</span>
+</span><span id="line-154">            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">flux</span><span class="p">)</span><span class="si">}</span><span class="s1"> stars used to calculate final zeropoint.&#39;</span><span class="p">)</span>
+</span><span id="line-155">        <span class="k">else</span><span class="p">:</span>
+</span><span id="line-156">            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">flux</span><span class="p">)</span><span class="si">}</span><span class="s1"> stars used to calculate final zeropoint.&#39;</span><span class="p">)</span>
+</span><span id="line-157">        
+</span><span id="line-158">        <span class="n">master_mask</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">i</span> <span class="ow">in</span> <span class="n">idx</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">nobj_orig</span><span class="p">)])</span>
+</span><span id="line-159">
+</span><span id="line-160">        <span class="k">return</span><span class="p">(</span><span class="n">zpt</span><span class="p">,</span> <span class="n">zpterr</span><span class="p">,</span> <span class="n">master_mask</span><span class="p">)</span></div>
+
+</span><span id="line-161">
+<div class="viewcode-block" id="absphot.get_catalog">
+<a class="viewcode-back" href="../../../api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.absphot.get_catalog">[docs]</a>
+</span><span id="line-162">    <span class="k">def</span><span class="w"> </span><span class="nf">get_catalog</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coords</span><span class="p">,</span> <span class="n">catalog</span><span class="p">,</span> <span class="n">filt</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span id="line-163"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Query VizieR for catalog magnitudes in a filter around given coordinates.</span>
+</span><span id="line-164">
+</span><span id="line-165"><span class="sd">        Parameters</span>
+</span><span id="line-166"><span class="sd">        ----------</span>
+</span><span id="line-167"><span class="sd">        coords : astropy.coordinates.SkyCoord</span>
+</span><span id="line-168"><span class="sd">            Target coordinates (used for region size).</span>
+</span><span id="line-169"><span class="sd">        catalog : str</span>
+</span><span id="line-170"><span class="sd">            Catalog name (e.g. &#39;PS1&#39;, &#39;2MASS&#39;).</span>
+</span><span id="line-171"><span class="sd">        filt : str</span>
+</span><span id="line-172"><span class="sd">            Filter name (e.g. &#39;g&#39;, &#39;r&#39;, &#39;J&#39;).</span>
+</span><span id="line-173"><span class="sd">        log : ColoredLogger, optional</span>
+</span><span id="line-174"><span class="sd">            Logger for progress.</span>
+</span><span id="line-175">
+</span><span id="line-176"><span class="sd">        Returns</span>
+</span><span id="line-177"><span class="sd">        -------</span>
+</span><span id="line-178"><span class="sd">        tuple or (None, None, None)</span>
+</span><span id="line-179"><span class="sd">            (astropy.table.Table, catalog_name, catalog_ID) or (None, None, None)</span>
+</span><span id="line-180"><span class="sd">            if query fails.</span>
+</span><span id="line-181"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="line-182">        <span class="k">if</span> <span class="n">log</span><span class="p">:</span> <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Searching for catalog </span><span class="si">{</span><span class="n">catalog</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</span><span id="line-183">        
+</span><span id="line-184">        <span class="n">coord_ra</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">([</span><span class="n">c</span><span class="o">.</span><span class="n">ra</span><span class="o">.</span><span class="n">degree</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">coords</span><span class="p">])</span>
+</span><span id="line-185">        <span class="n">coord_dec</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">([</span><span class="n">c</span><span class="o">.</span><span class="n">dec</span><span class="o">.</span><span class="n">degree</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">coords</span><span class="p">])</span>
+</span><span id="line-186">
+</span><span id="line-187">        <span class="n">catalog</span><span class="p">,</span> <span class="n">cat_ID</span><span class="p">,</span> <span class="n">cat_ra</span><span class="p">,</span> <span class="n">cat_dec</span><span class="p">,</span> <span class="n">cat_mag</span><span class="p">,</span> <span class="n">cat_err</span> <span class="o">=</span> <span class="n">utilities</span><span class="o">.</span><span class="n">find_catalog</span><span class="p">(</span><span class="n">catalog</span><span class="p">,</span> <span class="n">filt</span><span class="p">,</span> <span class="n">coord_ra</span><span class="p">,</span> <span class="n">coord_dec</span><span class="p">)</span>
+</span><span id="line-188">        
+</span><span id="line-189">        <span class="n">med_coord</span> <span class="o">=</span> <span class="n">SkyCoord</span><span class="p">(</span><span class="n">coord_ra</span><span class="p">,</span> <span class="n">coord_dec</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s1">&#39;deg&#39;</span><span class="p">)</span>
+</span><span id="line-190">
+</span><span id="line-191">        <span class="n">seps</span> <span class="o">=</span> <span class="n">med_coord</span><span class="o">.</span><span class="n">separation</span><span class="p">(</span><span class="n">coords</span><span class="p">)</span>
+</span><span id="line-192">        <span class="n">max_sep</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">seps</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">deg</span><span class="p">)</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+</span><span id="line-193">
+</span><span id="line-194">        <span class="n">cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">cat_ra</span><span class="p">,</span> <span class="n">cat_dec</span><span class="p">,</span> <span class="n">cat_mag</span><span class="p">,</span> <span class="n">cat_err</span><span class="p">]</span>
+</span><span id="line-195">        <span class="c1"># Add Kron mag if the catalog is PS1</span>
+</span><span id="line-196">        <span class="k">if</span> <span class="n">cat_ID</span><span class="o">==</span><span class="s1">&#39;II/349&#39;</span><span class="p">:</span>
+</span><span id="line-197">            <span class="n">cols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">filt</span><span class="si">}</span><span class="s1">Kmag&#39;</span><span class="p">)</span>
+</span><span id="line-198">        
+</span><span id="line-199">        <span class="k">if</span> <span class="n">log</span><span class="p">:</span>
+</span><span id="line-200">            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Getting </span><span class="si">{</span><span class="n">catalog</span><span class="si">}</span><span class="s1"> catalog with ID </span><span class="si">{</span><span class="n">cat_ID</span><span class="si">}</span><span class="s1"> in filt </span><span class="si">{</span><span class="n">filt</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</span><span id="line-201">            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Querying around </span><span class="si">{</span><span class="n">coord_ra</span><span class="si">}</span><span class="s1">, </span><span class="si">{</span><span class="n">coord_dec</span><span class="si">}</span><span class="s1"> deg&#39;</span><span class="p">)</span>
+</span><span id="line-202">        <span class="n">Vizier</span><span class="o">.</span><span class="n">clear_cache</span><span class="p">()</span>
+</span><span id="line-203">        <span class="n">width</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">([</span><span class="mf">2.0</span> <span class="o">*</span> <span class="n">max_sep</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">])</span>
+</span><span id="line-204">        <span class="n">cat</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="line-205">        <span class="n">last_error</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="line-206">        <span class="k">for</span> <span class="n">server</span> <span class="ow">in</span> <span class="n">VIZIER_MIRRORS</span><span class="p">:</span>
+</span><span id="line-207">            <span class="k">try</span><span class="p">:</span>
+</span><span id="line-208">                <span class="n">vizier</span> <span class="o">=</span> <span class="n">Vizier</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span> <span class="n">vizier_server</span><span class="o">=</span><span class="n">server</span><span class="p">)</span>
+</span><span id="line-209">                <span class="n">vizier</span><span class="o">.</span><span class="n">ROW_LIMIT</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+</span><span id="line-210">                <span class="n">cat</span> <span class="o">=</span> <span class="n">vizier</span><span class="o">.</span><span class="n">query_region</span><span class="p">(</span><span class="n">med_coord</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="n">width</span><span class="o">*</span><span class="n">u</span><span class="o">.</span><span class="n">degree</span><span class="p">,</span>
+</span><span id="line-211">                    <span class="n">catalog</span><span class="o">=</span><span class="n">cat_ID</span><span class="p">)</span>
+</span><span id="line-212">                <span class="k">if</span> <span class="n">cat</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">cat</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+</span><span id="line-213">                    <span class="k">if</span> <span class="n">log</span><span class="p">:</span>
+</span><span id="line-214">                        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Vizier query succeeded via </span><span class="si">{</span><span class="n">server</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</span><span id="line-215">                    <span class="k">break</span>
+</span><span id="line-216">                <span class="n">cat</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="line-217">            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+</span><span id="line-218">                <span class="n">last_error</span> <span class="o">=</span> <span class="n">e</span>
+</span><span id="line-219">                <span class="k">if</span> <span class="n">log</span><span class="p">:</span>
+</span><span id="line-220">                    <span class="n">log</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Vizier mirror </span><span class="si">{</span><span class="n">server</span><span class="si">}</span><span class="s1"> failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</span><span id="line-221">                <span class="k">else</span><span class="p">:</span>
+</span><span id="line-222">                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Vizier mirror </span><span class="si">{</span><span class="n">server</span><span class="si">}</span><span class="s1"> failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</span><span id="line-223">                <span class="n">cat</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="line-224">        <span class="k">if</span> <span class="n">cat</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">last_error</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">log</span><span class="p">:</span>
+</span><span id="line-225">            <span class="n">log</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;All Vizier mirrors failed; last error: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">last_error</span><span class="p">))</span>
+</span><span id="line-226">
+</span><span id="line-227">        <span class="k">if</span> <span class="n">cat</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">cat</span><span class="p">)</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">:</span>
+</span><span id="line-228">            <span class="n">cat</span> <span class="o">=</span> <span class="n">cat</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="line-229">            <span class="n">cat</span> <span class="o">=</span> <span class="n">cat</span><span class="p">[</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">cat</span><span class="p">[</span><span class="n">cat_mag</span><span class="p">])]</span>
+</span><span id="line-230">            <span class="n">cat</span> <span class="o">=</span> <span class="n">cat</span><span class="p">[</span><span class="n">cat</span><span class="p">[</span><span class="n">cat_err</span><span class="p">]</span><span class="o">&gt;</span><span class="mf">0.</span><span class="p">]</span>
+</span><span id="line-231">
+</span><span id="line-232">            <span class="k">if</span> <span class="n">cat_ID</span><span class="o">==</span><span class="s1">&#39;II/349&#39;</span><span class="p">:</span>
+</span><span id="line-233">                <span class="k">if</span> <span class="n">log</span><span class="p">:</span>
+</span><span id="line-234">                    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Cutting on Kron magnitudes&#39;</span><span class="p">)</span>
+</span><span id="line-235">                <span class="k">else</span><span class="p">:</span>
+</span><span id="line-236">                    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Cutting on Kron magnitudes&#39;</span><span class="p">)</span>
+</span><span id="line-237">
+</span><span id="line-238">                <span class="n">nsources</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">cat</span><span class="p">)</span>
+</span><span id="line-239">                <span class="n">cat_kron</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">filt</span><span class="si">}</span><span class="s1">Kmag&#39;</span>
+</span><span id="line-240">                <span class="n">mask</span> <span class="o">=</span> <span class="n">cat</span><span class="p">[</span><span class="n">cat_mag</span><span class="p">]</span><span class="o">-</span><span class="n">cat</span><span class="p">[</span><span class="n">cat_kron</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">0.1</span>
+</span><span id="line-241">                <span class="n">cat</span> <span class="o">=</span> <span class="n">cat</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span>
+</span><span id="line-242">                <span class="n">nkron</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">cat</span><span class="p">)</span>
+</span><span id="line-243">
+</span><span id="line-244">                <span class="k">if</span> <span class="n">log</span><span class="p">:</span>
+</span><span id="line-245">                    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Cut catalog from </span><span class="si">{</span><span class="n">nsources</span><span class="si">}</span><span class="s1"> to </span><span class="si">{</span><span class="n">nkron</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</span><span id="line-246">                <span class="k">else</span><span class="p">:</span>
+</span><span id="line-247">                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Cut catalog from </span><span class="si">{</span><span class="n">nsources</span><span class="si">}</span><span class="s1"> to </span><span class="si">{</span><span class="n">nkron</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</span><span id="line-248">
+</span><span id="line-249">            <span class="n">cat</span><span class="o">.</span><span class="n">rename_column</span><span class="p">(</span><span class="n">cat_ra</span><span class="p">,</span> <span class="s1">&#39;ra&#39;</span><span class="p">)</span>
+</span><span id="line-250">            <span class="n">cat</span><span class="o">.</span><span class="n">rename_column</span><span class="p">(</span><span class="n">cat_dec</span><span class="p">,</span> <span class="s1">&#39;dec&#39;</span><span class="p">)</span>
+</span><span id="line-251">            <span class="n">cat</span><span class="o">.</span><span class="n">rename_column</span><span class="p">(</span><span class="n">cat_mag</span><span class="p">,</span> <span class="s1">&#39;mag&#39;</span><span class="p">)</span>
+</span><span id="line-252">            <span class="n">cat</span><span class="o">.</span><span class="n">rename_column</span><span class="p">(</span><span class="n">cat_err</span><span class="p">,</span> <span class="s1">&#39;mag_err&#39;</span><span class="p">)</span>
+</span><span id="line-253">
+</span><span id="line-254">            <span class="c1"># Convert to AB magnitudes</span>
+</span><span id="line-255">            <span class="k">if</span> <span class="n">catalog</span><span class="o">==</span><span class="s1">&#39;2MASS&#39;</span><span class="p">:</span>
+</span><span id="line-256">                <span class="k">if</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;J&#39;</span><span class="p">:</span> <span class="n">cat</span><span class="p">[</span><span class="s1">&#39;mag&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cat</span><span class="p">[</span><span class="s1">&#39;mag&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="mf">4.56</span><span class="o">-</span><span class="mf">3.65</span><span class="p">)</span>
+</span><span id="line-257">                <span class="k">if</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;H&#39;</span><span class="p">:</span> <span class="n">cat</span><span class="p">[</span><span class="s1">&#39;mag&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cat</span><span class="p">[</span><span class="s1">&#39;mag&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="mf">4.71</span><span class="o">-</span><span class="mf">3.32</span><span class="p">)</span>
+</span><span id="line-258">                <span class="k">if</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;K&#39;</span><span class="p">:</span> <span class="n">cat</span><span class="p">[</span><span class="s1">&#39;mag&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cat</span><span class="p">[</span><span class="s1">&#39;mag&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="mf">5.14</span><span class="o">-</span><span class="mf">3.29</span><span class="p">)</span>
+</span><span id="line-259">                <span class="k">if</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;Ks&#39;</span><span class="p">:</span> <span class="n">cat</span><span class="p">[</span><span class="s1">&#39;mag&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cat</span><span class="p">[</span><span class="s1">&#39;mag&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="mf">5.14</span><span class="o">-</span><span class="mf">3.29</span><span class="p">)</span>
+</span><span id="line-260">
+</span><span id="line-261">            <span class="k">if</span> <span class="n">catalog</span><span class="o">==</span><span class="s1">&#39;2MASS&#39;</span> <span class="ow">and</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;Y&#39;</span><span class="p">:</span>
+</span><span id="line-262">                <span class="n">cat</span> <span class="o">=</span> <span class="n">cat</span><span class="p">[</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">cat</span><span class="p">[</span><span class="s1">&#39;Kmag&#39;</span><span class="p">])]</span>
+</span><span id="line-263">                <span class="n">cat</span><span class="p">[</span><span class="s1">&#39;mag&#39;</span><span class="p">],</span> <span class="n">cat</span><span class="p">[</span><span class="s1">&#39;mag_err&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Y_band</span><span class="p">(</span><span class="n">cat</span><span class="p">[</span><span class="s1">&#39;mag&#39;</span><span class="p">],</span> 
+</span><span id="line-264">                    <span class="n">cat</span><span class="p">[</span><span class="s1">&#39;mag_err&#39;</span><span class="p">],</span> <span class="n">cat</span><span class="p">[</span><span class="s1">&#39;Kmag&#39;</span><span class="p">],</span> <span class="n">cat</span><span class="p">[</span><span class="s1">&#39;e_Kmag&#39;</span><span class="p">])</span>
+</span><span id="line-265">
+</span><span id="line-266">            <span class="k">return</span><span class="p">(</span><span class="n">cat</span><span class="p">,</span> <span class="n">catalog</span><span class="p">,</span> <span class="n">cat_ID</span><span class="p">)</span>
+</span><span id="line-267">
+</span><span id="line-268">        <span class="k">else</span><span class="p">:</span>
+</span><span id="line-269">            <span class="n">m</span><span class="o">=</span><span class="s1">&#39;ERROR: cat </span><span class="si">{0}</span><span class="s1">, ra </span><span class="si">{1}</span><span class="s1">, dec </span><span class="si">{2}</span><span class="s1"> did not return a catalog&#39;</span>
+</span><span id="line-270">            <span class="n">m</span><span class="o">=</span><span class="n">m</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">catalog</span><span class="p">,</span> <span class="n">coord_ra</span><span class="p">,</span> <span class="n">coord_dec</span><span class="p">)</span>
+</span><span id="line-271">            <span class="k">if</span> <span class="n">log</span><span class="p">:</span>
+</span><span id="line-272">                <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+</span><span id="line-273">            <span class="k">else</span><span class="p">:</span>
+</span><span id="line-274">                <span class="nb">print</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+</span><span id="line-275">            <span class="k">return</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span></div>
+
+</span><span id="line-276">
+<div class="viewcode-block" id="absphot.find_zeropoint">
+<a class="viewcode-back" href="../../../api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.absphot.find_zeropoint">[docs]</a>
+</span><span id="line-277">    <span class="k">def</span><span class="w"> </span><span class="nf">find_zeropoint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmpfile</span><span class="p">,</span> <span class="n">tel</span><span class="p">,</span> <span class="n">match_radius</span><span class="o">=</span><span class="mf">2.5</span><span class="o">*</span><span class="n">u</span><span class="o">.</span><span class="n">arcsec</span><span class="p">,</span>
+</span><span id="line-278">        <span class="n">phottable</span><span class="o">=</span><span class="s1">&#39;APPPHOT&#39;</span><span class="p">,</span> <span class="n">input_catalog</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span id="line-279"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute zeropoint from cmpfile photometry and catalog; write to FITS header.</span>
+</span><span id="line-280">
+</span><span id="line-281"><span class="sd">        Matches sources to catalog (e.g. PS1), runs iterative ODR fit, and</span>
+</span><span id="line-282"><span class="sd">        updates ZPTMAG, ZPTNSTAR, ZPTCAT, etc. in the stack FITS.</span>
+</span><span id="line-283">
+</span><span id="line-284"><span class="sd">        Parameters</span>
+</span><span id="line-285"><span class="sd">        ----------</span>
+</span><span id="line-286"><span class="sd">        cmpfile : str</span>
+</span><span id="line-287"><span class="sd">            Path to stacked/comparison FITS with SCI and phottable extensions.</span>
+</span><span id="line-288"><span class="sd">        tel : Instrument</span>
+</span><span id="line-289"><span class="sd">            Instrument instance (for get_catalog).</span>
+</span><span id="line-290"><span class="sd">        match_radius : astropy.units.Quantity, optional</span>
+</span><span id="line-291"><span class="sd">            Matching radius for catalog. Default is 2.5 arcsec.</span>
+</span><span id="line-292"><span class="sd">        phottable : str, optional</span>
+</span><span id="line-293"><span class="sd">            FITS extension with photometry table. Default is &#39;APPPHOT&#39;.</span>
+</span><span id="line-294"><span class="sd">        input_catalog : astropy.table.Table, optional</span>
+</span><span id="line-295"><span class="sd">            Pre-loaded catalog; if None, catalog is queried via get_catalog.</span>
+</span><span id="line-296"><span class="sd">        log : ColoredLogger, optional</span>
+</span><span id="line-297"><span class="sd">            Logger for progress.</span>
+</span><span id="line-298">
+</span><span id="line-299"><span class="sd">        Returns</span>
+</span><span id="line-300"><span class="sd">        -------</span>
+</span><span id="line-301"><span class="sd">        None</span>
+</span><span id="line-302"><span class="sd">            cmpfile is updated in place.</span>
+</span><span id="line-303"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="line-304">        <span class="k">if</span> <span class="n">log</span><span class="p">:</span>
+</span><span id="line-305">            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Importing catalog from file: </span><span class="si">{</span><span class="n">cmpfile</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</span><span id="line-306">        <span class="k">else</span><span class="p">:</span>
+</span><span id="line-307">            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Importing catalog from file: </span><span class="si">{</span><span class="n">cmpfile</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</span><span id="line-308">
+</span><span id="line-309">        <span class="n">hdu</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">cmpfile</span><span class="p">)</span>
+</span><span id="line-310">        <span class="n">header</span> <span class="o">=</span> <span class="n">hdu</span><span class="p">[</span><span class="s1">&#39;SCI&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">header</span>
+</span><span id="line-311">        <span class="n">filtorig</span> <span class="o">=</span> <span class="n">header</span><span class="p">[</span><span class="s1">&#39;FILTER&#39;</span><span class="p">]</span>
+</span><span id="line-312">        <span class="n">catalog</span> <span class="o">=</span> <span class="n">tel</span><span class="o">.</span><span class="n">get_catalog</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
+</span><span id="line-313">
+</span><span id="line-314">
+</span><span id="line-315">        <span class="n">table</span> <span class="o">=</span> <span class="n">Table</span><span class="p">(</span><span class="n">hdu</span><span class="p">[</span><span class="n">phottable</span><span class="p">]</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">meta</span><span class="o">=</span><span class="n">hdu</span><span class="p">[</span><span class="n">phottable</span><span class="p">]</span><span class="o">.</span><span class="n">header</span><span class="p">)</span>
+</span><span id="line-316">        <span class="n">coords</span> <span class="o">=</span> <span class="n">SkyCoord</span><span class="p">(</span><span class="n">table</span><span class="p">[</span><span class="s1">&#39;RA&#39;</span><span class="p">],</span> <span class="n">table</span><span class="p">[</span><span class="s1">&#39;Dec&#39;</span><span class="p">],</span> <span class="n">unit</span><span class="o">=</span><span class="s1">&#39;deg&#39;</span><span class="p">)</span>
+</span><span id="line-317">
+</span><span id="line-318">        <span class="c1"># New metadata to update</span>
+</span><span id="line-319">        <span class="n">metadata</span> <span class="o">=</span> <span class="p">{}</span>
+</span><span id="line-320">
+</span><span id="line-321">        <span class="n">cat</span> <span class="o">=</span> <span class="kc">None</span> <span class="p">;</span> <span class="n">cat_ID</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="line-322">
+</span><span id="line-323">        <span class="n">filt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">convert_filter_name</span><span class="p">(</span><span class="n">filtorig</span><span class="p">)</span>
+</span><span id="line-324">        <span class="k">if</span> <span class="n">input_catalog</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="line-325">            <span class="n">cat</span> <span class="o">=</span> <span class="n">input_catalog</span>
+</span><span id="line-326">        <span class="k">else</span><span class="p">:</span>
+</span><span id="line-327">            <span class="k">if</span> <span class="n">log</span><span class="p">:</span>
+</span><span id="line-328">                <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Downloading </span><span class="si">{</span><span class="n">catalog</span><span class="si">}</span><span class="s1"> catalog in </span><span class="si">{</span><span class="n">filt</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</span><span id="line-329">            <span class="k">else</span><span class="p">:</span>
+</span><span id="line-330">                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Downloading </span><span class="si">{</span><span class="n">catalog</span><span class="si">}</span><span class="s1"> catalog in </span><span class="si">{</span><span class="n">filt</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</span><span id="line-331">
+</span><span id="line-332">            <span class="n">cat</span><span class="p">,</span> <span class="n">catalog</span><span class="p">,</span> <span class="n">cat_ID</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_catalog</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">catalog</span><span class="p">,</span> <span class="n">filt</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="n">log</span><span class="p">)</span>
+</span><span id="line-333">
+</span><span id="line-334">        <span class="k">if</span> <span class="n">cat</span><span class="p">:</span>
+</span><span id="line-335">            <span class="n">min_mag</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_minmag</span><span class="p">(</span><span class="n">filt</span><span class="p">)</span>
+</span><span id="line-336">            <span class="n">cat</span> <span class="o">=</span> <span class="n">cat</span><span class="p">[</span><span class="n">cat</span><span class="p">[</span><span class="s1">&#39;mag&#39;</span><span class="p">]</span><span class="o">&gt;</span><span class="n">min_mag</span><span class="p">]</span>
+</span><span id="line-337">
+</span><span id="line-338">            <span class="n">coords_cat</span> <span class="o">=</span> <span class="n">SkyCoord</span><span class="p">(</span><span class="n">cat</span><span class="p">[</span><span class="s1">&#39;ra&#39;</span><span class="p">],</span> <span class="n">cat</span><span class="p">[</span><span class="s1">&#39;dec&#39;</span><span class="p">],</span> <span class="n">unit</span><span class="o">=</span><span class="s1">&#39;deg&#39;</span><span class="p">)</span>
+</span><span id="line-339">
+</span><span id="line-340">            <span class="n">idx</span><span class="p">,</span> <span class="n">d2</span><span class="p">,</span> <span class="n">d3</span> <span class="o">=</span> <span class="n">coords_cat</span><span class="o">.</span><span class="n">match_to_catalog_sky</span><span class="p">(</span><span class="n">coords</span><span class="p">)</span>
+</span><span id="line-341">
+</span><span id="line-342">            <span class="c1"># Get matches from calibration catalog and cmpfile</span>
+</span><span id="line-343">            <span class="n">mask</span> <span class="o">=</span> <span class="n">d2</span> <span class="o">&lt;</span> <span class="n">match_radius</span>
+</span><span id="line-344">            <span class="n">cat</span> <span class="o">=</span> <span class="n">cat</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span>
+</span><span id="line-345">            <span class="n">idx</span> <span class="o">=</span> <span class="n">idx</span><span class="p">[</span><span class="n">mask</span><span class="p">]</span>
+</span><span id="line-346">
+</span><span id="line-347">            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">cat</span><span class="p">)</span><span class="o">==</span><span class="mi">0</span><span class="p">:</span>
+</span><span id="line-348">                <span class="k">if</span> <span class="n">log</span><span class="p">:</span>
+</span><span id="line-349">                    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;No star matches within match radius.&#39;</span><span class="p">)</span>
+</span><span id="line-350">                <span class="k">else</span><span class="p">:</span>
+</span><span id="line-351">                    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;No star matches within match radius.&#39;</span><span class="p">)</span>
+</span><span id="line-352">                <span class="k">return</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+</span><span id="line-353">
+</span><span id="line-354">            <span class="n">match_table</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="line-355">            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">idx</span><span class="p">:</span>
+</span><span id="line-356">                <span class="k">if</span> <span class="ow">not</span> <span class="n">match_table</span><span class="p">:</span>
+</span><span id="line-357">                    <span class="n">match_table</span> <span class="o">=</span> <span class="n">Table</span><span class="p">(</span><span class="n">table</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+</span><span id="line-358">                <span class="k">else</span><span class="p">:</span>
+</span><span id="line-359">                    <span class="n">match_table</span><span class="o">.</span><span class="n">add_row</span><span class="p">(</span><span class="n">table</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+</span><span id="line-360">
+</span><span id="line-361">            <span class="c1"># Sort by flux</span>
+</span><span id="line-362">            <span class="n">flux_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">match_table</span><span class="p">[</span><span class="s1">&#39;flux&#39;</span><span class="p">])</span>
+</span><span id="line-363">            <span class="n">match_table</span> <span class="o">=</span> <span class="n">match_table</span><span class="p">[</span><span class="n">flux_idx</span><span class="p">]</span>
+</span><span id="line-364">            <span class="n">cat</span> <span class="o">=</span> <span class="n">cat</span><span class="p">[</span><span class="n">flux_idx</span><span class="p">]</span>
+</span><span id="line-365">            
+</span><span id="line-366">            <span class="c1"># Do basic cuts on flux, fluxerr, catalog magnitude, cat magerr</span>
+</span><span id="line-367">            <span class="n">flux</span> <span class="o">=</span> <span class="n">match_table</span><span class="p">[</span><span class="s1">&#39;flux&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s1">&#39;float32&#39;</span><span class="p">)</span>
+</span><span id="line-368">            <span class="n">fluxerr</span> <span class="o">=</span> <span class="n">match_table</span><span class="p">[</span><span class="s1">&#39;flux_err&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s1">&#39;float32&#39;</span><span class="p">)</span>
+</span><span id="line-369">            <span class="n">cat_mag</span> <span class="o">=</span> <span class="n">cat</span><span class="p">[</span><span class="s1">&#39;mag&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s1">&#39;float32&#39;</span><span class="p">)</span>
+</span><span id="line-370">            <span class="n">cat_magerr</span> <span class="o">=</span> <span class="n">cat</span><span class="p">[</span><span class="s1">&#39;mag_err&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s1">&#39;float32&#39;</span><span class="p">)</span>
+</span><span id="line-371">
+</span><span id="line-372">            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">flux</span><span class="p">)</span><span class="o">==</span><span class="mi">0</span><span class="p">:</span>
+</span><span id="line-373">                <span class="k">if</span> <span class="n">log</span><span class="p">:</span>
+</span><span id="line-374">                    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;No suitable stars to calculate zeropoint .&#39;</span><span class="p">)</span>
+</span><span id="line-375">                <span class="k">return</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+</span><span id="line-376">
+</span><span id="line-377">            <span class="n">zpt</span><span class="p">,</span> <span class="n">zpterr</span><span class="p">,</span> <span class="n">master_mask</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">zpt_iteration</span><span class="p">(</span><span class="n">flux</span><span class="p">,</span> <span class="n">fluxerr</span><span class="p">,</span>
+</span><span id="line-378">                <span class="n">cat_mag</span><span class="p">,</span> <span class="n">cat_magerr</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="n">log</span><span class="p">)</span>
+</span><span id="line-379">
+</span><span id="line-380">            <span class="c1"># Set header variables</span>
+</span><span id="line-381">            <span class="n">metadata</span><span class="p">[</span><span class="s1">&#39;ZPTNSTAR&#39;</span><span class="p">]</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">flux</span><span class="p">)</span>
+</span><span id="line-382">            <span class="n">metadata</span><span class="p">[</span><span class="s1">&#39;ZPTMAG&#39;</span><span class="p">]</span><span class="o">=</span><span class="n">zpt</span>
+</span><span id="line-383">            <span class="n">metadata</span><span class="p">[</span><span class="s1">&#39;ZPTMUCER&#39;</span><span class="p">]</span><span class="o">=</span><span class="n">zpterr</span>
+</span><span id="line-384">            <span class="n">metadata</span><span class="p">[</span><span class="s1">&#39;ZPTCAT&#39;</span><span class="p">]</span><span class="o">=</span><span class="n">catalog</span>
+</span><span id="line-385">            <span class="n">metadata</span><span class="p">[</span><span class="s1">&#39;ZPTCATID&#39;</span><span class="p">]</span><span class="o">=</span><span class="n">cat_ID</span>
+</span><span id="line-386">            <span class="n">metadata</span><span class="p">[</span><span class="s1">&#39;ZPTPHOT&#39;</span><span class="p">]</span><span class="o">=</span><span class="n">phottable</span>
+</span><span id="line-387">            <span class="n">metadata</span><span class="p">[</span><span class="s1">&#39;FILTER&#39;</span><span class="p">]</span><span class="o">=</span><span class="n">filtorig</span>
+</span><span id="line-388">
+</span><span id="line-389">            <span class="c1"># Add limiting magnitudes</span>
+</span><span id="line-390">            <span class="k">if</span> <span class="s1">&#39;FWHM&#39;</span> <span class="ow">in</span> <span class="n">header</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="ow">and</span> <span class="s1">&#39;SKYSIG&#39;</span> <span class="ow">in</span> <span class="n">header</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+</span><span id="line-391">                <span class="n">fwhm</span> <span class="o">=</span> <span class="n">header</span><span class="p">[</span><span class="s1">&#39;FWHM&#39;</span><span class="p">]</span>
+</span><span id="line-392">                <span class="n">sky</span> <span class="o">=</span> <span class="n">header</span><span class="p">[</span><span class="s1">&#39;SKYSIG&#39;</span><span class="p">]</span>
+</span><span id="line-393">                <span class="n">Npix_per_FWHM_Area</span> <span class="o">=</span> <span class="mf">2.5</span> <span class="o">*</span> <span class="mf">2.5</span> <span class="o">*</span> <span class="n">fwhm</span> <span class="o">*</span> <span class="n">fwhm</span>
+</span><span id="line-394">                <span class="n">skysig_per_FWHM_Area</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">Npix_per_FWHM_Area</span> <span class="o">*</span> <span class="p">(</span><span class="n">sky</span><span class="o">*</span><span class="n">sky</span><span class="p">))</span>
+</span><span id="line-395">                <span class="n">m3sigma</span> <span class="o">=</span> <span class="o">-</span><span class="mf">2.5</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="mf">3.0</span><span class="o">*</span><span class="n">skysig_per_FWHM_Area</span><span class="p">)</span><span class="o">+</span><span class="n">zpt</span>
+</span><span id="line-396">                <span class="n">m5sigma</span> <span class="o">=</span> <span class="o">-</span><span class="mf">2.5</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="mf">5.0</span><span class="o">*</span><span class="n">skysig_per_FWHM_Area</span><span class="p">)</span><span class="o">+</span><span class="n">zpt</span>
+</span><span id="line-397">                <span class="n">m10sigma</span> <span class="o">=</span> <span class="o">-</span><span class="mf">2.5</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="mf">10.0</span><span class="o">*</span><span class="n">skysig_per_FWHM_Area</span><span class="p">)</span><span class="o">+</span><span class="n">zpt</span>
+</span><span id="line-398">                <span class="n">m3sigma</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%.6f</span><span class="s1">&#39;</span><span class="o">%</span><span class="n">m3sigma</span><span class="p">)</span>
+</span><span id="line-399">                <span class="n">m5sigma</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%.6f</span><span class="s1">&#39;</span><span class="o">%</span><span class="n">m5sigma</span><span class="p">)</span>
+</span><span id="line-400">                <span class="n">m10sigma</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%.6f</span><span class="s1">&#39;</span><span class="o">%</span><span class="n">m10sigma</span><span class="p">)</span>
+</span><span id="line-401">                <span class="n">metadata</span><span class="p">[</span><span class="s1">&#39;M3SIGMA&#39;</span><span class="p">]</span><span class="o">=</span><span class="n">m3sigma</span>
+</span><span id="line-402">                <span class="n">metadata</span><span class="p">[</span><span class="s1">&#39;M5SIGMA&#39;</span><span class="p">]</span><span class="o">=</span><span class="n">m5sigma</span>
+</span><span id="line-403">                <span class="n">metadata</span><span class="p">[</span><span class="s1">&#39;M10SIGMA&#39;</span><span class="p">]</span><span class="o">=</span><span class="n">m10sigma</span>
+</span><span id="line-404">                <span class="k">if</span> <span class="n">log</span><span class="p">:</span>
+</span><span id="line-405">                    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;3-sigma limiting mag of image is </span><span class="si">{</span><span class="n">m3sigma</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</span><span id="line-406">                <span class="k">else</span><span class="p">:</span>
+</span><span id="line-407">                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;3-sigma limiting mag of image is </span><span class="si">{</span><span class="n">m3sigma</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</span><span id="line-408">
+</span><span id="line-409">            <span class="n">hdu</span><span class="p">[</span><span class="s1">&#39;PRIMARY&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">metadata</span><span class="p">)</span>
+</span><span id="line-410">            <span class="n">hdu</span><span class="p">[</span><span class="s1">&#39;SCI&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">metadata</span><span class="p">)</span>
+</span><span id="line-411">            <span class="n">hdu</span><span class="p">[</span><span class="n">phottable</span><span class="p">]</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">metadata</span><span class="p">)</span>
+</span><span id="line-412">
+</span><span id="line-413">            <span class="n">hdu</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="n">cmpfile</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="line-414">            
+</span><span id="line-415">        <span class="k">elif</span> <span class="n">log</span><span class="p">:</span>
+</span><span id="line-416">            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;No zeropoint calculated.&#39;</span><span class="p">)</span></div>
+
+</span><span id="line-417">
+<div class="viewcode-block" id="absphot.Y_band">
+<a class="viewcode-back" href="../../../api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.absphot.Y_band">[docs]</a>
+</span><span id="line-418">    <span class="k">def</span><span class="w"> </span><span class="nf">Y_band</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">J</span><span class="p">,</span> <span class="n">J_err</span><span class="p">,</span> <span class="n">K</span><span class="p">,</span> <span class="n">K_err</span><span class="p">):</span>
+</span><span id="line-419"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute Y-band mag and error from J and K (2MASS relation).</span>
+</span><span id="line-420">
+</span><span id="line-421"><span class="sd">        Parameters</span>
+</span><span id="line-422"><span class="sd">        ----------</span>
+</span><span id="line-423"><span class="sd">        J, J_err : array-like or float</span>
+</span><span id="line-424"><span class="sd">            J magnitude(s) and error(s).</span>
+</span><span id="line-425"><span class="sd">        K, K_err : array-like or float</span>
+</span><span id="line-426"><span class="sd">            K magnitude(s) and error(s).</span>
+</span><span id="line-427">
+</span><span id="line-428"><span class="sd">        Returns</span>
+</span><span id="line-429"><span class="sd">        -------</span>
+</span><span id="line-430"><span class="sd">        tuple</span>
+</span><span id="line-431"><span class="sd">            (Y_mag, Y_err).</span>
+</span><span id="line-432"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="line-433">        <span class="n">Y</span> <span class="o">=</span> <span class="n">J</span><span class="o">+</span><span class="mf">0.46</span><span class="o">*</span><span class="p">(</span><span class="n">J</span><span class="o">-</span><span class="n">K</span><span class="p">)</span>
+</span><span id="line-434">        <span class="n">JK_err</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">J_err</span><span class="o">**</span><span class="mi">2</span><span class="o">+</span><span class="n">K_err</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+</span><span id="line-435">        <span class="n">JKY_err</span> <span class="o">=</span> <span class="mf">0.46</span><span class="o">*</span><span class="p">(</span><span class="n">J</span><span class="o">-</span><span class="n">K</span><span class="p">)</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">((</span><span class="mf">0.02</span><span class="o">/</span><span class="mf">0.46</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="o">+</span><span class="p">(</span><span class="n">JK_err</span><span class="o">/</span><span class="p">(</span><span class="n">J</span><span class="o">-</span><span class="n">K</span><span class="p">))</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+</span><span id="line-436">        <span class="n">Y_err</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">J_err</span><span class="o">**</span><span class="mi">2</span><span class="o">+</span><span class="n">JKY_err</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+</span><span id="line-437">        <span class="k">return</span> <span class="n">Y</span><span class="p">,</span> <span class="n">Y_err</span></div>
+
+</span><span id="line-438">
+<div class="viewcode-block" id="absphot.convert_filter_name">
+<a class="viewcode-back" href="../../../api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.absphot.convert_filter_name">[docs]</a>
+</span><span id="line-439">    <span class="k">def</span><span class="w"> </span><span class="nf">convert_filter_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filt</span><span class="p">):</span>
+</span><span id="line-440"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Map instrument filter names to catalog filter names (e.g. PS1).</span>
+</span><span id="line-441">
+</span><span id="line-442"><span class="sd">        Parameters</span>
+</span><span id="line-443"><span class="sd">        ----------</span>
+</span><span id="line-444"><span class="sd">        filt : str</span>
+</span><span id="line-445"><span class="sd">            Instrument filter keyword (e.g. &#39;gG0301&#39;, &#39;RG850&#39;).</span>
+</span><span id="line-446">
+</span><span id="line-447"><span class="sd">        Returns</span>
+</span><span id="line-448"><span class="sd">        -------</span>
+</span><span id="line-449"><span class="sd">        str</span>
+</span><span id="line-450"><span class="sd">            Catalog filter name (&#39;u&#39;, &#39;g&#39;, &#39;r&#39;, &#39;i&#39;, &#39;z&#39;, &#39;J&#39;, etc.).</span>
+</span><span id="line-451"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="line-452">        <span class="k">if</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;uG0308&#39;</span> <span class="ow">or</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;uG0332&#39;</span> <span class="ow">or</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;U&#39;</span><span class="p">:</span>
+</span><span id="line-453">            <span class="k">return</span> <span class="s1">&#39;u&#39;</span>
+</span><span id="line-454">        <span class="k">if</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;gG0301&#39;</span> <span class="ow">or</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;gG0325&#39;</span> <span class="ow">or</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;G&#39;</span> <span class="ow">or</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;V&#39;</span> <span class="ow">or</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;B&#39;</span><span class="p">:</span>
+</span><span id="line-455">            <span class="k">return</span> <span class="s1">&#39;g&#39;</span>
+</span><span id="line-456">        <span class="k">if</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;rG0303&#39;</span> <span class="ow">or</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;rG0326&#39;</span> <span class="ow">or</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;R&#39;</span> <span class="ow">or</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;Rs&#39;</span><span class="p">:</span>
+</span><span id="line-457">            <span class="k">return</span> <span class="s1">&#39;r&#39;</span>
+</span><span id="line-458">        <span class="k">if</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;iG0302&#39;</span> <span class="ow">or</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;iG0327&#39;</span> <span class="ow">or</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;I&#39;</span><span class="p">:</span>
+</span><span id="line-459">            <span class="k">return</span> <span class="s1">&#39;i&#39;</span>
+</span><span id="line-460">        <span class="k">if</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;zG0304&#39;</span> <span class="ow">or</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;zG0328&#39;</span> <span class="ow">or</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;Z&#39;</span><span class="p">:</span>
+</span><span id="line-461">            <span class="k">return</span> <span class="s1">&#39;z&#39;</span>
+</span><span id="line-462">        <span class="k">if</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;RG850&#39;</span><span class="p">:</span>
+</span><span id="line-463">            <span class="k">return</span> <span class="s1">&#39;z&#39;</span>
+</span><span id="line-464">        <span class="k">if</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;Y&#39;</span><span class="p">:</span>
+</span><span id="line-465">            <span class="k">return</span> <span class="s1">&#39;J&#39;</span>
+</span><span id="line-466">        <span class="c1"># K, Ks, Kspec all use 2MASS K-band for calibration</span>
+</span><span id="line-467">        <span class="k">if</span> <span class="n">filt</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;K&#39;</span><span class="p">,</span> <span class="s1">&#39;Ks&#39;</span><span class="p">,</span> <span class="s1">&#39;Kspec&#39;</span><span class="p">):</span>
+</span><span id="line-468">            <span class="k">return</span> <span class="s1">&#39;K&#39;</span>
+</span><span id="line-469">        <span class="k">else</span><span class="p">:</span>
+</span><span id="line-470">            <span class="k">return</span> <span class="n">filt</span></div>
+
+</span><span id="line-471">    
+<div class="viewcode-block" id="absphot.get_minmag">
+<a class="viewcode-back" href="../../../api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.absphot.get_minmag">[docs]</a>
+</span><span id="line-472">    <span class="k">def</span><span class="w"> </span><span class="nf">get_minmag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filt</span><span class="p">):</span>
+</span><span id="line-473"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Return minimum catalog magnitude to use for zeropoint (bright limit).</span>
+</span><span id="line-474">
+</span><span id="line-475"><span class="sd">        Parameters</span>
+</span><span id="line-476"><span class="sd">        ----------</span>
+</span><span id="line-477"><span class="sd">        filt : str</span>
+</span><span id="line-478"><span class="sd">            Filter name.</span>
+</span><span id="line-479">
+</span><span id="line-480"><span class="sd">        Returns</span>
+</span><span id="line-481"><span class="sd">        -------</span>
+</span><span id="line-482"><span class="sd">        float</span>
+</span><span id="line-483"><span class="sd">            Minimum magnitude (brighter limit).</span>
+</span><span id="line-484"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="line-485">        <span class="k">if</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;J&#39;</span><span class="p">:</span>
+</span><span id="line-486">            <span class="k">return</span> <span class="mf">15.5</span>
+</span><span id="line-487">        <span class="k">if</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;K&#39;</span><span class="p">:</span>
+</span><span id="line-488">            <span class="k">return</span> <span class="mf">13.0</span>
+</span><span id="line-489">        <span class="k">if</span> <span class="n">filt</span><span class="o">==</span><span class="s1">&#39;Y&#39;</span><span class="p">:</span>
+</span><span id="line-490">            <span class="k">return</span> <span class="mf">15.0</span>
+</span><span id="line-491">        <span class="k">else</span><span class="p">:</span>
+</span><span id="line-492">            <span class="k">return</span> <span class="mf">16.0</span></div>
+</div>
+
+</span><span id="line-493">
+<div class="viewcode-block" id="find_zeropoint">
+<a class="viewcode-back" href="../../../api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.find_zeropoint">[docs]</a>
+</span><span id="line-494"><span class="k">def</span><span class="w"> </span><span class="nf">find_zeropoint</span><span class="p">(</span><span class="n">stack</span><span class="p">,</span> <span class="n">tel</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span id="line-495"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute and write zeropoint to stack FITS using instrument catalog (e.g. PS1).</span>
+</span><span id="line-496">
+</span><span id="line-497"><span class="sd">    Parameters</span>
+</span><span id="line-498"><span class="sd">    ----------</span>
+</span><span id="line-499"><span class="sd">    stack : str</span>
+</span><span id="line-500"><span class="sd">        Path to stacked science FITS file (SCI + APPPHOT extensions).</span>
+</span><span id="line-501"><span class="sd">    tel : Instrument</span>
+</span><span id="line-502"><span class="sd">        Instrument instance (for catalog and filter).</span>
+</span><span id="line-503"><span class="sd">    log : ColoredLogger, optional</span>
+</span><span id="line-504"><span class="sd">        Logger for progress and errors.</span>
+</span><span id="line-505">
+</span><span id="line-506"><span class="sd">    Returns</span>
+</span><span id="line-507"><span class="sd">    -------</span>
+</span><span id="line-508"><span class="sd">    None</span>
+</span><span id="line-509"><span class="sd">        Stack FITS is updated in place with ZPTMAG, ZPTNSTAR, etc.</span>
+</span><span id="line-510"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="line-511">    <span class="n">cal</span> <span class="o">=</span> <span class="n">absphot</span><span class="p">()</span>
+</span><span id="line-512">    <span class="n">cal</span><span class="o">.</span><span class="n">find_zeropoint</span><span class="p">(</span><span class="n">stack</span><span class="p">,</span> <span class="n">tel</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="n">log</span><span class="p">)</span></div>
+
+</span></code></pre></div>
+    </div></div>
+          </main>
+        </div>
+      </div><footer class="py-6 border-t border-border md:py-0">
+    <div class="container flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row">
+      <div class="flex flex-col items-center gap-4 px-8 md:flex-row md:gap-2 md:px-0">
+        <p class="text-sm leading-loose text-center text-muted-foreground md:text-left">© 2025, POTPyRI Team&nbsp;Built with <a class="font-medium underline underline-offset-4"
+    href="https://www.sphinx-doc.org"
+    rel="noreferrer">Sphinx 8.1.3</a></p>
+</div>
+</div>
+</footer>
+    </div>
+    
+    <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script defer="defer" src="../../../_static/theme.js?v=582b20c5"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    
+</body>
+
+</html>

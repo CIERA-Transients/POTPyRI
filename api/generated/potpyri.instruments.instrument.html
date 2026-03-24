@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+
+<html :class="{ 'dark' : darkMode === true }" data-content_root="../../" lang="en" x-data="{ darkMode: $persist(window.matchMedia('(prefers-color-scheme: dark)').matches), activeSection: ''}">
+<head>
+<script>
+    (function () {
+      // Set initial color scheme
+      if ((localStorage.getItem("_x_darkMode") === "true") || (window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+        document.documentElement.classList.add("dark");
+      }
+
+      // Watch for media preference changes
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (event) => {
+        localStorage.setItem("_x_darkMode", event.matches);
+        document.documentElement.classList.toggle("dark", event.matches);
+      });
+    })();
+  </script>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta charset="utf-8"/>
+<meta content="#ffffff" media="(prefers-color-scheme: light)" name="theme-color"/>
+<meta content="#030711" media="(prefers-color-scheme: dark)" name="theme-color"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>potpyri.instruments.instrument | POTPyRI  documentation</title>
+<meta content="potpyri.instruments.instrument | POTPyRI  documentation" property="og:title"/>
+<meta content="potpyri.instruments.instrument | POTPyRI  documentation" name="twitter:title"/>
+<link href="../../_static/pygments.css?v=d862e8e8" rel="stylesheet" type="text/css"/>
+<link href="../../_static/theme.css?v=73505e79" rel="stylesheet" type="text/css"/>
+<link href="../../_static/custom.css" rel="stylesheet" type="text/css"/>
+<link href="https://CIERA-Transients.github.io/POTPyRI/api/generated/potpyri.instruments.instrument.html" rel="canonical"/>
+<link href="../../search.html" rel="search" title="Search"/>
+<link href="../../genindex.html" rel="index" title="Index"/>
+<link href="potpyri.instruments.BINOSPEC.html" rel="next" title="potpyri.instruments.BINOSPEC"/>
+<link href="../instruments.html" rel="prev" title="Instruments"/>
+</head>
+<body :class="{ 'overflow-hidden': showSidebar }" class="min-h-screen font-sans antialiased bg-background text-foreground" x-data="{ showSidebar: false, showScrollTop: false }">
+<div @click.self="showSidebar = false" class="fixed inset-0 z-50 overflow-hidden bg-background/80 backdrop-blur-sm md:hidden" x-cloak="" x-show="showSidebar"></div><div class="relative flex flex-col min-h-screen" id="page"><a class="absolute top-0 left-0 z-[100] block bg-background p-4 text-xl transition -translate-x-full opacity-0 focus:translate-x-0 focus:opacity-100" href="#content">
+      Skip to content
+    </a><header class="sticky top-0 z-40 w-full border-b shadow-xs border-border bg-background/90 backdrop-blur"><div class="container flex items-center h-14">
+<div class="hidden mr-4 md:flex">
+<a class="flex items-center mr-6" href="../../index.html"><span class="hidden font-bold sm:inline-block text-clip whitespace-nowrap">POTPyRI  documentation</span>
+</a></div><button @click="showSidebar = true" class="inline-flex items-center justify-center h-10 px-0 py-2 mr-2 text-base font-medium transition-colors rounded-md hover:text-accent-foreground hover:bg-transparent md:hidden" type="button">
+<svg aria-hidden="true" fill="currentColor" height="24" viewbox="0 96 960 960" width="24" xmlns="http://www.w3.org/2000/svg">
+<path d="M152.587 825.087q-19.152 0-32.326-13.174t-13.174-32.326q0-19.152 13.174-32.326t32.326-13.174h440q19.152 0 32.326 13.174t13.174 32.326q0 19.152-13.174 32.326t-32.326 13.174h-440Zm0-203.587q-19.152 0-32.326-13.174T107.087 576q0-19.152 13.174-32.326t32.326-13.174h320q19.152 0 32.326 13.174T518.087 576q0 19.152-13.174 32.326T472.587 621.5h-320Zm0-203.587q-19.152 0-32.326-13.174t-13.174-32.326q0-19.152 13.174-32.326t32.326-13.174h440q19.152 0 32.326 13.174t13.174 32.326q0 19.152-13.174 32.326t-32.326 13.174h-440ZM708.913 576l112.174 112.174q12.674 12.674 12.674 31.826t-12.674 31.826Q808.413 764.5 789.261 764.5t-31.826-12.674l-144-144Q600 594.391 600 576t13.435-31.826l144-144q12.674-12.674 31.826-12.674t31.826 12.674q12.674 12.674 12.674 31.826t-12.674 31.826L708.913 576Z"></path>
+</svg>
+<span class="sr-only">Toggle navigation menu</span>
+</button>
+<div class="flex items-center justify-between flex-1 gap-2 sm:gap-4 md:justify-end">
+<div class="flex-1 w-full md:w-auto md:flex-none"><form @keydown.k.window.meta="$refs.search.focus()" action="../../search.html" class="relative flex items-center group" id="searchbox" method="get">
+<input aria-label="Search the docs" class="inline-flex items-center font-medium transition-colors bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background border border-input hover:bg-accent focus:bg-accent hover:text-accent-foreground focus:text-accent-foreground hover:placeholder-accent-foreground py-2 px-4 relative h-9 w-full justify-start rounded-[0.5rem] text-sm text-muted-foreground sm:pr-12 md:w-40 lg:w-64" id="search-input" name="q" placeholder="Search ..." type="search" x-ref="search"/>
+<kbd class="pointer-events-none absolute right-1.5 top-2 hidden h-5 select-none text-muted-foreground items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex group-hover:bg-accent group-hover:text-accent-foreground">
+<span class="text-xs">⌘</span>
+    K
+  </kbd>
+</form>
+</div>
+<nav class="flex items-center gap-1">
+<button @click="darkMode = !darkMode" class="relative inline-flex items-center justify-center px-0 text-sm font-medium transition-colors rounded-md hover:bg-accent hover:text-accent-foreground h-9 w-9" title="Toggle color scheme" type="button">
+<svg class="absolute transition-all scale-100 rotate-0 dark:-rotate-90 dark:scale-0" fill="currentColor" height="16" viewbox="0 96 960 960" width="16" xmlns="http://www.w3.org/2000/svg">
+<path d="M480 685q45.456 0 77.228-31.772Q589 621.456 589 576q0-45.456-31.772-77.228Q525.456 467 480 467q-45.456 0-77.228 31.772Q371 530.544 371 576q0 45.456 31.772 77.228Q434.544 685 480 685Zm0 91q-83 0-141.5-58.5T280 576q0-83 58.5-141.5T480 376q83 0 141.5 58.5T680 576q0 83-58.5 141.5T480 776ZM80 621.5q-19.152 0-32.326-13.174T34.5 576q0-19.152 13.174-32.326T80 530.5h80q19.152 0 32.326 13.174T205.5 576q0 19.152-13.174 32.326T160 621.5H80Zm720 0q-19.152 0-32.326-13.174T754.5 576q0-19.152 13.174-32.326T800 530.5h80q19.152 0 32.326 13.174T925.5 576q0 19.152-13.174 32.326T880 621.5h-80Zm-320-320q-19.152 0-32.326-13.174T434.5 256v-80q0-19.152 13.174-32.326T480 130.5q19.152 0 32.326 13.174T525.5 176v80q0 19.152-13.174 32.326T480 301.5Zm0 720q-19.152 0-32.326-13.17Q434.5 995.152 434.5 976v-80q0-19.152 13.174-32.326T480 850.5q19.152 0 32.326 13.174T525.5 896v80q0 19.152-13.174 32.33-13.174 13.17-32.326 13.17ZM222.174 382.065l-43-42Q165.5 327.391 166 308.239t13.174-33.065q13.435-13.674 32.587-13.674t32.065 13.674l42.239 43q12.674 13.435 12.555 31.706-.12 18.272-12.555 31.946-12.674 13.674-31.445 13.413-18.772-.261-32.446-13.174Zm494 494.761-42.239-43q-12.674-13.435-12.674-32.087t12.674-31.565Q686.609 756.5 705.38 757q18.772.5 32.446 13.174l43 41.761Q794.5 824.609 794 843.761t-13.174 33.065Q767.391 890.5 748.239 890.5t-32.065-13.674Zm-42-494.761Q660.5 369.391 661 350.62q.5-18.772 13.174-32.446l41.761-43Q728.609 261.5 747.761 262t33.065 13.174q13.674 13.435 13.674 32.587t-13.674 32.065l-43 42.239q-13.435 12.674-31.706 12.555-18.272-.12-31.946-12.555Zm-495 494.761Q165.5 863.391 165.5 844.239t13.674-32.065l43-42.239q13.435-12.674 32.087-12.674t31.565 12.674Q299.5 782.609 299 801.38q-.5 18.772-13.174 32.446l-41.761 43Q231.391 890.5 212.239 890t-33.065-13.174ZM480 576Z"></path>
+</svg>
+<svg class="absolute transition-all scale-0 rotate-90 dark:rotate-0 dark:scale-100" fill="currentColor" height="16" viewbox="0 96 960 960" width="16" xmlns="http://www.w3.org/2000/svg">
+<path d="M480 936q-151 0-255.5-104.5T120 576q0-138 90-239.5T440 218q25-3 39 18t-1 44q-17 26-25.5 55t-8.5 61q0 90 63 153t153 63q31 0 61.5-9t54.5-25q21-14 43-1.5t19 39.5q-14 138-117.5 229T480 936Zm0-80q88 0 158-48.5T740 681q-20 5-40 8t-40 3q-123 0-209.5-86.5T364 396q0-20 3-40t8-40q-78 32-126.5 102T200 576q0 116 82 198t198 82Zm-10-270Z"></path>
+</svg>
+</button>
+</nav>
+</div>
+</div>
+</header>
+<div class="flex-1"><div class="container md:grid md:grid-cols-[220px_minmax(0,1fr)] md:gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-10"><aside :aria-hidden="!showSidebar" :class="{ 'translate-x-0': showSidebar }" class="fixed inset-y-0 left-0 md:top-14 z-50 md:z-30 bg-background md:bg-transparent transition-all duration-100 -translate-x-full md:translate-x-0 ml-0 p-6 md:p-0 md:-ml-2 md:h-[calc(100vh-3.5rem)] w-5/6 md:w-full overflow-y-auto border-r border-border md:sticky" id="left-sidebar">
+<a class="justify-start text-sm md:!hidden bg-background" href="../../index.html"><span class="font-bold text-clip whitespace-nowrap">POTPyRI  documentation</span>
+</a>
+<div class="relative overflow-hidden md:overflow-auto my-4 md:my-0">
+<div class="overflow-y-auto h-full w-full relative pr-6"><nav class="table w-full min-w-full my-6 lg:my-8">
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+<li class="toctree-l1 current" x-data="{ expanded: $el.classList.contains('current') ? true : false }"><a :class="{ 'expanded' : expanded }" @click="expanded = !expanded" class="reference internal expandable" href="../index.html">API Reference<button @click.prevent.stop="expanded = !expanded" type="button" x-cloak=""><span class="sr-only"></span><svg fill="currentColor" height="18px" stroke="none" viewbox="0 0 24 24" width="18px" xmlns="http://www.w3.org/2000/svg"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"></path></svg></button></a><ul class="current" x-show="expanded">
+<li class="toctree-l2 current"><a class="reference internal" href="../instruments.html">Instruments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../primitives.html">Primitives</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../utils.html">Utilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../scripts.html">Scripts</a></li>
+</ul>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+<button @click="showSidebar = false" class="absolute md:hidden right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100" type="button">
+<svg class="h-4 w-4" fill="currentColor" height="24" stroke="none" viewbox="0 96 960 960" width="24" xmlns="http://www.w3.org/2000/svg">
+<path d="M480 632 284 828q-11 11-28 11t-28-11q-11-11-11-28t11-28l196-196-196-196q-11-11-11-28t11-28q11-11 28-11t28 11l196 196 196-196q11-11 28-11t28 11q11 11 11 28t-11 28L536 576l196 196q11 11 11 28t-11 28q-11 11-28 11t-28-11L480 632Z"></path>
+</svg>
+</button>
+</aside>
+<main class="relative py-6 lg:gap-10 lg:py-8 xl:grid xl:grid-cols-[1fr_300px]">
+<div class="w-full min-w-0 mx-auto">
+<nav aria-label="breadcrumbs" class="flex items-center mb-4 space-x-1 text-sm text-muted-foreground">
+<a class="overflow-hidden text-ellipsis whitespace-nowrap hover:text-foreground" href="../../index.html">
+<span class="hidden md:inline">POTPyRI  documentation</span>
+<svg aria-label="Home" class="md:hidden" fill="currentColor" height="18" stroke="none" viewbox="0 96 960 960" width="18" xmlns="http://www.w3.org/2000/svg">
+<path d="M240 856h120V616h240v240h120V496L480 316 240 496v360Zm-80 80V456l320-240 320 240v480H520V696h-80v240H160Zm320-350Z"></path>
+</svg>
+</a>
+<div class="mr-1">/</div><a class="hover:text-foreground overflow-hidden text-ellipsis whitespace-nowrap" href="../index.html">API Reference</a>
+<div class="mr-1">/</div><a class="hover:text-foreground overflow-hidden text-ellipsis whitespace-nowrap" href="../instruments.html">Instruments</a>
+<div class="mr-1">/</div><span aria-current="page" class="font-medium text-foreground overflow-hidden text-ellipsis whitespace-nowrap">potpyri.instruments.instrument</span>
+</nav>
+<div id="content" role="main">
+<section id="module-potpyri.instruments.instrument">
+<span id="potpyri-instruments-instrument"></span><h1>potpyri.instruments.instrument<a class="headerlink" href="#module-potpyri.instruments.instrument" title="Link to this heading"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></h1>
+<p>Base instrument class and shared reduction logic for POTPyRI.</p>
+<p>Defines detector keywords, calibration flags, file naming, and methods for
+importing/processing science frames, building master bias/dark/flat, and
+loading static masks. Subclasses (GMOS, LRIS, BINOSPEC, etc.) set
+instrument-specific attributes.</p>
+<p class="rubric">Classes</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#potpyri.instruments.instrument.Instrument" title="potpyri.instruments.instrument.Instrument"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Instrument</span></code></a>()</p></td>
+<td><p>Base class for all POTPyRI instruments.</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py class">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">potpyri.instruments.instrument.</span></span><span class="sig-name descname"><span class="pre">Instrument</span></span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Base class for all POTPyRI instruments.</p>
+<p>Holds detector parameters (gain, rdnoise, pixscale, saturation), header
+keyword names, file-sorting rules, and methods for calibration and
+science processing. Subclasses override attributes as needed.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.create_bias">
+<span class="sig-name descname"><span class="pre">create_bias</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bias_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">binn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.create_bias"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.create_bias" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.create_bias'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Combine bias frames into master bias and write to paths[‘cal’].</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>bias_list</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> of <code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Paths to bias FITS files.</p></li>
+<li><p><strong>amp</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Amplifier identifier.</p></li>
+<li><p><strong>binn</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Binning string.</p></li>
+<li><p><strong>paths</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>) – Paths dict (cal key).</p></li>
+<li><p><strong>log</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ColoredLogger</span></code>, <em>optional</em>) – Logger for progress.</p></li>
+<li><p><strong>**kwargs</strong> – Unused; for subclass compatibility.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Master bias written via get_mbias_name.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.create_dark">
+<span class="sig-name descname"><span class="pre">create_dark</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dark_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">binn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mbias</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.create_dark"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.create_dark" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.create_dark'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Combine dark frames (with optional bias subtraction) and write master dark.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dark_list</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> of <code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Paths to dark FITS files.</p></li>
+<li><p><strong>amp</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Amplifier identifier.</p></li>
+<li><p><strong>binn</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Binning string.</p></li>
+<li><p><strong>paths</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>) – Paths dict (cal key).</p></li>
+<li><p><strong>mbias</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ccdproc.CCDData</span></code>, <em>optional</em>) – Master bias to subtract before combining.</p></li>
+<li><p><strong>log</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ColoredLogger</span></code>, <em>optional</em>) – Logger for progress.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Master dark written via get_mdark_name.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.create_flat">
+<span class="sig-name descname"><span class="pre">create_flat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">flat_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fil</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">binn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mbias</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mdark</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_science</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.create_flat"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.create_flat" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.create_flat'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Combine flat frames (bias/dark subtract, normalize) and write master flat.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>flat_list</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> of <code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Paths to flat FITS files.</p></li>
+<li><p><strong>fil</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Filter name.</p></li>
+<li><p><strong>amp</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Amplifier identifier.</p></li>
+<li><p><strong>binn</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Binning string.</p></li>
+<li><p><strong>paths</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>) – Paths dict (cal key).</p></li>
+<li><p><strong>mbias</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ccdproc.CCDData</span></code>, <em>optional</em>) – Master bias to subtract.</p></li>
+<li><p><strong>mdark</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ccdproc.CCDData</span></code>, <em>optional</em>) – Master dark to subtract.</p></li>
+<li><p><strong>is_science</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code>, <em>optional</em>) – If True, mask high pixels as for science. Default is False.</p></li>
+<li><p><strong>log</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ColoredLogger</span></code>, <em>optional</em>) – Logger for progress.</p></li>
+<li><p><strong>**kwargs</strong> – Unused; for subclass compatibility.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Master flat written via get_mflat_name.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.create_sky">
+<span class="sig-name descname"><span class="pre">create_sky</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sky_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fil</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">binn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sky_sigma_upper</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sky_sigma_lower</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sky_maxiters</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sky_n_sigma_high</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sky_n_sigma_low</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msky_n_sigma_high</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msky_n_sigma_low</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">msky_maxiters</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.create_sky"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.create_sky" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.create_sky'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Combine sky frames (normalize by median) and write master sky.</p>
+<p>Uses iterative sigma clipping to estimate the sky background and mask
+bright sources (and optionally low outliers) so the median is not
+biased. Per-frame and combined master sky masking use configurable
+sigma and iteration limits.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sky_list</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> of <code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Paths to sky FITS files.</p></li>
+<li><p><strong>fil</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Filter name.</p></li>
+<li><p><strong>amp</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Amplifier identifier.</p></li>
+<li><p><strong>binn</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Binning string.</p></li>
+<li><p><strong>paths</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>) – Paths dict (cal key).</p></li>
+<li><p><strong>log</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ColoredLogger</span></code>, <em>optional</em>) – Logger for progress.</p></li>
+<li><p><strong>sky_sigma_upper</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>, <em>optional</em>) – Upper sigma for iterative clip when estimating per-frame sky.
+Default 3.0.</p></li>
+<li><p><strong>sky_sigma_lower</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>, <em>optional</em>) – Lower sigma for iterative clip when estimating per-frame sky.
+Default 4.0.</p></li>
+<li><p><strong>sky_maxiters</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <em>optional</em>) – Max iterations for sigma clipping per sky frame. Default 5.</p></li>
+<li><p><strong>sky_n_sigma_high</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>, <em>optional</em>) – Mask pixels above med + this many * std (bright sources). Default 3.0.</p></li>
+<li><p><strong>sky_n_sigma_low</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>, <em>optional</em>) – Mask pixels below med - this many * std (defects). Default 4.0.</p></li>
+<li><p><strong>msky_n_sigma_high</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>, <em>optional</em>) – Mask master sky pixels above median + this * std. Default 5.0.</p></li>
+<li><p><strong>msky_n_sigma_low</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>, <em>optional</em>) – Mask master sky pixels below median - this * std. Default 5.0.</p></li>
+<li><p><strong>msky_maxiters</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <em>optional</em>) – Max iterations for sigma clipping on combined master sky. Default 5.</p></li>
+<li><p><strong>**kwargs</strong> – Unused; for subclass compatibility.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Master sky written via get_msky_name.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.expand_mask">
+<span class="sig-name descname"><span class="pre">expand_mask</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_mask</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.expand_mask"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.expand_mask" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.expand_mask'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Build combined mask from NaN, inf, zero pixels and optional input mask.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>input_data</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ccdproc.CCDData</span></code>) – Image data (input_data.data used).</p></li>
+<li><p><strong>input_mask</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">np.ndarray</span></code>, <em>optional</em>) – Boolean mask to OR with bad-pixel mask.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Boolean mask (True = bad).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">np.ndarray</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.format_datasec">
+<span class="sig-name descname"><span class="pre">format_datasec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sec_string</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">binning</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.format_datasec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.format_datasec" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.format_datasec'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Convert datasec string to binned pixel bounds (e.g. ‘[1:100,1:200]’).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sec_string</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Data section string like ‘[x1:x2,y1:y2]’.</p></li>
+<li><p><strong>binning</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <em>optional</em>) – Binning factor. Default is 1.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Reformatted section string with binned limits.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_ampl">
+<span class="sig-name descname"><span class="pre">get_ampl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hdr</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_ampl"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_ampl" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_ampl'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return amplifier identifier from header as string.</p>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_binning">
+<span class="sig-name descname"><span class="pre">get_binning</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hdr</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_binning"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_binning" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_binning'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return binning string from header (e.g. ‘11’, ‘22’), normalized and no ‘x’.</p>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_bkg_name">
+<span class="sig-name descname"><span class="pre">get_bkg_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hdr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">red_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_bkg_name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_bkg_name" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_bkg_name'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return full path for background FITS (sci name with _bkg.fits).</p>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_catalog">
+<span class="sig-name descname"><span class="pre">get_catalog</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hdr</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_catalog"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_catalog" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_catalog'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return catalog name for zeropoint (e.g. ‘PS1’).</p>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_exptime">
+<span class="sig-name descname"><span class="pre">get_exptime</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hdr</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_exptime"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_exptime" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_exptime'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return exposure time from header (exptime_keyword).</p>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_filter">
+<span class="sig-name descname"><span class="pre">get_filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hdr</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_filter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_filter" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_filter'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return filter name from header; leading segment before underscore.</p>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_gain">
+<span class="sig-name descname"><span class="pre">get_gain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hdr</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_gain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_gain" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_gain'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return gain value(s) for the detector/amplifier.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>hdr</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.io.fits.Header</span></code>) – FITS header (may be used in subclasses for amp-dependent values).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Gain in e-/ADU.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code> or <code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_instrument_name">
+<span class="sig-name descname"><span class="pre">get_instrument_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hdr</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_instrument_name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_instrument_name" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_instrument_name'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return instrument name (lowercase) for paths/filenames.</p>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_mbias_name">
+<span class="sig-name descname"><span class="pre">get_mbias_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">binn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_mbias_name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_mbias_name" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_mbias_name'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return path for master bias FITS (paths[‘cal’]/mbias_amp_binn.fits).</p>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_mdark_name">
+<span class="sig-name descname"><span class="pre">get_mdark_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">binn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_mdark_name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_mdark_name" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_mdark_name'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return path for master dark FITS.</p>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_mflat_name">
+<span class="sig-name descname"><span class="pre">get_mflat_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fil</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">binn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_mflat_name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_mflat_name" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_mflat_name'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return path for master flat FITS (filter, amp, binning).</p>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_msky_name">
+<span class="sig-name descname"><span class="pre">get_msky_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fil</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">binn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_msky_name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_msky_name" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_msky_name'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return path for master sky FITS.</p>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_out_size">
+<span class="sig-name descname"><span class="pre">get_out_size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hdr</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_out_size"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_out_size" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_out_size'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return output image size (pixels) for this binning (out_size / binn).</p>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_pixscale">
+<span class="sig-name descname"><span class="pre">get_pixscale</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_pixscale"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_pixscale" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_pixscale'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return pixel scale in arcsec/pixel.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Pixel scale; may vary by mode in subclasses.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code> or <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_rdnoise">
+<span class="sig-name descname"><span class="pre">get_rdnoise</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hdr</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_rdnoise"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_rdnoise" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_rdnoise'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return read noise value(s) for the detector/amplifier.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>hdr</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.io.fits.Header</span></code>) – FITS header (may be used in subclasses for amp-dependent values).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Read noise in electrons.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code> or <code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_sci_name">
+<span class="sig-name descname"><span class="pre">get_sci_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hdr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">red_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_sci_name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_sci_name" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_sci_name'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return full path for single-extension science FITS.</p>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_staticmask_filename">
+<span class="sig-name descname"><span class="pre">get_staticmask_filename</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hdr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paths</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_staticmask_filename"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_staticmask_filename" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_staticmask_filename'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return path(s) to the static bad-pixel mask FITS for this instrument/binning.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hdr</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.io.fits.Header</span></code>) – FITS header (for binning and instrument).</p></li>
+<li><p><strong>paths</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>) – Paths dict with ‘code’ key (package root).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>One-element list with path to staticmask FITS, or [None] if not found.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_stk_name">
+<span class="sig-name descname"><span class="pre">get_stk_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hdr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">red_path</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_stk_name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_stk_name" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_stk_name'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return full path for stacked output FITS (target.filter.utYYMMDD.amp.binn.stk.fits).</p>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_target">
+<span class="sig-name descname"><span class="pre">get_target</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hdr</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_target"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_target" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_target'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return target name from header (target_keyword), spaces stripped.</p>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.get_time">
+<span class="sig-name descname"><span class="pre">get_time</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hdr</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.get_time"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.get_time" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.get_time'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return MJD from header (mjd_keyword) as float.</p>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.import_image">
+<span class="sig-name descname"><span class="pre">import_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.import_image"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.import_image" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.import_image'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Load raw multi-extension FITS and return processed CCDData (bias/overscan/trim/gain).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filename</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Path to raw FITS file.</p></li>
+<li><p><strong>amp</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Amplifier identifier (number of extensions).</p></li>
+<li><p><strong>log</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ColoredLogger</span></code>, <em>optional</em>) – Logger for progress.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Processed frame in electrons (single combined image).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">ccdproc.CCDData</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.import_sci_image">
+<span class="sig-name descname"><span class="pre">import_sci_image</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.import_sci_image"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.import_sci_image" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.import_sci_image'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Load a single science FITS as CCDData (no overscan/trim; already reduced).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filename</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Path to FITS file.</p></li>
+<li><p><strong>log</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ColoredLogger</span></code>, <em>optional</em>) – Logger for progress.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Science frame.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">ccdproc.CCDData</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.load_bias">
+<span class="sig-name descname"><span class="pre">load_bias</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">binn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.load_bias"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.load_bias" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.load_bias'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Load master bias CCDData for given amp and binning.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>paths</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>) – Paths dict (cal key).</p></li>
+<li><p><strong>amp</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Amplifier identifier.</p></li>
+<li><p><strong>binn</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Binning string.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Master bias in electrons.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">ccdproc.CCDData</span></code></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>Exception</strong> – If master bias file not found.</p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.load_dark">
+<span class="sig-name descname"><span class="pre">load_dark</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">binn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.load_dark"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.load_dark" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.load_dark'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Load master dark CCDData for given amp and binning.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>paths</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>) – Paths dict (cal key).</p></li>
+<li><p><strong>amp</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Amplifier identifier.</p></li>
+<li><p><strong>binn</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Binning string.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Master dark in electrons.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">ccdproc.CCDData</span></code></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>Exception</strong> – If master dark file not found.</p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.load_flat">
+<span class="sig-name descname"><span class="pre">load_flat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fil</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">binn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.load_flat"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.load_flat" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.load_flat'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Load master flat CCDData for given filter, amp, and binning.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>paths</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>) – Paths dict (cal key).</p></li>
+<li><p><strong>fil</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Filter name.</p></li>
+<li><p><strong>amp</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Amplifier identifier.</p></li>
+<li><p><strong>binn</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Binning string.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Master flat (normalized).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">ccdproc.CCDData</span></code></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>Exception</strong> – If master flat file not found.</p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.load_sky">
+<span class="sig-name descname"><span class="pre">load_sky</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fil</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">binn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.load_sky"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.load_sky" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.load_sky'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Load master sky CCDData for given filter, amp, and binning.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>paths</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>) – Paths dict (cal key).</p></li>
+<li><p><strong>fil</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Filter name.</p></li>
+<li><p><strong>amp</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Amplifier identifier.</p></li>
+<li><p><strong>binn</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Binning string.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Master sky (normalized).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">ccdproc.CCDData</span></code></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>Exception</strong> – If master sky file not found.</p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.load_staticmask">
+<span class="sig-name descname"><span class="pre">load_staticmask</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hdr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paths</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.load_staticmask"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.load_staticmask" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.load_staticmask'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Load the static mask array for this instrument and binning.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hdr</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.io.fits.Header</span></code>) – FITS header (for binning and instrument name).</p></li>
+<li><p><strong>paths</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>) – Paths dict with ‘code’ key.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Boolean mask from static mask FITS extension [1], or None if not found.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">np.ndarray</span></code> or <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.match_type_keywords">
+<span class="sig-name descname"><span class="pre">match_type_keywords</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">kwds</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_table</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.match_type_keywords"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.match_type_keywords" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.match_type_keywords'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return a boolean mask of file_table rows whose Type is in kwds.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>kwds</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Comma-separated type names (e.g. ‘SCIENCE’, ‘FLAT’).</p></li>
+<li><p><strong>file_table</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">astropy.table.Table</span></code>) – File list table with ‘Type’ column.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Boolean mask, True where file_table[‘Type’] is in kwds.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">np.ndarray</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.needs_sky_subtraction">
+<span class="sig-name descname"><span class="pre">needs_sky_subtraction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filt</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.needs_sky_subtraction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.needs_sky_subtraction" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.needs_sky_subtraction'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return True if sky subtraction should be run for this filter.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filt</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Filter name (e.g. ‘r’, ‘J’).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True for NIR wavelength instruments, False otherwise.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.process_science">
+<span class="sig-name descname"><span class="pre">process_science</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sci_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fil</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">binn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">paths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mbias</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mflat</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mdark</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_skysub</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_bkg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.process_science"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.process_science" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.process_science'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Reduce science frames: bias/dark/flat, optional sky subtraction; return CCDData list.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sci_list</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> of <code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Paths to science FITS files.</p></li>
+<li><p><strong>fil</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Filter name.</p></li>
+<li><p><strong>amp</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Amplifier identifier.</p></li>
+<li><p><strong>binn</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – Binning string.</p></li>
+<li><p><strong>paths</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>) – Paths dict (work, cal, etc.).</p></li>
+<li><p><strong>mbias</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ccdproc.CCDData</span></code>, <em>optional</em>) – Master bias.</p></li>
+<li><p><strong>mflat</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ccdproc.CCDData</span></code>, <em>optional</em>) – Master flat.</p></li>
+<li><p><strong>mdark</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ccdproc.CCDData</span></code>, <em>optional</em>) – Master dark.</p></li>
+<li><p><strong>skip_skysub</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code>, <em>optional</em>) – If True, skip 2D background subtraction. Default is False.</p></li>
+<li><p><strong>save_bkg</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code>, <em>optional</em>) – If True, save background model. Default is False.</p></li>
+<li><p><strong>log</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">ColoredLogger</span></code>, <em>optional</em>) – Logger for progress.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Reduced science frames (each with FILENAME in header).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> of <code class="xref py py-class docutils literal notranslate"><span class="pre">ccdproc.CCDData</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="potpyri.instruments.instrument.Instrument.raw_format">
+<span class="sig-name descname"><span class="pre">raw_format</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">proc</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/potpyri/instruments/instrument.html#Instrument.raw_format"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#potpyri.instruments.instrument.Instrument.raw_format" title="Link to this definition" x-intersect.margin.0%.0%.-70%.0%="activeSection = '#potpyri.instruments.instrument.Instrument.raw_format'"><svg height="1em" viewbox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path></svg></a></dt>
+<dd><p>Return glob pattern for raw files (e.g. ‘sci_img_*.fits’ or ‘sci_img*[!proc].fits’).</p>
+</dd></dl>
+</dd></dl>
+</section>
+</div></div><aside class="hidden text-sm xl:block" id="right-sidebar">
+<div class="sticky top-16 -mt-10 max-h-[calc(100vh-5rem)] h-full overflow-y-auto pt-6 space-y-2"><p class="font-medium">On this page</p>
+<ul>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument'" class="reference internal" href="#potpyri.instruments.instrument.Instrument"><code class="docutils literal notranslate"><span class="pre">Instrument</span></code></a><ul>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.create_bias'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.create_bias"><code class="docutils literal notranslate"><span class="pre">Instrument.create_bias()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.create_dark'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.create_dark"><code class="docutils literal notranslate"><span class="pre">Instrument.create_dark()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.create_flat'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.create_flat"><code class="docutils literal notranslate"><span class="pre">Instrument.create_flat()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.create_sky'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.create_sky"><code class="docutils literal notranslate"><span class="pre">Instrument.create_sky()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.expand_mask'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.expand_mask"><code class="docutils literal notranslate"><span class="pre">Instrument.expand_mask()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.format_datasec'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.format_datasec"><code class="docutils literal notranslate"><span class="pre">Instrument.format_datasec()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_ampl'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_ampl"><code class="docutils literal notranslate"><span class="pre">Instrument.get_ampl()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_binning'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_binning"><code class="docutils literal notranslate"><span class="pre">Instrument.get_binning()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_bkg_name'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_bkg_name"><code class="docutils literal notranslate"><span class="pre">Instrument.get_bkg_name()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_catalog'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_catalog"><code class="docutils literal notranslate"><span class="pre">Instrument.get_catalog()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_exptime'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_exptime"><code class="docutils literal notranslate"><span class="pre">Instrument.get_exptime()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_filter'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_filter"><code class="docutils literal notranslate"><span class="pre">Instrument.get_filter()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_gain'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_gain"><code class="docutils literal notranslate"><span class="pre">Instrument.get_gain()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_instrument_name'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_instrument_name"><code class="docutils literal notranslate"><span class="pre">Instrument.get_instrument_name()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_mbias_name'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_mbias_name"><code class="docutils literal notranslate"><span class="pre">Instrument.get_mbias_name()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_mdark_name'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_mdark_name"><code class="docutils literal notranslate"><span class="pre">Instrument.get_mdark_name()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_mflat_name'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_mflat_name"><code class="docutils literal notranslate"><span class="pre">Instrument.get_mflat_name()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_msky_name'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_msky_name"><code class="docutils literal notranslate"><span class="pre">Instrument.get_msky_name()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_out_size'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_out_size"><code class="docutils literal notranslate"><span class="pre">Instrument.get_out_size()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_pixscale'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_pixscale"><code class="docutils literal notranslate"><span class="pre">Instrument.get_pixscale()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_rdnoise'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_rdnoise"><code class="docutils literal notranslate"><span class="pre">Instrument.get_rdnoise()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_sci_name'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_sci_name"><code class="docutils literal notranslate"><span class="pre">Instrument.get_sci_name()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_staticmask_filename'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_staticmask_filename"><code class="docutils literal notranslate"><span class="pre">Instrument.get_staticmask_filename()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_stk_name'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_stk_name"><code class="docutils literal notranslate"><span class="pre">Instrument.get_stk_name()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_target'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_target"><code class="docutils literal notranslate"><span class="pre">Instrument.get_target()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.get_time'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.get_time"><code class="docutils literal notranslate"><span class="pre">Instrument.get_time()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.import_image'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.import_image"><code class="docutils literal notranslate"><span class="pre">Instrument.import_image()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.import_sci_image'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.import_sci_image"><code class="docutils literal notranslate"><span class="pre">Instrument.import_sci_image()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.load_bias'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.load_bias"><code class="docutils literal notranslate"><span class="pre">Instrument.load_bias()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.load_dark'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.load_dark"><code class="docutils literal notranslate"><span class="pre">Instrument.load_dark()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.load_flat'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.load_flat"><code class="docutils literal notranslate"><span class="pre">Instrument.load_flat()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.load_sky'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.load_sky"><code class="docutils literal notranslate"><span class="pre">Instrument.load_sky()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.load_staticmask'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.load_staticmask"><code class="docutils literal notranslate"><span class="pre">Instrument.load_staticmask()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.match_type_keywords'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.match_type_keywords"><code class="docutils literal notranslate"><span class="pre">Instrument.match_type_keywords()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.needs_sky_subtraction'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.needs_sky_subtraction"><code class="docutils literal notranslate"><span class="pre">Instrument.needs_sky_subtraction()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.process_science'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.process_science"><code class="docutils literal notranslate"><span class="pre">Instrument.process_science()</span></code></a></li>
+<li><a :data-current="activeSection === '#potpyri.instruments.instrument.Instrument.raw_format'" class="reference internal" href="#potpyri.instruments.instrument.Instrument.raw_format"><code class="docutils literal notranslate"><span class="pre">Instrument.raw_format()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</div>
+</aside>
+</main>
+</div>
+</div><footer class="py-6 border-t border-border md:py-0">
+<div class="container flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row">
+<div class="flex flex-col items-center gap-4 px-8 md:flex-row md:gap-2 md:px-0">
+<p class="text-sm leading-loose text-center text-muted-foreground md:text-left">© 2025, POTPyRI Team Built with <a class="font-medium underline underline-offset-4" href="https://www.sphinx-doc.org" rel="noreferrer">Sphinx 8.1.3</a></p>
+</div>
+</div>
+</footer>
+</div>
+<script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+<script src="../../_static/doctools.js?v=9bcbadda"></script>
+<script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+<script defer="defer" src="../../_static/theme.js?v=582b20c5"></script>
+<script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+</body>
+</html>

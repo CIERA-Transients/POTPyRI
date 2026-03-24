@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en" data-content_root="./"
+  x-data="{ darkMode: $persist(window.matchMedia('(prefers-color-scheme: dark)').matches), activeSection: ''}"
+  :class="{ 'dark' : darkMode === true }">
+
+<head>
+  <script>
+    (function () {
+      // Set initial color scheme
+      if ((localStorage.getItem("_x_darkMode") === "true") || (window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+        document.documentElement.classList.add("dark");
+      }
+
+      // Watch for media preference changes
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (event) => {
+        localStorage.setItem("_x_darkMode", event.matches);
+        document.documentElement.classList.toggle("dark", event.matches);
+      });
+    })();
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#030711" />
+  
+  <title>Index | POTPyRI  documentation</title>
+  <meta property="og:title" content="Index | POTPyRI  documentation" />
+  <meta name="twitter:title" content="Index | POTPyRI  documentation" />
+  <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d862e8e8" />
+  <link rel="stylesheet" type="text/css" href="_static/theme.css?v=73505e79" />
+  <link rel="stylesheet" type="text/css" href="_static/custom.css" />
+  <link rel="canonical" href="https://CIERA-Transients.github.io/POTPyRI/genindex.html" />
+  <link rel="search" title="Search" href="search.html" />
+  <link rel="index" title="Index" href="#" />
+</head>
+
+<body x-data="{ showSidebar: false, showScrollTop: false }"
+  class="min-h-screen font-sans antialiased bg-background text-foreground" :class="{ 'overflow-hidden': showSidebar }">
+  <div x-cloak x-show="showSidebar"
+    class="fixed inset-0 z-50 overflow-hidden bg-background/80 backdrop-blur-sm md:hidden"
+    @click.self="showSidebar = false"></div><div id="page" class="relative flex flex-col min-h-screen"><a href="#content"
+      class="absolute top-0 left-0 z-[100] block bg-background p-4 text-xl transition -translate-x-full opacity-0 focus:translate-x-0 focus:opacity-100">
+      Skip to content
+    </a><header class="sticky top-0 z-40 w-full border-b shadow-xs border-border bg-background/90 backdrop-blur"><div class="container flex items-center h-14">
+    <div class="hidden mr-4 md:flex">
+      <a href="index.html" class="flex items-center mr-6"><span class="hidden font-bold sm:inline-block text-clip whitespace-nowrap">POTPyRI  documentation</span>
+      </a></div><button
+      class="inline-flex items-center justify-center h-10 px-0 py-2 mr-2 text-base font-medium transition-colors rounded-md hover:text-accent-foreground hover:bg-transparent md:hidden"
+      type="button" @click="showSidebar = true">
+      <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 96 960 960" aria-hidden="true"
+        fill="currentColor">
+        <path
+          d="M152.587 825.087q-19.152 0-32.326-13.174t-13.174-32.326q0-19.152 13.174-32.326t32.326-13.174h440q19.152 0 32.326 13.174t13.174 32.326q0 19.152-13.174 32.326t-32.326 13.174h-440Zm0-203.587q-19.152 0-32.326-13.174T107.087 576q0-19.152 13.174-32.326t32.326-13.174h320q19.152 0 32.326 13.174T518.087 576q0 19.152-13.174 32.326T472.587 621.5h-320Zm0-203.587q-19.152 0-32.326-13.174t-13.174-32.326q0-19.152 13.174-32.326t32.326-13.174h440q19.152 0 32.326 13.174t13.174 32.326q0 19.152-13.174 32.326t-32.326 13.174h-440ZM708.913 576l112.174 112.174q12.674 12.674 12.674 31.826t-12.674 31.826Q808.413 764.5 789.261 764.5t-31.826-12.674l-144-144Q600 594.391 600 576t13.435-31.826l144-144q12.674-12.674 31.826-12.674t31.826 12.674q12.674 12.674 12.674 31.826t-12.674 31.826L708.913 576Z" />
+      </svg>
+      <span class="sr-only">Toggle navigation menu</span>
+    </button>
+    <div class="flex items-center justify-between flex-1 gap-2 sm:gap-4 md:justify-end">
+      <div class="flex-1 w-full md:w-auto md:flex-none"><form id="searchbox"
+      action="search.html"
+      method="get"
+      class="relative flex items-center group"
+      @keydown.k.window.meta="$refs.search.focus()">
+  <input x-ref="search"
+          name="q"
+          id="search-input"
+          type="search"
+          aria-label="Search the docs"
+          placeholder="Search ..."
+          class="inline-flex items-center font-medium transition-colors bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background border border-input hover:bg-accent focus:bg-accent hover:text-accent-foreground focus:text-accent-foreground hover:placeholder-accent-foreground py-2 px-4 relative h-9 w-full justify-start rounded-[0.5rem] text-sm text-muted-foreground sm:pr-12 md:w-40 lg:w-64" />
+  <kbd class="pointer-events-none absolute right-1.5 top-2 hidden h-5 select-none text-muted-foreground items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex group-hover:bg-accent group-hover:text-accent-foreground">
+    <span class="text-xs">⌘</span>
+    K
+  </kbd>
+</form>
+      </div>
+      <nav class="flex items-center gap-1">
+        <button @click="darkMode = !darkMode"
+          class="relative inline-flex items-center justify-center px-0 text-sm font-medium transition-colors rounded-md hover:bg-accent hover:text-accent-foreground h-9 w-9"
+          type="button"
+          title="Toggle color scheme">
+          <svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 96 960 960" fill="currentColor"
+            class="absolute transition-all scale-100 rotate-0 dark:-rotate-90 dark:scale-0">
+            <path
+              d="M480 685q45.456 0 77.228-31.772Q589 621.456 589 576q0-45.456-31.772-77.228Q525.456 467 480 467q-45.456 0-77.228 31.772Q371 530.544 371 576q0 45.456 31.772 77.228Q434.544 685 480 685Zm0 91q-83 0-141.5-58.5T280 576q0-83 58.5-141.5T480 376q83 0 141.5 58.5T680 576q0 83-58.5 141.5T480 776ZM80 621.5q-19.152 0-32.326-13.174T34.5 576q0-19.152 13.174-32.326T80 530.5h80q19.152 0 32.326 13.174T205.5 576q0 19.152-13.174 32.326T160 621.5H80Zm720 0q-19.152 0-32.326-13.174T754.5 576q0-19.152 13.174-32.326T800 530.5h80q19.152 0 32.326 13.174T925.5 576q0 19.152-13.174 32.326T880 621.5h-80Zm-320-320q-19.152 0-32.326-13.174T434.5 256v-80q0-19.152 13.174-32.326T480 130.5q19.152 0 32.326 13.174T525.5 176v80q0 19.152-13.174 32.326T480 301.5Zm0 720q-19.152 0-32.326-13.17Q434.5 995.152 434.5 976v-80q0-19.152 13.174-32.326T480 850.5q19.152 0 32.326 13.174T525.5 896v80q0 19.152-13.174 32.33-13.174 13.17-32.326 13.17ZM222.174 382.065l-43-42Q165.5 327.391 166 308.239t13.174-33.065q13.435-13.674 32.587-13.674t32.065 13.674l42.239 43q12.674 13.435 12.555 31.706-.12 18.272-12.555 31.946-12.674 13.674-31.445 13.413-18.772-.261-32.446-13.174Zm494 494.761-42.239-43q-12.674-13.435-12.674-32.087t12.674-31.565Q686.609 756.5 705.38 757q18.772.5 32.446 13.174l43 41.761Q794.5 824.609 794 843.761t-13.174 33.065Q767.391 890.5 748.239 890.5t-32.065-13.674Zm-42-494.761Q660.5 369.391 661 350.62q.5-18.772 13.174-32.446l41.761-43Q728.609 261.5 747.761 262t33.065 13.174q13.674 13.435 13.674 32.587t-13.674 32.065l-43 42.239q-13.435 12.674-31.706 12.555-18.272-.12-31.946-12.555Zm-495 494.761Q165.5 863.391 165.5 844.239t13.674-32.065l43-42.239q13.435-12.674 32.087-12.674t31.565 12.674Q299.5 782.609 299 801.38q-.5 18.772-13.174 32.446l-41.761 43Q231.391 890.5 212.239 890t-33.065-13.174ZM480 576Z" />
+          </svg>
+          <svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 96 960 960" fill="currentColor"
+            class="absolute transition-all scale-0 rotate-90 dark:rotate-0 dark:scale-100">
+            <path
+              d="M480 936q-151 0-255.5-104.5T120 576q0-138 90-239.5T440 218q25-3 39 18t-1 44q-17 26-25.5 55t-8.5 61q0 90 63 153t153 63q31 0 61.5-9t54.5-25q21-14 43-1.5t19 39.5q-14 138-117.5 229T480 936Zm0-80q88 0 158-48.5T740 681q-20 5-40 8t-40 3q-123 0-209.5-86.5T364 396q0-20 3-40t8-40q-78 32-126.5 102T200 576q0 116 82 198t198 82Zm-10-270Z" />
+          </svg>
+        </button>
+      </nav>
+    </div>
+  </div>
+</header>
+
+    <div class="flex-1"><div
+        class="container md:grid md:grid-cols-[220px_minmax(0,1fr)] md:gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-10"><aside id="left-sidebar"
+  class="fixed inset-y-0 left-0 md:top-14 z-50 md:z-30 bg-background md:bg-transparent transition-all duration-100 -translate-x-full md:translate-x-0 ml-0 p-6 md:p-0 md:-ml-2 md:h-[calc(100vh-3.5rem)] w-5/6 md:w-full overflow-y-auto border-r border-border md:sticky"
+  :aria-hidden="!showSidebar" :class="{ 'translate-x-0': showSidebar }">
+
+    <a href="index.html" class="justify-start text-sm md:!hidden bg-background"><span class="font-bold text-clip whitespace-nowrap">POTPyRI  documentation</span>
+    </a>
+
+    <div class="relative overflow-hidden md:overflow-auto my-4 md:my-0">
+      <div class="overflow-y-auto h-full w-full relative pr-6"><nav class="table w-full min-w-full my-6 lg:my-8">
+  <ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/index.html">API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api/instruments.html">Instruments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/primitives.html">Primitives</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/utils.html">Utilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api/scripts.html">Scripts</a></li>
+</ul>
+</li>
+</ul>
+
+</nav>
+      </div>
+    </div>
+    <button type="button" @click="showSidebar = false"
+      class="absolute md:hidden right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100">
+      <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 96 960 960" fill="currentColor"
+        stroke="none" class="h-4 w-4">
+        <path
+          d="M480 632 284 828q-11 11-28 11t-28-11q-11-11-11-28t11-28l196-196-196-196q-11-11-11-28t11-28q11-11 28-11t28 11l196 196 196-196q11-11 28-11t28 11q11 11 11 28t-11 28L536 576l196 196q11 11 11 28t-11 28q-11 11-28 11t-28-11L480 632Z" />
+      </svg>
+    </button>
+  </aside>
+          <main class="relative py-6 lg:gap-10 lg:py-8 xl:grid xl:grid-cols-[1fr_300px]">
+<div class="w-full min-w-0 mx-auto">
+<nav aria-label="breadcrumbs"
+     class="flex items-center mb-4 space-x-1 text-sm text-muted-foreground">
+  <a class="overflow-hidden text-ellipsis whitespace-nowrap hover:text-foreground"
+     href="index.html">
+    <span class="hidden md:inline">POTPyRI  documentation</span>
+    <svg xmlns="http://www.w3.org/2000/svg"
+         height="18"
+         width="18"
+         viewBox="0 96 960 960"
+         aria-label="Home"
+         fill="currentColor"
+         stroke="none"
+         class="md:hidden">
+      <path d="M240 856h120V616h240v240h120V496L480 316 240 496v360Zm-80 80V456l320-240 320 240v480H520V696h-80v240H160Zm320-350Z" />
+    </svg>
+  </a>
+  
+<div class="mr-1">/</div><span aria-current="page"
+        class="font-medium text-foreground overflow-hidden text-ellipsis whitespace-nowrap">Index</span>
+</nav>
+
+<div id="content" role="main">
+
+  <h1 id="index">Index</h1>
+  <h2 id="A">A</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.absphot">absphot (class in potpyri.primitives.absphot)</a>
+</li>
+      <li><a href="api/generated/potpyri.scripts.archives.download_anet_index.html#potpyri.scripts.archives.download_anet_index.add_options">add_options() (in module potpyri.scripts.archives.download_anet_index)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.scripts.archives.download_gemini_data.html#potpyri.scripts.archives.download_gemini_data.add_options">(in module potpyri.scripts.archives.download_gemini_data)</a>
+</li>
+        <li><a href="api/generated/potpyri.scripts.archives.download_keck_data.html#potpyri.scripts.archives.download_keck_data.add_options">(in module potpyri.scripts.archives.download_keck_data)</a>
+</li>
+        <li><a href="api/generated/potpyri.utils.options.html#potpyri.utils.options.add_options">(in module potpyri.utils.options)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.utils.options.html#potpyri.utils.options.add_paths">add_paths() (in module potpyri.utils.options)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.image_procs.html#potpyri.primitives.image_procs.add_stack_mask">add_stack_mask() (in module potpyri.primitives.image_procs)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.image_procs.html#potpyri.primitives.image_procs.align_images">align_images() (in module potpyri.primitives.image_procs)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.solve_wcs.html#potpyri.primitives.solve_wcs.align_to_gaia">align_to_gaia() (in module potpyri.primitives.solve_wcs)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="B">B</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.instruments.BINOSPEC.html#potpyri.instruments.BINOSPEC.BINOSPEC">BINOSPEC (class in potpyri.instruments.BINOSPEC)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="C">C</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.primitives.solve_wcs.html#potpyri.primitives.solve_wcs.clean_up_astrometry">clean_up_astrometry() (in module potpyri.primitives.solve_wcs)</a>
+</li>
+      <li><a href="api/generated/potpyri.utils.logger.html#potpyri.utils.logger.ColoredLogger.close">close() (potpyri.utils.logger.ColoredLogger method)</a>
+</li>
+      <li><a href="api/generated/potpyri.utils.logger.html#potpyri.utils.logger.ColoredFormatter">ColoredFormatter (class in potpyri.utils.logger)</a>
+</li>
+      <li><a href="api/generated/potpyri.utils.logger.html#potpyri.utils.logger.ColoredLogger">ColoredLogger (class in potpyri.utils.logger)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.image_procs.html#potpyri.primitives.image_procs.compute_relative_scales">compute_relative_scales() (in module potpyri.primitives.image_procs)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.absphot.convert_filter_name">convert_filter_name() (potpyri.primitives.absphot.absphot method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.create_bias">create_bias() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.primitives.photometry.html#potpyri.primitives.photometry.create_conv">create_conv() (in module potpyri.primitives.photometry)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.create_dark">create_dark() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.image_procs.html#potpyri.primitives.image_procs.create_error">create_error() (in module potpyri.primitives.image_procs)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.create_flat">create_flat() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.image_procs.html#potpyri.primitives.image_procs.create_mask">create_mask() (in module potpyri.primitives.image_procs)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.photometry.html#potpyri.primitives.photometry.create_params">create_params() (in module potpyri.primitives.photometry)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.create_sky">create_sky() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="D">D</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.scripts.archives.download_keck_data.html#potpyri.scripts.archives.download_keck_data.date_query">date_query() (in module potpyri.scripts.archives.download_keck_data)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.DEIMOS.html#potpyri.instruments.DEIMOS.DEIMOS">DEIMOS (class in potpyri.instruments.DEIMOS)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.image_procs.html#potpyri.primitives.image_procs.detrend_stack">detrend_stack() (in module potpyri.primitives.image_procs)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.calibration.html#potpyri.primitives.calibration.do_bias">do_bias() (in module potpyri.primitives.calibration)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.calibration.html#potpyri.primitives.calibration.do_dark">do_dark() (in module potpyri.primitives.calibration)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.primitives.calibration.html#potpyri.primitives.calibration.do_flat">do_flat() (in module potpyri.primitives.calibration)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.photometry.html#potpyri.primitives.photometry.do_phot">do_phot() (in module potpyri.primitives.photometry)</a>
+</li>
+      <li><a href="api/generated/potpyri.scripts.archives.download_gemini_data.html#potpyri.scripts.archives.download_gemini_data.download_data">download_data() (in module potpyri.scripts.archives.download_gemini_data)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.scripts.archives.download_keck_data.html#potpyri.scripts.archives.download_keck_data.download_data">(in module potpyri.scripts.archives.download_keck_data)</a>
+</li>
+      </ul></li>
+      <li><a href="api/generated/potpyri.scripts.archives.download_gemini_data.html#potpyri.scripts.archives.download_gemini_data.download_file">download_file() (in module potpyri.scripts.archives.download_gemini_data)</a>
+</li>
+      <li><a href="api/generated/potpyri.scripts.archives.download_anet_index.html#potpyri.scripts.archives.download_anet_index.download_index_files">download_index_files() (in module potpyri.scripts.archives.download_anet_index)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="E">E</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.expand_mask">expand_mask() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.primitives.photometry.html#potpyri.primitives.photometry.extract_aperture_stats">extract_aperture_stats() (in module potpyri.primitives.photometry)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.photometry.html#potpyri.primitives.photometry.extract_fwhm_from_epsf">extract_fwhm_from_epsf() (in module potpyri.primitives.photometry)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="F">F</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.instruments.F2.html#potpyri.instruments.F2.F2">F2 (class in potpyri.instruments.F2)</a>
+</li>
+      <li><a href="api/generated/potpyri.utils.logger.html#potpyri.utils.logger.ColoredLogger.F_FMT">F_FMT (potpyri.utils.logger.ColoredLogger attribute)</a>
+</li>
+      <li><a href="api/generated/potpyri.utils.logger.html#potpyri.utils.logger.ColoredLogger.FILE_FORMAT">FILE_FORMAT (potpyri.utils.logger.ColoredLogger attribute)</a>
+</li>
+      <li><a href="api/generated/potpyri.utils.utilities.html#potpyri.utils.utilities.find_catalog">find_catalog() (in module potpyri.utils.utilities)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.find_zeropoint">find_zeropoint() (in module potpyri.primitives.absphot)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.absphot.find_zeropoint">(potpyri.primitives.absphot.absphot method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.utils.logger.html#potpyri.utils.logger.ColoredFormatter.format">format() (potpyri.utils.logger.ColoredFormatter method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.format_datasec">format_datasec() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.utils.logger.html#potpyri.utils.logger.formatter_message">formatter_message() (in module potpyri.utils.logger)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.FOURSTAR.html#potpyri.instruments.FOURSTAR.FOURSTAR">FOURSTAR (class in potpyri.instruments.FOURSTAR)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="G">G</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.primitives.photometry.html#potpyri.primitives.photometry.generate_epsf">generate_epsf() (in module potpyri.primitives.photometry)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.image_procs.html#potpyri.primitives.image_procs.generate_wcs">generate_wcs() (in module potpyri.primitives.image_procs)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.LRIS.html#potpyri.instruments.LRIS.LRIS.get_1R_datasec">get_1R_datasec() (potpyri.instruments.LRIS.LRIS method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.LRIS.html#potpyri.instruments.LRIS.LRIS.get_2R_datasec">get_2R_datasec() (potpyri.instruments.LRIS.LRIS method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.DEIMOS.html#potpyri.instruments.DEIMOS.DEIMOS.get_ampl">get_ampl() (potpyri.instruments.DEIMOS.DEIMOS method)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.GMOS.html#potpyri.instruments.GMOS.GMOS.get_ampl">(potpyri.instruments.GMOS.GMOS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.IMACS.html#potpyri.instruments.IMACS.IMACS.get_ampl">(potpyri.instruments.IMACS.IMACS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_ampl">(potpyri.instruments.instrument.Instrument method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.LRIS.html#potpyri.instruments.LRIS.LRIS.get_ampl">(potpyri.instruments.LRIS.LRIS method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/generated/potpyri.scripts.archives.download_gemini_data.html#potpyri.scripts.archives.download_gemini_data.get_associated_cals">get_associated_cals() (in module potpyri.scripts.archives.download_gemini_data)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_binning">get_binning() (potpyri.instruments.instrument.Instrument method)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.LRIS.html#potpyri.instruments.LRIS.LRIS.get_binning">(potpyri.instruments.LRIS.LRIS method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_bkg_name">get_bkg_name() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.GMOS.html#potpyri.instruments.GMOS.GMOS.get_catalog">get_catalog() (potpyri.instruments.GMOS.GMOS method)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_catalog">(potpyri.instruments.instrument.Instrument method)</a>
+</li>
+        <li><a href="api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.absphot.get_catalog">(potpyri.primitives.absphot.absphot method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/generated/potpyri.instruments.DEIMOS.html#potpyri.instruments.DEIMOS.DEIMOS.get_exptime">get_exptime() (potpyri.instruments.DEIMOS.DEIMOS method)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.F2.html#potpyri.instruments.F2.F2.get_exptime">(potpyri.instruments.F2.F2 method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_exptime">(potpyri.instruments.instrument.Instrument method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.LRIS.html#potpyri.instruments.LRIS.LRIS.get_exptime">(potpyri.instruments.LRIS.LRIS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.MOSFIRE.html#potpyri.instruments.MOSFIRE.MOSFIRE.get_exptime">(potpyri.instruments.MOSFIRE.MOSFIRE method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/generated/potpyri.primitives.image_procs.html#potpyri.primitives.image_procs.get_fieldcenter">get_fieldcenter() (in module potpyri.primitives.image_procs)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.F2.html#potpyri.instruments.F2.F2.get_filter">get_filter() (potpyri.instruments.F2.F2 method)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.IMACS.html#potpyri.instruments.IMACS.IMACS.get_filter">(potpyri.instruments.IMACS.IMACS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_filter">(potpyri.instruments.instrument.Instrument method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.LRIS.html#potpyri.instruments.LRIS.LRIS.get_filter">(potpyri.instruments.LRIS.LRIS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.MOSFIRE.html#potpyri.instruments.MOSFIRE.MOSFIRE.get_filter">(potpyri.instruments.MOSFIRE.MOSFIRE method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/generated/potpyri.scripts.archives.download_gemini_data.html#potpyri.scripts.archives.download_gemini_data.get_full_outname">get_full_outname() (in module potpyri.scripts.archives.download_gemini_data)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.solve_wcs.html#potpyri.primitives.solve_wcs.get_gaia_catalog">get_gaia_catalog() (in module potpyri.primitives.solve_wcs)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.DEIMOS.html#potpyri.instruments.DEIMOS.DEIMOS.get_gain">get_gain() (potpyri.instruments.DEIMOS.DEIMOS method)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.F2.html#potpyri.instruments.F2.F2.get_gain">(potpyri.instruments.F2.F2 method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.FOURSTAR.html#potpyri.instruments.FOURSTAR.FOURSTAR.get_gain">(potpyri.instruments.FOURSTAR.FOURSTAR method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.GMOS.html#potpyri.instruments.GMOS.GMOS.get_gain">(potpyri.instruments.GMOS.GMOS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_gain">(potpyri.instruments.instrument.Instrument method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.LRIS.html#potpyri.instruments.LRIS.LRIS.get_gain">(potpyri.instruments.LRIS.LRIS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.MMIRS.html#potpyri.instruments.MMIRS.MMIRS.get_gain">(potpyri.instruments.MMIRS.MMIRS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.MOSFIRE.html#potpyri.instruments.MOSFIRE.MOSFIRE.get_gain">(potpyri.instruments.MOSFIRE.MOSFIRE method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/generated/potpyri.instruments.GMOS.html#potpyri.instruments.GMOS.GMOS.get_instrument_name">get_instrument_name() (potpyri.instruments.GMOS.GMOS method)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_instrument_name">(potpyri.instruments.instrument.Instrument method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.LRIS.html#potpyri.instruments.LRIS.LRIS.get_instrument_name">(potpyri.instruments.LRIS.LRIS method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/generated/potpyri.utils.logger.html#potpyri.utils.logger.get_log">get_log() (in module potpyri.utils.logger)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_mbias_name">get_mbias_name() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_mdark_name">get_mdark_name() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_mflat_name">get_mflat_name() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.absphot.get_minmag">get_minmag() (potpyri.primitives.absphot.absphot method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_msky_name">get_msky_name() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.BINOSPEC.html#potpyri.instruments.BINOSPEC.BINOSPEC.get_number">get_number() (potpyri.instruments.BINOSPEC.BINOSPEC method)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.DEIMOS.html#potpyri.instruments.DEIMOS.DEIMOS.get_number">(potpyri.instruments.DEIMOS.DEIMOS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.F2.html#potpyri.instruments.F2.F2.get_number">(potpyri.instruments.F2.F2 method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.FOURSTAR.html#potpyri.instruments.FOURSTAR.FOURSTAR.get_number">(potpyri.instruments.FOURSTAR.FOURSTAR method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.GMOS.html#potpyri.instruments.GMOS.GMOS.get_number">(potpyri.instruments.GMOS.GMOS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.IMACS.html#potpyri.instruments.IMACS.IMACS.get_number">(potpyri.instruments.IMACS.IMACS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.LRIS.html#potpyri.instruments.LRIS.LRIS.get_number">(potpyri.instruments.LRIS.LRIS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.MMIRS.html#potpyri.instruments.MMIRS.MMIRS.get_number">(potpyri.instruments.MMIRS.MMIRS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.MOSFIRE.html#potpyri.instruments.MOSFIRE.MOSFIRE.get_number">(potpyri.instruments.MOSFIRE.MOSFIRE method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/generated/potpyri.scripts.archives.download_gemini_data.html#potpyri.scripts.archives.download_gemini_data.get_observation_data">get_observation_data() (in module potpyri.scripts.archives.download_gemini_data)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_out_size">get_out_size() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.LRIS.html#potpyri.instruments.LRIS.LRIS.get_overscan">get_overscan() (potpyri.instruments.LRIS.LRIS method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_pixscale">get_pixscale() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.DEIMOS.html#potpyri.instruments.DEIMOS.DEIMOS.get_rdnoise">get_rdnoise() (potpyri.instruments.DEIMOS.DEIMOS method)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.F2.html#potpyri.instruments.F2.F2.get_rdnoise">(potpyri.instruments.F2.F2 method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.FOURSTAR.html#potpyri.instruments.FOURSTAR.FOURSTAR.get_rdnoise">(potpyri.instruments.FOURSTAR.FOURSTAR method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.GMOS.html#potpyri.instruments.GMOS.GMOS.get_rdnoise">(potpyri.instruments.GMOS.GMOS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_rdnoise">(potpyri.instruments.instrument.Instrument method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.LRIS.html#potpyri.instruments.LRIS.LRIS.get_rdnoise">(potpyri.instruments.LRIS.LRIS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.MMIRS.html#potpyri.instruments.MMIRS.MMIRS.get_rdnoise">(potpyri.instruments.MMIRS.MMIRS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.MOSFIRE.html#potpyri.instruments.MOSFIRE.MOSFIRE.get_rdnoise">(potpyri.instruments.MOSFIRE.MOSFIRE method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/generated/potpyri.instruments.F2.html#potpyri.instruments.F2.F2.get_saturation">get_saturation() (potpyri.instruments.F2.F2 method)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.MOSFIRE.html#potpyri.instruments.MOSFIRE.MOSFIRE.get_saturation">(potpyri.instruments.MOSFIRE.MOSFIRE method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_sci_name">get_sci_name() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.photometry.html#potpyri.primitives.photometry.get_star_catalog">get_star_catalog() (in module potpyri.primitives.photometry)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_staticmask_filename">get_staticmask_filename() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_stk_name">get_stk_name() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_target">get_target() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.FOURSTAR.html#potpyri.instruments.FOURSTAR.FOURSTAR.get_time">get_time() (potpyri.instruments.FOURSTAR.FOURSTAR method)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.GMOS.html#potpyri.instruments.GMOS.GMOS.get_time">(potpyri.instruments.GMOS.GMOS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.IMACS.html#potpyri.instruments.IMACS.IMACS.get_time">(potpyri.instruments.IMACS.IMACS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.get_time">(potpyri.instruments.instrument.Instrument method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.LRIS.html#potpyri.instruments.LRIS.LRIS.get_time">(potpyri.instruments.LRIS.LRIS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.MMIRS.html#potpyri.instruments.MMIRS.MMIRS.get_time">(potpyri.instruments.MMIRS.MMIRS method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.absphot.get_zeropoint">get_zeropoint() (potpyri.primitives.absphot.absphot method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.GMOS.html#potpyri.instruments.GMOS.GMOS">GMOS (class in potpyri.instruments.GMOS)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="H">H</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.primitives.sort_files.html#potpyri.primitives.sort_files.handle_files">handle_files() (in module potpyri.primitives.sort_files)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="I">I</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.instruments.IMACS.html#potpyri.instruments.IMACS.IMACS">IMACS (class in potpyri.instruments.IMACS)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.image_procs.html#potpyri.primitives.image_procs.image_proc">image_proc() (in module potpyri.primitives.image_procs)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.BINOSPEC.html#potpyri.instruments.BINOSPEC.BINOSPEC.import_image">import_image() (potpyri.instruments.BINOSPEC.BINOSPEC method)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.DEIMOS.html#potpyri.instruments.DEIMOS.DEIMOS.import_image">(potpyri.instruments.DEIMOS.DEIMOS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.F2.html#potpyri.instruments.F2.F2.import_image">(potpyri.instruments.F2.F2 method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.FOURSTAR.html#potpyri.instruments.FOURSTAR.FOURSTAR.import_image">(potpyri.instruments.FOURSTAR.FOURSTAR method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.GMOS.html#potpyri.instruments.GMOS.GMOS.import_image">(potpyri.instruments.GMOS.GMOS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.IMACS.html#potpyri.instruments.IMACS.IMACS.import_image">(potpyri.instruments.IMACS.IMACS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.import_image">(potpyri.instruments.instrument.Instrument method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.LRIS.html#potpyri.instruments.LRIS.LRIS.import_image">(potpyri.instruments.LRIS.LRIS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.MMIRS.html#potpyri.instruments.MMIRS.MMIRS.import_image">(potpyri.instruments.MMIRS.MMIRS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.MOSFIRE.html#potpyri.instruments.MOSFIRE.MOSFIRE.import_image">(potpyri.instruments.MOSFIRE.MOSFIRE method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.import_sci_image">import_sci_image() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.utils.options.html#potpyri.utils.options.init_options">init_options() (in module potpyri.utils.options)</a>
+</li>
+      <li><a href="api/generated/potpyri.utils.options.html#potpyri.utils.options.initialize_telescope">initialize_telescope() (in module potpyri.utils.options)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument">Instrument (class in potpyri.instruments.instrument)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.sort_files.html#potpyri.primitives.sort_files.is_bad">is_bad() (in module potpyri.primitives.sort_files)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.sort_files.html#potpyri.primitives.sort_files.is_bias">is_bias() (in module potpyri.primitives.sort_files)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.sort_files.html#potpyri.primitives.sort_files.is_dark">is_dark() (in module potpyri.primitives.sort_files)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.sort_files.html#potpyri.primitives.sort_files.is_flat">is_flat() (in module potpyri.primitives.sort_files)</a>
+</li>
+      <li><a href="api/generated/potpyri.utils.utilities.html#potpyri.utils.utilities.is_number">is_number() (in module potpyri.utils.utilities)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.sort_files.html#potpyri.primitives.sort_files.is_science">is_science() (in module potpyri.primitives.sort_files)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.sort_files.html#potpyri.primitives.sort_files.is_spec">is_spec() (in module potpyri.primitives.sort_files)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="L">L</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.load_bias">load_bias() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.scripts.archives.download_gemini_data.html#potpyri.scripts.archives.download_gemini_data.load_cookie">load_cookie() (in module potpyri.scripts.archives.download_gemini_data)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.load_dark">load_dark() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.load_flat">load_flat() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.load_sky">load_sky() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.load_staticmask">load_staticmask() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.scripts.archives.download_keck_data.html#potpyri.scripts.archives.download_keck_data.login">login() (in module potpyri.scripts.archives.download_keck_data)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.LRIS.html#potpyri.instruments.LRIS.LRIS">LRIS (class in potpyri.instruments.LRIS)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="M">M</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.scripts.archives.download_anet_index.html#potpyri.scripts.archives.download_anet_index.main">main() (in module potpyri.scripts.archives.download_anet_index)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.scripts.archives.download_gemini_data.html#potpyri.scripts.archives.download_gemini_data.main">(in module potpyri.scripts.archives.download_gemini_data)</a>
+</li>
+        <li><a href="api/generated/potpyri.scripts.archives.download_keck_data.html#potpyri.scripts.archives.download_keck_data.main">(in module potpyri.scripts.archives.download_keck_data)</a>
+</li>
+        <li><a href="api/generated/potpyri.scripts.main_pipeline.html#potpyri.scripts.main_pipeline.main">(in module potpyri.scripts.main_pipeline)</a>
+</li>
+      </ul></li>
+      <li><a href="api/generated/potpyri.scripts.main_pipeline.html#potpyri.scripts.main_pipeline.main_pipeline">main_pipeline() (in module potpyri.scripts.main_pipeline)</a>
+</li>
+      <li><a href="api/generated/potpyri.scripts.archives.download_gemini_data.html#potpyri.scripts.archives.download_gemini_data.mask_object_spectral_observation">mask_object_spectral_observation() (in module potpyri.scripts.archives.download_gemini_data)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.image_procs.html#potpyri.primitives.image_procs.mask_satellites">mask_satellites() (in module potpyri.primitives.image_procs)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.match_type_keywords">match_type_keywords() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      <li><a href="api/generated/potpyri.instruments.FOURSTAR.html#potpyri.instruments.FOURSTAR.FOURSTAR.measure_slope">measure_slope() (potpyri.instruments.FOURSTAR.FOURSTAR method)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.MMIRS.html#potpyri.instruments.MMIRS.MMIRS.measure_slope">(potpyri.instruments.MMIRS.MMIRS method)</a>
+</li>
+      </ul></li>
+      <li><a href="api/generated/potpyri.instruments.MMIRS.html#potpyri.instruments.MMIRS.MMIRS">MMIRS (class in potpyri.instruments.MMIRS)</a>
+</li>
+      <li>
+    module
+
+      <ul style="list-style-type:none">
+        <li><a href="api/instruments.html#module-potpyri.instruments">potpyri.instruments</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.BINOSPEC.html#module-potpyri.instruments.BINOSPEC">potpyri.instruments.BINOSPEC</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.DEIMOS.html#module-potpyri.instruments.DEIMOS">potpyri.instruments.DEIMOS</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.F2.html#module-potpyri.instruments.F2">potpyri.instruments.F2</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.FOURSTAR.html#module-potpyri.instruments.FOURSTAR">potpyri.instruments.FOURSTAR</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.GMOS.html#module-potpyri.instruments.GMOS">potpyri.instruments.GMOS</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.IMACS.html#module-potpyri.instruments.IMACS">potpyri.instruments.IMACS</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.instrument.html#module-potpyri.instruments.instrument">potpyri.instruments.instrument</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.LRIS.html#module-potpyri.instruments.LRIS">potpyri.instruments.LRIS</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.MMIRS.html#module-potpyri.instruments.MMIRS">potpyri.instruments.MMIRS</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.MOSFIRE.html#module-potpyri.instruments.MOSFIRE">potpyri.instruments.MOSFIRE</a>
+</li>
+        <li><a href="api/primitives.html#module-potpyri.primitives">potpyri.primitives</a>
+</li>
+        <li><a href="api/generated/potpyri.primitives.absphot.html#module-potpyri.primitives.absphot">potpyri.primitives.absphot</a>
+</li>
+        <li><a href="api/generated/potpyri.primitives.calibration.html#module-potpyri.primitives.calibration">potpyri.primitives.calibration</a>
+</li>
+        <li><a href="api/generated/potpyri.primitives.image_procs.html#module-potpyri.primitives.image_procs">potpyri.primitives.image_procs</a>
+</li>
+        <li><a href="api/generated/potpyri.primitives.photometry.html#module-potpyri.primitives.photometry">potpyri.primitives.photometry</a>
+</li>
+        <li><a href="api/generated/potpyri.primitives.solve_wcs.html#module-potpyri.primitives.solve_wcs">potpyri.primitives.solve_wcs</a>
+</li>
+        <li><a href="api/generated/potpyri.primitives.sort_files.html#module-potpyri.primitives.sort_files">potpyri.primitives.sort_files</a>
+</li>
+        <li><a href="api/generated/potpyri.scripts.archives.download_anet_index.html#module-potpyri.scripts.archives.download_anet_index">potpyri.scripts.archives.download_anet_index</a>
+</li>
+        <li><a href="api/generated/potpyri.scripts.archives.download_gemini_data.html#module-potpyri.scripts.archives.download_gemini_data">potpyri.scripts.archives.download_gemini_data</a>
+</li>
+        <li><a href="api/generated/potpyri.scripts.archives.download_keck_data.html#module-potpyri.scripts.archives.download_keck_data">potpyri.scripts.archives.download_keck_data</a>
+</li>
+        <li><a href="api/generated/potpyri.scripts.main_pipeline.html#module-potpyri.scripts.main_pipeline">potpyri.scripts.main_pipeline</a>
+</li>
+        <li><a href="api/utils.html#module-potpyri.utils">potpyri.utils</a>
+</li>
+        <li><a href="api/generated/potpyri.utils.logger.html#module-potpyri.utils.logger">potpyri.utils.logger</a>
+</li>
+        <li><a href="api/generated/potpyri.utils.options.html#module-potpyri.utils.options">potpyri.utils.options</a>
+</li>
+        <li><a href="api/generated/potpyri.utils.utilities.html#module-potpyri.utils.utilities">potpyri.utils.utilities</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.instruments.MOSFIRE.html#potpyri.instruments.MOSFIRE.MOSFIRE">MOSFIRE (class in potpyri.instruments.MOSFIRE)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="N">N</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.instruments.GMOS.html#potpyri.instruments.GMOS.GMOS.needs_sky_subtraction">needs_sky_subtraction() (potpyri.instruments.GMOS.GMOS method)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.needs_sky_subtraction">(potpyri.instruments.instrument.Instrument method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="P">P</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.scripts.archives.download_anet_index.html#potpyri.scripts.archives.download_anet_index.parse_astrometry_config">parse_astrometry_config() (in module potpyri.scripts.archives.download_anet_index)</a>
+</li>
+      <li><a href="api/generated/potpyri.utils.utilities.html#potpyri.utils.utilities.parse_coord">parse_coord() (in module potpyri.utils.utilities)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.photometry.html#potpyri.primitives.photometry.photloop">photloop() (in module potpyri.primitives.photometry)</a>
+</li>
+      <li>
+    potpyri.instruments
+
+      <ul style="list-style-type:none">
+        <li><a href="api/instruments.html#module-potpyri.instruments">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.instruments.BINOSPEC
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.BINOSPEC.html#module-potpyri.instruments.BINOSPEC">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.instruments.DEIMOS
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.DEIMOS.html#module-potpyri.instruments.DEIMOS">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.instruments.F2
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.F2.html#module-potpyri.instruments.F2">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.instruments.FOURSTAR
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.FOURSTAR.html#module-potpyri.instruments.FOURSTAR">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.instruments.GMOS
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.GMOS.html#module-potpyri.instruments.GMOS">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.instruments.IMACS
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.IMACS.html#module-potpyri.instruments.IMACS">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.instruments.instrument
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.instrument.html#module-potpyri.instruments.instrument">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.instruments.LRIS
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.LRIS.html#module-potpyri.instruments.LRIS">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.instruments.MMIRS
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.MMIRS.html#module-potpyri.instruments.MMIRS">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.instruments.MOSFIRE
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.MOSFIRE.html#module-potpyri.instruments.MOSFIRE">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.primitives
+
+      <ul style="list-style-type:none">
+        <li><a href="api/primitives.html#module-potpyri.primitives">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.primitives.absphot
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.primitives.absphot.html#module-potpyri.primitives.absphot">module</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li>
+    potpyri.primitives.calibration
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.primitives.calibration.html#module-potpyri.primitives.calibration">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.primitives.image_procs
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.primitives.image_procs.html#module-potpyri.primitives.image_procs">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.primitives.photometry
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.primitives.photometry.html#module-potpyri.primitives.photometry">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.primitives.solve_wcs
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.primitives.solve_wcs.html#module-potpyri.primitives.solve_wcs">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.primitives.sort_files
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.primitives.sort_files.html#module-potpyri.primitives.sort_files">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.scripts.archives.download_anet_index
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.scripts.archives.download_anet_index.html#module-potpyri.scripts.archives.download_anet_index">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.scripts.archives.download_gemini_data
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.scripts.archives.download_gemini_data.html#module-potpyri.scripts.archives.download_gemini_data">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.scripts.archives.download_keck_data
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.scripts.archives.download_keck_data.html#module-potpyri.scripts.archives.download_keck_data">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.scripts.main_pipeline
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.scripts.main_pipeline.html#module-potpyri.scripts.main_pipeline">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.utils
+
+      <ul style="list-style-type:none">
+        <li><a href="api/utils.html#module-potpyri.utils">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.utils.logger
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.utils.logger.html#module-potpyri.utils.logger">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.utils.options
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.utils.options.html#module-potpyri.utils.options">module</a>
+</li>
+      </ul></li>
+      <li>
+    potpyri.utils.utilities
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.utils.utilities.html#module-potpyri.utils.utilities">module</a>
+</li>
+      </ul></li>
+      <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.process_science">process_science() (potpyri.instruments.instrument.Instrument method)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="R">R</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.instruments.BINOSPEC.html#potpyri.instruments.BINOSPEC.BINOSPEC.raw_format">raw_format() (potpyri.instruments.BINOSPEC.BINOSPEC method)</a>
+
+      <ul style="list-style-type:none">
+        <li><a href="api/generated/potpyri.instruments.DEIMOS.html#potpyri.instruments.DEIMOS.DEIMOS.raw_format">(potpyri.instruments.DEIMOS.DEIMOS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.F2.html#potpyri.instruments.F2.F2.raw_format">(potpyri.instruments.F2.F2 method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.FOURSTAR.html#potpyri.instruments.FOURSTAR.FOURSTAR.raw_format">(potpyri.instruments.FOURSTAR.FOURSTAR method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.GMOS.html#potpyri.instruments.GMOS.GMOS.raw_format">(potpyri.instruments.GMOS.GMOS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.IMACS.html#potpyri.instruments.IMACS.IMACS.raw_format">(potpyri.instruments.IMACS.IMACS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.instrument.html#potpyri.instruments.instrument.Instrument.raw_format">(potpyri.instruments.instrument.Instrument method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.LRIS.html#potpyri.instruments.LRIS.LRIS.raw_format">(potpyri.instruments.LRIS.LRIS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.MMIRS.html#potpyri.instruments.MMIRS.MMIRS.raw_format">(potpyri.instruments.MMIRS.MMIRS method)</a>
+</li>
+        <li><a href="api/generated/potpyri.instruments.MOSFIRE.html#potpyri.instruments.MOSFIRE.MOSFIRE.raw_format">(potpyri.instruments.MOSFIRE.MOSFIRE method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.primitives.image_procs.html#potpyri.primitives.image_procs.remove_pv_distortion">remove_pv_distortion() (in module potpyri.primitives.image_procs)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.photometry.html#potpyri.primitives.photometry.run_photometry">run_photometry() (in module potpyri.primitives.photometry)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.photometry.html#potpyri.primitives.photometry.run_sextractor">run_sextractor() (in module potpyri.primitives.photometry)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="S">S</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.utils.logger.html#potpyri.utils.logger.ColoredLogger.shutdown">shutdown() (potpyri.utils.logger.ColoredLogger method)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.solve_wcs.html#potpyri.primitives.solve_wcs.solve_astrometry">solve_astrometry() (in module potpyri.primitives.solve_wcs)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.sort_files.html#potpyri.primitives.sort_files.sort_files">sort_files() (in module potpyri.primitives.sort_files)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.utils.logger.html#potpyri.utils.logger.ColoredLogger.ST_FMT">ST_FMT (potpyri.utils.logger.ColoredLogger attribute)</a>
+</li>
+      <li><a href="api/generated/potpyri.primitives.image_procs.html#potpyri.primitives.image_procs.stack_data">stack_data() (in module potpyri.primitives.image_procs)</a>
+</li>
+      <li><a href="api/generated/potpyri.utils.logger.html#potpyri.utils.logger.ColoredLogger.STREAM_FORMAT">STREAM_FORMAT (potpyri.utils.logger.ColoredLogger attribute)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="T">T</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.utils.options.html#potpyri.utils.options.test_for_dependencies">test_for_dependencies() (in module potpyri.utils.options)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="U">U</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.scripts.archives.download_gemini_data.html#potpyri.scripts.archives.download_gemini_data.unpack_tarfile">unpack_tarfile() (in module potpyri.scripts.archives.download_gemini_data)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="Y">Y</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.absphot.Y_band">Y_band() (potpyri.primitives.absphot.absphot method)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+  <h2 id="Z">Z</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul style="margin-left:0;list-style-type:none">
+      <li><a href="api/generated/potpyri.primitives.absphot.html#potpyri.primitives.absphot.absphot.zpt_iteration">zpt_iteration() (potpyri.primitives.absphot.absphot method)</a>
+</li>
+  </ul></td>
+  </tr>
+      </table>
+  
+
+</div></div>
+<aside id="right-sidebar" class="hidden text-sm xl:block">
+<div class="sticky top-16 -mt-10 max-h-[calc(var(--vh)-4rem)] overflow-y-auto pt-6 space-y-2">
+<a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#A">A</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#B">B</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#C">C</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#D">D</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#E">E</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#F">F</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#G">G</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#H">H</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#I">I</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#L">L</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#M">M</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#N">N</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#P">P</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#R">R</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#S">S</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#T">T</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#U">U</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#Y">Y</a><a class="pt-2 block text-muted-foreground no-underline transition-colors hover:text-foreground focus-visible:outline-offset-[-1px]" href="#Z">Z</a>
+</div>
+</aside>
+          </main>
+        </div>
+      </div><footer class="py-6 border-t border-border md:py-0">
+    <div class="container flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row">
+      <div class="flex flex-col items-center gap-4 px-8 md:flex-row md:gap-2 md:px-0">
+        <p class="text-sm leading-loose text-center text-muted-foreground md:text-left">© 2025, POTPyRI Team&nbsp;Built with <a class="font-medium underline underline-offset-4"
+    href="https://www.sphinx-doc.org"
+    rel="noreferrer">Sphinx 8.1.3</a></p>
+</div>
+</div>
+</footer>
+    </div>
+    
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script defer="defer" src="_static/theme.js?v=582b20c5"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    
+</body>
+
+</html>
