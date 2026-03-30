@@ -17,7 +17,7 @@ from tests.utils import download_gdrive_file
 
 @pytest.mark.integration
 def test_absphot(tmp_path):
-    """Run find_zeropoint on LRIS stack and check ZPTMAG, ZPTCAT, ZPTMUCER in header."""
+    """Run find_zeropoint on LRIS stack and check ZPTMAG, MAGSYS, ZPTCAT, ZPTMUCER in header."""
     instrument = 'LRIS'
     file_list_name = 'files.txt'
 
@@ -49,6 +49,7 @@ def test_absphot(tmp_path):
 
     assert header['ZPTCAT']=='PS1'
     assert header['FILTER']=='R'
+    assert header['MAGSYS'] == absphot.DEFAULT_MAGSYS
     assert np.abs(27.576871-header['ZPTMAG'])<0.01
     assert header['ZPTMUCER']<0.01
 
@@ -107,11 +108,41 @@ def test_get_minmag():
 
 
 def test_Y_band():
-    """Y_band returns (Y, Y_err) from J and K relation Y = J + 0.46*(J-K)."""
+    """GF18 eq. (6): VISTA Y_V = J + C_Y*(J-Ks)_2MASS with C_Y=0.46 (Vega-like Y)."""
     cal = absphot.absphot()
     J, J_err = 15.0, 0.02
-    K, K_err = 14.0, 0.02
-    Y, Y_err = cal.Y_band(J, J_err, K, K_err)
-    expected_Y = J + 0.46 * (J - K)
-    np.testing.assert_allclose(Y, expected_Y)
+    Ks, Ks_err = 14.0, 0.02
+    Yv, Y_err = cal.y_band_from_jk(J, J_err, Ks, Ks_err)
+    expected_Yv = J + absphot.GF18_TWOMASS_TO_VISTA_Y_SLOPE * (J - Ks)
+    np.testing.assert_allclose(Yv, expected_Yv)
     assert np.isfinite(Y_err) and Y_err > 0
+    Y2, Y2_err = cal.Y_band(J, J_err, Ks, Ks_err)
+    np.testing.assert_allclose(Y2, Yv)
+    np.testing.assert_allclose(Y2_err, Y_err)
+
+
+def test_twomass_y_includes_gf18_ab_offset():
+    """GF18 Appendix D (D3): Y_AB = Y_V + 0.600 for twomass_y_mag_to_ab."""
+    cal = absphot.absphot()
+    J, J_err = 15.0, 0.02
+    Ks, Ks_err = 14.0, 0.02
+    Yv, _ = cal.twomass_j_ks_to_vista_y_vega(J, J_err, Ks, Ks_err)
+    Yab, _ = cal.twomass_y_mag_to_ab(J, J_err, Ks, Ks_err)
+    np.testing.assert_allclose(Yab, Yv + absphot.GF18_VISTA_Y_VEGA_TO_AB)
+
+
+def test_twomass_vega_to_ab():
+    """twomass_vega_to_ab applies standard 2MASS Vega -> AB offsets."""
+    m = 10.0
+    assert absphot.absphot.twomass_vega_to_ab(m, 'J') == m + (4.56 - 3.65)
+    assert absphot.absphot.twomass_vega_to_ab(m, 'H') == m + (4.71 - 3.32)
+    assert absphot.absphot.twomass_vega_to_ab(m, 'K') == m + (5.14 - 3.29)
+    assert absphot.absphot.twomass_vega_to_ab(m, 'Ks') == m + (5.14 - 3.29)
+
+
+def test_magsys_get_set():
+    """get_magsys / set_magsys and DEFAULT_MAGSYS."""
+    cal = absphot.absphot()
+    assert cal.get_magsys() == absphot.DEFAULT_MAGSYS == 'ABMAG'
+    cal.set_magsys('VEGAMAG')
+    assert cal.get_magsys() == 'VEGAMAG'
