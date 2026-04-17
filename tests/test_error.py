@@ -1,7 +1,7 @@
 """Tests for create_error (per-pixel error array from science and mask)."""
 from potpyri.utils import options
 from potpyri.utils import logger
-from potpyri.primitives import image_procs
+from potpyri.primitives import stacking
 from potpyri.instruments import instrument_getter
 
 import numpy as np
@@ -44,7 +44,7 @@ def test_error(tmp_path):
     hdu.writeto(outfile, overwrite=True, output_verify='silentfix')
 
     try:
-        error_hdu = image_procs.create_error(outfile, maskhdu, rdnoise)
+        error_hdu = stacking.create_error(outfile, maskhdu, rdnoise)
     finally:
         log.close()
 

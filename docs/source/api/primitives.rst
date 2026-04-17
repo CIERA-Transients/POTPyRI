@@ -3,9 +3,9 @@
 Primitives
 ==========
 
-POTPyRI primitives handle calibration, image processing, file sorting,
-WCS solving, photometry, and absolute photometry (zeropoint fitting).
-All of these are used by the main pipeline.
+POTPyRI primitives handle calibration, raw file sorting, stacking,
+astrometry, photometry, and catalog zeropoint fitting.
+These subpackages are composed by the main pipeline.
 
 Package overview
 ----------------
@@ -20,9 +20,9 @@ Modules
    :toctree: generated/
    :template: autosummary/module.rst
 
-   potpyri.primitives.absphot
+   potpyri.primitives.astrometry
    potpyri.primitives.calibration
-   potpyri.primitives.image_procs
+   potpyri.primitives.sorting
+   potpyri.primitives.stacking
    potpyri.primitives.photometry
-   potpyri.primitives.solve_wcs
-   potpyri.primitives.sort_files
+   potpyri.primitives.zeropoint

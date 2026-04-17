@@ -1,4 +1,4 @@
-"""Tests for photometry.photloop (PSF and aperture photometry on stacks) and helpers (create_conv, create_params, extract_*, get_star_catalog, extract_fwhm_from_epsf)."""
+"""Tests for photometry.run_stack_photometry and helpers (create_conv, create_params, extract_*, get_star_catalog, extract_fwhm_from_epsf)."""
 import warnings
 
 from potpyri.utils import options
@@ -19,7 +19,7 @@ from tests.utils import download_gdrive_file
 
 @pytest.mark.integration
 def test_photometry(tmp_path):
-    """Run photloop on GMOS stack; assert APPPHOT, PSFPHOT, PSFSTARS, PSF extensions and catalog size."""
+    """Run run_stack_photometry on GMOS stack; assert APPPHOT, PSFPHOT, PSFSTARS, PSF extensions and catalog size."""
     instrument = 'GMOS'
     file_list_name = 'files.txt'
 
@@ -55,7 +55,7 @@ def test_photometry(tmp_path):
     fwhm_init = 5.0
 
     try:
-        photometry.photloop(file_path, phot_sn_min=phot_sn_min,
+        photometry.run_stack_photometry(file_path, phot_sn_min=phot_sn_min,
             fwhm_init=fwhm_init, phot_sn_max=phot_sn_max, log=log)
     finally:
         log.close()

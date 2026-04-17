@@ -144,7 +144,7 @@ Required: `instrument`, `data_path`. All other options are optional. Run `main_p
 
 All outputs from the pipeline are written out to the `red` folder and various subdirectories. Calibration files such as the master bias, flat and dark are saved using `mbias`, `mflat` and `mdark` prefixes, along with additional information such as the filter, amplifiers and binning in the file names.  These calibration files are stored under `red/cals`.
 
-All processed science files are renamed following the basic format: `{object}.{filter}.{ut_date}.{amplifier}.{binning}.{unique_number}*.fits`.  All data are processed together within a common `TargType`, defined as image frames with the same object, filter, amplifier setup, and binning.  This variable is defined in the `file_list.txt` located in `data_path` and that is generated from `potpyri/primitives/sort_files.py` during the initial file processing performed by POTPyRI.  A more detailed description of `file_list.txt` is provided below.
+All processed science files are renamed following the basic format: `{object}.{filter}.{ut_date}.{amplifier}.{binning}.{unique_number}*.fits`.  All data are processed together within a common `TargType`, defined as image frames with the same object, filter, amplifier setup, and binning.  This variable is defined in the `file_list.txt` located in `data_path` and that is generated from `potpyri/primitives/sorting/` during the initial file processing performed by POTPyRI.  A more detailed description of `file_list.txt` is provided below.
 
 The following table provides a basic description of the naming format, location, and brief description for each science output file that POTPyRI will produce:
 
@@ -157,17 +157,17 @@ Filename         Location       Description
 *stk.fits        red            The stacked image data for the corresponding `TargType`, containing SCI (image data), MASK (mask), and ERR (error) extensions
 ```
 
-Once photometry is performed, additional extensions are added to each `*stk.fits` file containing FITS-formatted tables with aperture photometry, PSF stars, and PSF photometry of identified sources in the image. Currently, only the aperture photometry table is used by `potpyri/primitives/absphot.py` for flux calibration.
+Once photometry is performed, additional extensions are added to each `*stk.fits` file containing FITS-formatted tables with aperture photometry, PSF stars, and PSF photometry of identified sources in the image. Currently, only the aperture photometry table is used by `potpyri/primitives/zeropoint/` for flux calibration.
 
 ## File list
 
 The pipeline will sort through all FITS files with the correct format for a given instrument (given by the **raw_format** function in the settings file) and create a file list with the file type, target name, exposure time, observation time, and instrument setup such as number of amps and binning.
 
-This process is designed to be automatic and account for common observation or archiving errors by checking various header keywords to classify each file. Classification logic lives in `potpyri/primitives/sort_files.py`. If you find your files are being misclassified for a POTPyRI-supported instrument, please contact us or open a GitHub issue with the instrument and specific error indicated.
+This process is designed to be automatic and account for common observation or archiving errors by checking various header keywords to classify each file. Classification logic lives in `potpyri/primitives/sorting/`. If you find your files are being misclassified for a POTPyRI-supported instrument, please contact us or open a GitHub issue with the instrument and specific error indicated.
 
 ## Image Calibration
 
-Bias, dark, and flat-field images are defined by the corresponding keywords in each instrument module under `potpyri/instruments/`. The methods for generating and applying each calibration frame are generic and defined in the base class in `potpyri/instruments/instrument.py`; calibration orchestration is in `potpyri/primitives/calibration.py`.  Combined with instrument-specific differences in overscan, trimming, and static masking, we find that these methods provide good quality initial processed images with few bad pixels and generally Gaussian noise for the typical calibration frames that are available by instrument.
+Bias, dark, and flat-field images are defined by the corresponding keywords in each instrument module under `potpyri/instruments/`. The methods for generating and applying each calibration frame are generic and defined in the base class in `potpyri/instruments/instrument.py`; calibration orchestration is in `potpyri/primitives/calibration/`.  Combined with instrument-specific differences in overscan, trimming, and static masking, we find that these methods provide good quality initial processed images with few bad pixels and generally Gaussian noise for the typical calibration frames that are available by instrument.
 
 If you find that your initial processed images (see **Outputs**) are noisy, contain a large number of bad pixels, or contain other artifacts due to pixel-level processing, please contact us or open a GitHub issue with the instrument and specific error indicated.
 
@@ -179,7 +179,7 @@ If you find that you have good quality images that consistently fail image align
 
 ## Image Masking and Stacking
 
-POTPyRI has been significantly updated to implement optimal masking for satellite trails, cosmic rays, bad pixels that can be statically masked or are introduced by the pixel-level calibration, and saturation/non-linear effects.  These pixels are tracked throughout the pipeline from calibration through image stacking and are stored within the `*.fits`, `*_data.fits`, and `*stk.fits` using a bitwise image mask.  In general, the following schema is used by `potpyri/primitives/image_procs.py` to flag bad pixels:
+POTPyRI has been significantly updated to implement optimal masking for satellite trails, cosmic rays, bad pixels that can be statically masked or are introduced by the pixel-level calibration, and saturation/non-linear effects.  These pixels are tracked throughout the pipeline from calibration through image stacking and are stored within the `*.fits`, `*_data.fits`, and `*stk.fits` using a bitwise image mask.  In general, the following schema is used by `potpyri/primitives/stacking/` to flag bad pixels:
 
 ```
 Bit     Value
@@ -193,11 +193,11 @@ These pixels are ignored during image stacking; only pixels not flagged are used
 
 Error/uncertainty images are generated for each frame (read noise, Poisson noise, and empirical sky noise). These error images set the `weight` term for each input frame when stacking.
 
-Stacking is performed by `ccdproc.combine` in `potpyri/primitives/image_procs.py` with the individual image data, mask, and error frames for each science image.  The stacking method is generally `median`, but can be changed via the **stack_method** value in each `potpyri/instruments/*.py` parameter file.  Images are scaled by the exposure time within each header to account for variable depth between frames.
+Stacking is performed by `ccdproc.combine` in `potpyri/primitives/stacking/` with the individual image data, mask, and error frames for each science image.  The stacking method is generally `median`, but can be changed via the **stack_method** value in each `potpyri/instruments/*.py` parameter file.  Images are scaled by the exposure time within each header to account for variable depth between frames.
 
 ## Automatic Aperture and PSF photometry
 
-The pipeline performs both automatic aperture and PSF photometry of sources in the stacked image using `potpyri/primitives/photometry.py`. Firstly, the pipeline will detect sources within the image and determine statistics within a fiducial aperture radius using `photutils.aperture.ApertureStats`.  This initial table of aperture photometry is saved within the `*stk.fits` image as the extension `APPPHOT`.
+The pipeline performs both automatic aperture and PSF photometry of sources in the stacked image using `potpyri/primitives/photometry/`. Firstly, the pipeline will detect sources within the image and determine statistics within a fiducial aperture radius using `photutils.aperture.ApertureStats`.  This initial table of aperture photometry is saved within the `*stk.fits` image as the extension `APPPHOT`.
 
 Next, based on cuts on roundness, FWHM, and signal-to-noise, the pipeline will define a list of bright stars with which it calculates an empirical PSF model.  The final list of PSF stars is saved in the `*stk.fits` file as the `PSFSTARS` extension.  The PSF itself will be generated from the extracted data around these PSF stars using `photutils.psf.EPSFBuilder`.  A stamp of the final effective PSF is saved in the `*stk.fits` file as the `PSF` extension.  A final FWHM is empirically calculated from the effective PSF model using an `astropy.modeling.functional_models.Moffat2D` profile and saved to the `*stk.fits` header.
 

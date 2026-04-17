@@ -1,5 +1,6 @@
-"""Tests for image_procs: remove_pv_distortion, get_fieldcenter, generate_wcs, detrend_stack, add_stack_mask, compute_relative_scales."""
-from potpyri.primitives import image_procs
+"""Tests for stacking: remove_pv_distortion, get_fieldcenter, generate_wcs, detrend_stack, add_stack_mask, compute_relative_scales."""
+from potpyri.primitives import stacking
+from potpyri.primitives import photometry
 from potpyri.instruments import instrument_getter
 
 import numpy as np
@@ -22,7 +23,7 @@ def test_remove_pv_distortion(tmp_path):
     header['PV1_1'] = 1.0
     header['PV2_1'] = 0.0
     header['CTYPE1'] = 'RA---TAN'
-    out = image_procs.remove_pv_distortion(header)
+    out = stacking.remove_pv_distortion(header)
     assert out is header
     assert 'PV1_1' not in header
     assert 'PV2_1' not in header
@@ -41,7 +42,7 @@ def test_get_fieldcenter(tmp_path):
         path = os.path.join(tmp_path, f'img{i}.fits')
         hdu.writeto(path, overwrite=True)
     images = [os.path.join(tmp_path, 'img0.fits'), os.path.join(tmp_path, 'img1.fits')]
-    center = image_procs.get_fieldcenter(images)
+    center = stacking.get_fieldcenter(images)
     assert len(center) == 2
     assert np.isfinite(center[0]) and np.isfinite(center[1])
     # CRVAL from make_dummy_wcs is 30, -30
@@ -54,7 +55,7 @@ def test_generate_wcs(tmp_path):
     binn = '22'
     fieldcenter = [30.0, -30.0]
     out_size = 256
-    wcs = image_procs.generate_wcs(tel, binn, fieldcenter, out_size)
+    wcs = stacking.generate_wcs(tel, binn, fieldcenter, out_size)
     assert isinstance(wcs, WCS)
     np.testing.assert_allclose(wcs.wcs.crval, [30.0, -30.0])
     assert wcs.pixel_shape == (out_size, out_size)
@@ -70,7 +71,7 @@ def test_detrend_stack(tmp_path):
     hdu_sci.header['SATURATE'] = 50000.0
     hdu_mask = fits.ImageHDU(mask)
     stack = fits.HDUList([hdu_sci, hdu_mask])
-    out = image_procs.detrend_stack(stack)
+    out = stacking.detrend_stack(stack)
     assert out is stack
     assert stack[0].data is not None
     # After detrend, row/col median should be ~0
@@ -98,7 +99,7 @@ def test_add_stack_mask(tmp_path):
         stack_mask = fits.ImageHDU(mask.copy())
         stack_err = fits.ImageHDU(err.copy())
         stack = fits.HDUList([stack_sci, stack_mask, stack_err])
-        image_procs.add_stack_mask(stack, stacking_data)
+        stacking.add_stack_mask(stack, stacking_data)
         assert stack[1].data is not None
         assert stack[0].data is not None
         # Saturation 1000, data 10 -> no sat mask; bad pixel mask could be 0
@@ -118,7 +119,7 @@ def test_create_error(tmp_path):
     mask_data = fits.ImageHDU(np.zeros((16, 16), dtype=np.uint8))
     rdnoise = 4.0
 
-    err_hdu = image_procs.create_error(science_path, mask_data, rdnoise)
+    err_hdu = stacking.create_error(science_path, mask_data, rdnoise)
     assert err_hdu is not None
     assert err_hdu.data.shape == (16, 16)
     assert err_hdu.header.get("BUNIT") == "ELECTRONS"
@@ -146,7 +147,7 @@ def test_compute_relative_scales_returns_none_for_single_image():
     paths = {}
     data_images = ['/fake/path0.fits']
     exptimes = [60.0]
-    out = image_procs.compute_relative_scales(data_images, paths, exptimes)
+    out = stacking.compute_relative_scales(data_images, paths, exptimes)
     assert out is None
 
 
@@ -155,9 +156,9 @@ def test_compute_relative_scales_returns_none_for_exptimes_length_mismatch():
     paths = {}
     data_images = ['/fake/a.fits', '/fake/b.fits']
     exptimes = [60.0, 30.0, 90.0]
-    with patch.object(image_procs.photometry, 'run_sextractor') as m_sextractor:
+    with patch.object(photometry, 'run_sextractor') as m_sextractor:
         m_sextractor.return_value = _make_catalog(10)
-        out = image_procs.compute_relative_scales(data_images, paths, exptimes)
+        out = stacking.compute_relative_scales(data_images, paths, exptimes)
     assert out is None
 
 
@@ -172,8 +173,8 @@ def test_compute_relative_scales_returns_none_when_sextractor_fails():
             return _make_catalog(10)
         return None
 
-    with patch.object(image_procs.photometry, 'run_sextractor', side_effect=side_effect):
-        out = image_procs.compute_relative_scales(data_images, paths, exptimes)
+    with patch.object(photometry, 'run_sextractor', side_effect=side_effect):
+        out = stacking.compute_relative_scales(data_images, paths, exptimes)
     assert out is None
 
 
@@ -188,8 +189,8 @@ def test_compute_relative_scales_returns_none_when_catalog_too_small():
     def side_effect(path, log=None, sextractor_path=None):
         return small if 'a.fits' in path else big
 
-    with patch.object(image_procs.photometry, 'run_sextractor', side_effect=side_effect):
-        out = image_procs.compute_relative_scales(data_images, paths, exptimes, min_sources=5)
+    with patch.object(photometry, 'run_sextractor', side_effect=side_effect):
+        out = stacking.compute_relative_scales(data_images, paths, exptimes, min_sources=5)
     assert out is None
 
 
@@ -208,8 +209,8 @@ def test_compute_relative_scales_two_frames_flux_ratio():
     def side_effect(path, log=None, sextractor_path=None):
         return ref_cat if 'ref.fits' in path else f1_cat
 
-    with patch.object(image_procs.photometry, 'run_sextractor', side_effect=side_effect):
-        out = image_procs.compute_relative_scales(data_images, paths, exptimes, min_sources=5)
+    with patch.object(photometry, 'run_sextractor', side_effect=side_effect):
+        out = stacking.compute_relative_scales(data_images, paths, exptimes, min_sources=5)
     assert out is not None
     assert len(out) == 2
     assert out[0] == 1.0
@@ -235,8 +236,8 @@ def test_compute_relative_scales_frame_fails_gets_exptime_scale():
             return f1_cat
         return f2_cat
 
-    with patch.object(image_procs.photometry, 'run_sextractor', side_effect=side_effect):
-        out = image_procs.compute_relative_scales(data_images, paths, exptimes, min_sources=5, match_radius_arcsec=2.0)
+    with patch.object(photometry, 'run_sextractor', side_effect=side_effect):
+        out = stacking.compute_relative_scales(data_images, paths, exptimes, min_sources=5, match_radius_arcsec=2.0)
     assert out is not None
     assert len(out) == 3
     # Ref (most sources) is frame 0; scale[0]=1
@@ -260,8 +261,8 @@ def test_compute_relative_scales_uses_fluxerr_weighting():
     def side_effect(path, log=None, sextractor_path=None):
         return ref_cat if 'ref.fits' in path else f1_cat
 
-    with patch.object(image_procs.photometry, 'run_sextractor', side_effect=side_effect):
-        out = image_procs.compute_relative_scales(data_images, paths, exptimes, min_sources=5)
+    with patch.object(photometry, 'run_sextractor', side_effect=side_effect):
+        out = stacking.compute_relative_scales(data_images, paths, exptimes, min_sources=5)
     assert out is not None
     assert out[0] == 1.0
     # Weighted mean of ratio ~2.0 (with small errors) should be close to 2
@@ -283,8 +284,8 @@ def test_compute_relative_scales_without_fluxerr_uses_median():
     def side_effect(path, log=None, sextractor_path=None):
         return ref_cat if 'ref.fits' in path else f1_cat
 
-    with patch.object(image_procs.photometry, 'run_sextractor', side_effect=side_effect):
-        out = image_procs.compute_relative_scales(data_images, paths, exptimes, min_sources=5)
+    with patch.object(photometry, 'run_sextractor', side_effect=side_effect):
+        out = stacking.compute_relative_scales(data_images, paths, exptimes, min_sources=5)
     assert out is not None
     assert out[0] == 1.0
     np.testing.assert_allclose(out[1], 2.0, rtol=0.2)

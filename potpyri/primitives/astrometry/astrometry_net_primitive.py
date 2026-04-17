@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from potpyri.primitives.base_primitive import BasePrimitive
 
-from .core import solve_astrometry
+from .wcs_solution import solve_astrometry
 
 
 class AstrometryNetPrimitive(BasePrimitive):

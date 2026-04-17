@@ -1,7 +1,7 @@
-"""Tests for sort_files.handle_files and file table content (BINOSPEC), and classifiers (is_bad, is_spec, is_flat, is_dark, is_bias, is_science)."""
+"""Tests for sorting.collect_file_table and classifiers (is_bad, is_spec, is_flat, is_dark, is_bias, is_science)."""
 from potpyri.utils import options
 from potpyri.utils import logger
-from potpyri.primitives import sort_files
+from potpyri.primitives import sorting
 from potpyri.instruments import instrument_getter
 
 import os
@@ -14,7 +14,7 @@ from tests.utils import download_gdrive_file
 
 @pytest.mark.integration
 def test_sort(tmp_path):
-    """Run handle_files on BINOSPEC proc file; check file table rows and no_redo reuse."""
+    """Run collect_file_table on BINOSPEC proc file; check file table rows and no_redo reuse."""
     instrument = 'BINOSPEC'
     file_list_name = 'files.txt'
 
@@ -31,7 +31,7 @@ def test_sort(tmp_path):
 
     # This contains all of the file data
     try:
-        file_table = sort_files.handle_files(paths['filelist'], paths, tel,
+        file_table = sorting.collect_file_table(paths['filelist'], paths, tel,
             incl_bad=True, proc='proc', no_redo=False, log=log)
 
         # Run validation checks on file_table
@@ -46,7 +46,7 @@ def test_sort(tmp_path):
         assert file_table[0]['Amp']=="2"
 
         # Test the no_redo flag
-        new_file_table = sort_files.handle_files(paths['filelist'], paths, tel,
+        new_file_table = sorting.collect_file_table(paths['filelist'], paths, tel,
             incl_bad=True, proc='proc', no_redo=True, log=log)
     finally:
         log.close()
@@ -68,10 +68,10 @@ def test_is_bad_binospec():
     hdr = fits.Header()
     hdr['MASK'] = 'mira'
     # No CCDSUM so binning check does not overwrite; keyword match gives bad=True
-    assert sort_files.is_bad(hdr, tel) == True
+    assert sorting.is_bad(hdr, tel) == True
     hdr['MASK'] = 'imaging'
     hdr['CCDSUM'] = '1,1'  # valid binning so keyword result (False) is kept
-    assert sort_files.is_bad(hdr, tel) == False
+    assert sorting.is_bad(hdr, tel) == False
 
 
 def test_is_spec_binospec():
@@ -79,9 +79,9 @@ def test_is_spec_binospec():
     tel = instrument_getter('BINOSPEC')
     hdr = fits.Header()
     hdr['MASK'] = 'spectroscopy'
-    assert sort_files.is_spec(hdr, tel) == True
+    assert sorting.is_spec(hdr, tel) == True
     hdr['MASK'] = 'imaging'
-    assert sort_files.is_spec(hdr, tel) == False
+    assert sorting.is_spec(hdr, tel) == False
 
 
 def test_is_flat_binospec():
@@ -91,9 +91,9 @@ def test_is_flat_binospec():
     hdr['MASK'] = 'imaging'
     hdr['SCRN'] = 'deployed'
     hdr['CCDSUM'] = '1,1'
-    assert sort_files.is_flat(hdr, tel) == True
+    assert sorting.is_flat(hdr, tel) == True
     hdr['SCRN'] = 'stowed'
-    assert sort_files.is_flat(hdr, tel) == False
+    assert sorting.is_flat(hdr, tel) == False
 
 
 def test_is_science_binospec():
@@ -104,23 +104,23 @@ def test_is_science_binospec():
     hdr['SCRN'] = 'stowed'
     hdr['CCDSUM'] = '1,1'
     hdr['EXPTIME'] = 120.0
-    assert sort_files.is_science(hdr, tel) == True
+    assert sorting.is_science(hdr, tel) == True
     hdr['SCRN'] = 'deployed'
-    assert sort_files.is_science(hdr, tel) == False
+    assert sorting.is_science(hdr, tel) == False
 
 
 def test_is_bias_binospec():
     """is_bias False for BINOSPEC (no bias keywords)."""
     tel = instrument_getter('BINOSPEC')
     hdr = fits.Header()
-    assert sort_files.is_bias(hdr, tel) is False
+    assert sorting.is_bias(hdr, tel) is False
 
 
 def test_is_dark_binospec():
     """is_dark False for BINOSPEC (no dark keywords)."""
     tel = instrument_getter('BINOSPEC')
     hdr = fits.Header()
-    assert sort_files.is_dark(hdr, tel) is False
+    assert sorting.is_dark(hdr, tel) is False
 
 
 def test_is_bias_gmos():
@@ -131,6 +131,6 @@ def test_is_bias_gmos():
     hdr['OBSCLASS'] = 'daycal'
     hdr['OBSTYPE'] = 'bias'
     hdr['CCDSUM'] = '2,2'
-    assert sort_files.is_bias(hdr, tel) == True
+    assert sorting.is_bias(hdr, tel) == True
     hdr['OBSTYPE'] = 'object'
-    assert sort_files.is_bias(hdr, tel) == False
+    assert sorting.is_bias(hdr, tel) == False

@@ -6,7 +6,8 @@ Authors: Kerry Paterson, Charlie Kilpatrick.
 """
 from __future__ import annotations
 
-from .core import (
+from .astrometry_net_primitive import AstrometryNetPrimitive
+from .wcs_solution import (
     _log_gaia,
     _validate_refined_wcs,
     _write_gaia_fallback_header,
@@ -15,7 +16,6 @@ from .core import (
     get_gaia_catalog,
     solve_astrometry,
 )
-from .primitive import AstrometryNetPrimitive
 
 __all__ = [
     'AstrometryNetPrimitive',

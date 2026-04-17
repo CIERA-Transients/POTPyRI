@@ -1,4 +1,4 @@
-"""Tests for absolute photometry zeropoint (find_zeropoint, Vizier/PS1) and absphot class methods."""
+"""Tests for zeropoint (find_zeropoint, Vizier/PS1) and ZeropointFitter methods."""
 import os
 
 import numpy as np
@@ -9,7 +9,7 @@ from astropy.table import Table
 from astropy.coordinates import SkyCoord
 
 from potpyri.utils import options, logger
-from potpyri.primitives import absphot
+from potpyri.primitives import zeropoint
 from potpyri.instruments import instrument_getter
 
 from tests.utils import download_gdrive_file
@@ -37,7 +37,7 @@ def test_absphot(tmp_path):
     hdu.close()
 
     try:
-        absphot.find_zeropoint(file_path, tel, log=log)
+        zeropoint.find_zeropoint(file_path, tel, log=log)
     except (requests.exceptions.ConnectionError, OSError) as e:
         pytest.skip(f"VizieR unreachable (zeropoint needs PS1): {e}")
     finally:
@@ -49,14 +49,14 @@ def test_absphot(tmp_path):
 
     assert header['ZPTCAT']=='PS1'
     assert header['FILTER']=='R'
-    assert header['MAGSYS'] == absphot.DEFAULT_MAGSYS
+    assert header['MAGSYS'] == zeropoint.DEFAULT_MAGSYS
     assert np.abs(27.576871-header['ZPTMAG'])<0.01
     assert header['ZPTMUCER']<0.01
 
 
 def test_get_zeropoint():
     """get_zeropoint returns (zpt, zpterr) consistent with mag = zpt - 2.5*log10(flux)."""
-    cal = absphot.absphot()
+    cal = zeropoint.ZeropointFitter()
     flux = np.array([1000.0, 2000.0, 500.0])
     fluxerr = np.array([10.0, 14.0, 7.0])
     mag = np.array([25.0, 24.25, 25.75])
@@ -69,7 +69,7 @@ def test_get_zeropoint():
 
 def test_zpt_iteration():
     """zpt_iteration returns (zpt, zpterr, master_mask) with mask length = input length."""
-    cal = absphot.absphot(iterations=2, sigma=3.0)
+    cal = zeropoint.ZeropointFitter(iterations=2, sigma=3.0)
     np.random.seed(42)
     n = 20
     flux = np.random.uniform(500, 3000, n).astype(float)
@@ -85,7 +85,7 @@ def test_zpt_iteration():
 
 def test_convert_filter_name():
     """convert_filter_name maps instrument filter names to catalog names."""
-    cal = absphot.absphot()
+    cal = zeropoint.ZeropointFitter()
     assert cal.convert_filter_name('gG0301') == 'g'
     assert cal.convert_filter_name('rG0303') == 'r'
     assert cal.convert_filter_name('RG850') == 'z'
@@ -100,7 +100,7 @@ def test_convert_filter_name():
 
 def test_get_minmag():
     """get_minmag returns bright limit by filter."""
-    cal = absphot.absphot()
+    cal = zeropoint.ZeropointFitter()
     assert cal.get_minmag('J') == 15.5
     assert cal.get_minmag('K') == 13.0
     assert cal.get_minmag('Y') == 15.0
@@ -109,11 +109,11 @@ def test_get_minmag():
 
 def test_Y_band():
     """GF18 eq. (6): VISTA Y_V = J + C_Y*(J-Ks)_2MASS with C_Y=0.46 (Vega-like Y)."""
-    cal = absphot.absphot()
+    cal = zeropoint.ZeropointFitter()
     J, J_err = 15.0, 0.02
     Ks, Ks_err = 14.0, 0.02
     Yv, Y_err = cal.y_band_from_jk(J, J_err, Ks, Ks_err)
-    expected_Yv = J + absphot.GF18_TWOMASS_TO_VISTA_Y_SLOPE * (J - Ks)
+    expected_Yv = J + zeropoint.GF18_TWOMASS_TO_VISTA_Y_SLOPE * (J - Ks)
     np.testing.assert_allclose(Yv, expected_Yv)
     assert np.isfinite(Y_err) and Y_err > 0
     Y2, Y2_err = cal.Y_band(J, J_err, Ks, Ks_err)
@@ -123,26 +123,26 @@ def test_Y_band():
 
 def test_twomass_y_includes_gf18_ab_offset():
     """GF18 Appendix D (D3): Y_AB = Y_V + 0.600 for twomass_y_mag_to_ab."""
-    cal = absphot.absphot()
+    cal = zeropoint.ZeropointFitter()
     J, J_err = 15.0, 0.02
     Ks, Ks_err = 14.0, 0.02
     Yv, _ = cal.twomass_j_ks_to_vista_y_vega(J, J_err, Ks, Ks_err)
     Yab, _ = cal.twomass_y_mag_to_ab(J, J_err, Ks, Ks_err)
-    np.testing.assert_allclose(Yab, Yv + absphot.GF18_VISTA_Y_VEGA_TO_AB)
+    np.testing.assert_allclose(Yab, Yv + zeropoint.GF18_VISTA_Y_VEGA_TO_AB)
 
 
 def test_twomass_vega_to_ab():
     """twomass_vega_to_ab applies standard 2MASS Vega -> AB offsets."""
     m = 10.0
-    assert absphot.absphot.twomass_vega_to_ab(m, 'J') == m + (4.56 - 3.65)
-    assert absphot.absphot.twomass_vega_to_ab(m, 'H') == m + (4.71 - 3.32)
-    assert absphot.absphot.twomass_vega_to_ab(m, 'K') == m + (5.14 - 3.29)
-    assert absphot.absphot.twomass_vega_to_ab(m, 'Ks') == m + (5.14 - 3.29)
+    assert zeropoint.ZeropointFitter.twomass_vega_to_ab(m, 'J') == m + (4.56 - 3.65)
+    assert zeropoint.ZeropointFitter.twomass_vega_to_ab(m, 'H') == m + (4.71 - 3.32)
+    assert zeropoint.ZeropointFitter.twomass_vega_to_ab(m, 'K') == m + (5.14 - 3.29)
+    assert zeropoint.ZeropointFitter.twomass_vega_to_ab(m, 'Ks') == m + (5.14 - 3.29)
 
 
 def test_magsys_get_set():
     """get_magsys / set_magsys and DEFAULT_MAGSYS."""
-    cal = absphot.absphot()
-    assert cal.get_magsys() == absphot.DEFAULT_MAGSYS == 'ABMAG'
+    cal = zeropoint.ZeropointFitter()
+    assert cal.get_magsys() == zeropoint.DEFAULT_MAGSYS == 'ABMAG'
     cal.set_magsys('VEGAMAG')
     assert cal.get_magsys() == 'VEGAMAG'

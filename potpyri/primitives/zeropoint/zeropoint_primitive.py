@@ -1,13 +1,13 @@
-"""Absolute zeropoint primitive and find_zeropoint."""
+"""Zeropoint calibration primitive and :func:`find_zeropoint` entry point."""
 from __future__ import annotations
 
 from potpyri.primitives.base_primitive import BasePrimitive
 
-from .zeropoint import absphot
+from .catalog_zeropoint import ZeropointFitter
 
 
-class AbsPhotZeropointPrimitive(BasePrimitive):
-    """Absolute photometry zeropoint calibration (see :func:`find_zeropoint`)."""
+class ZeropointCalibrationPrimitive(BasePrimitive):
+    """Fit and write catalog-based zeropoint (see :func:`find_zeropoint`)."""
 
     ARGUMENTS = {
         **BasePrimitive.ARGUMENTS,
@@ -15,15 +15,15 @@ class AbsPhotZeropointPrimitive(BasePrimitive):
     }
 
     def _perform(self):
-        cal = absphot(magsys=self.magsys)
+        cal = ZeropointFitter(magsys=self.magsys)
         cal.find_zeropoint(self.input, self.tel, log=self.log)
         return {'output': None}
 
 
 def find_zeropoint(stack, tel, log=None, magsys=None):
-    """Compute and write zeropoint to stack FITS using instrument catalog (e.g. PS1).
+    """Compute and write zeropoint to stack FITS using the instrument catalog (e.g. PS1).
 
-    Delegates to :class:`AbsPhotZeropointPrimitive`.
+    Delegates to :class:`ZeropointCalibrationPrimitive`.
 
     Parameters
     ----------
@@ -41,5 +41,5 @@ def find_zeropoint(stack, tel, log=None, magsys=None):
     None
         Stack FITS is updated in place with ZPTMAG, MAGSYS, ZPTNSTAR, etc.
     """
-    return AbsPhotZeropointPrimitive(magsys=magsys).apply(
+    return ZeropointCalibrationPrimitive(magsys=magsys).apply(
         input=stack, tel=tel, log=log)

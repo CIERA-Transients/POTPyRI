@@ -1,7 +1,7 @@
-"""Tests for image_procs.stack_data (median stack of synthetic MMIRS images)."""
+"""Tests for stacking.stack_data (median stack of synthetic MMIRS images)."""
 from potpyri.utils import options
 from potpyri.utils import logger
-from potpyri.primitives import image_procs
+from potpyri.primitives import stacking
 from potpyri.instruments import instrument_getter
 
 import numpy as np
@@ -48,7 +48,7 @@ def test_stack(tmp_path):
         errors.append(fits.ImageHDU(errimg))
 
     try:
-        sci_med = image_procs.stack_data(aligned_data, tel, masks, errors, log=log)
+        sci_med = stacking.stack_data(aligned_data, tel, masks, errors, log=log)
     finally:
         log.close()
 

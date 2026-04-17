@@ -1,1 +1,1 @@
-"""POTPyRI unit tests: instruments, calibration, image_procs, sort_files, WCS, photometry, absphot."""
+"""POTPyRI unit tests: instruments, calibration, sorting, stacking, astrometry, photometry, zeropoint."""

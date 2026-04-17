@@ -1,4 +1,4 @@
-"""Tests for solve_wcs (solve_astrometry, align_to_gaia on GMOS stack) and helpers (clean_up_astrometry)."""
+"""Tests for astrometry (solve_astrometry, align_to_gaia on GMOS stack) and helpers (clean_up_astrometry)."""
 import os
 
 import numpy as np
@@ -8,7 +8,8 @@ from astropy.io import fits
 from astropy.table import Table
 
 from potpyri.utils import options, logger
-from potpyri.primitives import solve_wcs
+from potpyri.primitives import astrometry
+from potpyri.primitives import photometry
 from potpyri.instruments import instrument_getter
 
 from tests.utils import download_gdrive_file
@@ -73,8 +74,8 @@ def test_wcs_integration(tmp_path):
     file_path = file_path_unfz
 
     try:
-        solve_wcs.solve_astrometry(file_path, tel, binn, paths, index=astm_path, log=log)
-        solve_wcs.align_to_gaia(file_path, tel, radius=0.5, log=log)
+        astrometry.solve_astrometry(file_path, tel, binn, paths, index=astm_path, log=log)
+        astrometry.align_to_gaia(file_path, tel, radius=0.5, log=log)
     except (requests.exceptions.ConnectionError, OSError) as e:
         pytest.skip(f"VizieR/network unreachable (Gaia catalog): {e}")
     finally:
@@ -106,7 +107,7 @@ def test_clean_up_astrometry(tmp_path):
             fp.write('dummy')
     dir_path = tmp_path
     file_path = os.path.join(dir_path, base)
-    solve_wcs.clean_up_astrometry(dir_path, base, exten)
+    astrometry.clean_up_astrometry(dir_path, base, exten)
     for f in to_create:
         path = os.path.join(tmp_path, f)
         assert not os.path.exists(path), f'{f} should have been removed'
@@ -130,9 +131,9 @@ def test_align_to_gaia_fallback_when_no_gaia_catalog(tmp_path, monkeypatch):
     hdu.header['CD2_2'] = 2.2e-5
     hdu.writeto(file_path, overwrite=True)
 
-    monkeypatch.setattr(solve_wcs, 'get_gaia_catalog', lambda *args, **kwargs: None)
+    monkeypatch.setattr(astrometry, 'get_gaia_catalog', lambda *args, **kwargs: None)
     tel = instrument_getter('GMOS')
-    ok = solve_wcs.align_to_gaia(file_path, tel, log=None)
+    ok = astrometry.align_to_gaia(file_path, tel, log=None)
     assert ok is True
     with fits.open(file_path) as out:
         assert out[0].header['RADISP'] == 1.0
@@ -165,11 +166,11 @@ def test_align_to_gaia_fallback_when_no_sextractor_sources(tmp_path, monkeypatch
     cat['PSS'] = [1.0] * 8
     cat['Plx'] = [1.0] * 8
     cat['PM'] = [1.0] * 8
-    monkeypatch.setattr(solve_wcs, 'get_gaia_catalog', lambda *args, **kwargs: cat)
-    monkeypatch.setattr(solve_wcs.photometry, 'run_sextractor', lambda *args, **kwargs: None)
+    monkeypatch.setattr(astrometry, 'get_gaia_catalog', lambda *args, **kwargs: cat)
+    monkeypatch.setattr(photometry, 'run_sextractor', lambda *args, **kwargs: None)
 
     tel = instrument_getter('GMOS')
-    ok = solve_wcs.align_to_gaia(file_path, tel, log=None)
+    ok = astrometry.align_to_gaia(file_path, tel, log=None)
     assert ok is True
     with fits.open(file_path) as out:
         assert out[0].header['RADISP'] == 1.0

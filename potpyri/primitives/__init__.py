@@ -1,35 +1,35 @@
-"""POTPyRI primitives: calibration, image processing, sorting, WCS, photometry, absphot."""
+"""Pipeline primitives: sorting, calibration, stacking, astrometry, photometry, zeropoint."""
 
 from .base_primitive import BasePrimitive
 
-from .absphot import AbsPhotZeropointPrimitive
+from .astrometry import AstrometryNetPrimitive
 from .calibration import BiasPrimitive, DarkPrimitive, FlatPrimitive
-from .image_procs import ImageProcPrimitive
-from .photometry import PhotometryPrimitive
-from .solve_wcs import AstrometryNetPrimitive
-from .sort_files import SortFilesPrimitive
+from .sorting import FileSortingPrimitive
+from .stacking import ScienceStackingPrimitive
+from .photometry import StackPhotometryPrimitive
+from .zeropoint import ZeropointCalibrationPrimitive
 
-from . import absphot
+from . import astrometry
 from . import calibration
-from . import image_procs
+from . import sorting
+from . import stacking
 from . import photometry
-from . import solve_wcs
-from . import sort_files
+from . import zeropoint
 
 __all__ = [
     'BasePrimitive',
-    'AbsPhotZeropointPrimitive',
     'AstrometryNetPrimitive',
     'BiasPrimitive',
     'DarkPrimitive',
     'FlatPrimitive',
-    'ImageProcPrimitive',
-    'PhotometryPrimitive',
-    'SortFilesPrimitive',
-    'absphot',
+    'FileSortingPrimitive',
+    'ScienceStackingPrimitive',
+    'StackPhotometryPrimitive',
+    'ZeropointCalibrationPrimitive',
+    'astrometry',
     'calibration',
-    'image_procs',
+    'sorting',
+    'stacking',
     'photometry',
-    'solve_wcs',
-    'sort_files',
+    'zeropoint',
 ]

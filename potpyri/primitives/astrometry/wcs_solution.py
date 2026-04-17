@@ -6,8 +6,6 @@ Authors: Kerry Paterson, Charlie Kilpatrick.
 """
 from potpyri._version import __version__
 
-from potpyri.primitives.base_primitive import BasePrimitive
-
 import numpy as np
 import subprocess
 import os

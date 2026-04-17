@@ -50,7 +50,7 @@ GF18_TWOMASS_TO_VISTA_Y_SLOPE_ERR = 0.02
 GF18_VISTA_Y_VEGA_TO_AB = 0.600
 
 
-class absphot(object):
+class ZeropointFitter(object):
     """Zeropoint fitter using catalog magnitudes and iterative sigma clipping."""
 
     def __init__(self, iterations=5, sigma=5, magsys=None):
@@ -700,6 +700,5 @@ class absphot(object):
         else:
             return 16.0
 
-    # Backward-compatible alias for y_band_from_jk
     Y_band = y_band_from_jk
 
