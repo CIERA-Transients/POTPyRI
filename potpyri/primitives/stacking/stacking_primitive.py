@@ -1,13 +1,13 @@
-"""ImageProcPrimitive and image_proc entry point."""
+"""Science stacking primitive and :func:`stack_science_frames` entry point."""
 from __future__ import annotations
 
 from potpyri.primitives.base_primitive import BasePrimitive
 
-from .worker import _image_proc_worker
+from .stacking_pipeline_worker import _stacking_pipeline_worker
 
 
-class ImageProcPrimitive(BasePrimitive):
-    """Stack and calibrate science frames for one target (see :func:`image_proc`)."""
+class ScienceStackingPrimitive(BasePrimitive):
+    """Stack and calibrate science frames for one target (see :func:`stack_science_frames`)."""
 
     ARGUMENTS = {
         **BasePrimitive.ARGUMENTS,
@@ -22,7 +22,7 @@ class ImageProcPrimitive(BasePrimitive):
     }
 
     def _perform(self):
-        out = _image_proc_worker(
+        out = _stacking_pipeline_worker(
             self.input,
             self.tel,
             self.paths,
@@ -39,13 +39,13 @@ class ImageProcPrimitive(BasePrimitive):
         return {'output': out}
 
 
-def image_proc(image_data, tel, paths, skip_skysub=False,
+def stack_science_frames(image_data, tel, paths, skip_skysub=False,
     fieldcenter=None, out_size=None, satellites=True, cosmic_ray=True,
     skip_gaia=False, keep_all_astro=False, relative_calibration=False,
     log=None):
-    """Full image processing: align, mask, stack, and optionally detrend.
+    """Align, mask, stack, and optionally detrend science frames for one table row group.
 
-    Delegates to :class:`ImageProcPrimitive`.
+    Delegates to :class:`ScienceStackingPrimitive`.
 
     Parameters
     ----------
@@ -79,7 +79,7 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
     str or None
         Path to stacked output FITS, or None if processing failed.
     """
-    return ImageProcPrimitive(
+    return ScienceStackingPrimitive(
         skip_skysub=skip_skysub,
         fieldcenter=fieldcenter,
         out_size=out_size,

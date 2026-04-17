@@ -1,30 +1,29 @@
-"""Image calibration, masking, error arrays, alignment, and stacking.
+"""Science image calibration, masking, alignment, and stacking.
 
 Provides WCS handling, alignment to a common grid, cosmic-ray rejection,
-satellite masking, master calibration combination, and stacked science
-output. Authors: Charlie Kilpatrick.
+satellite masking, and stacked science output. Authors: Charlie Kilpatrick.
 """
 from __future__ import annotations
 
 from potpyri._version import __version__
 
-from .align import align_images
-from .mask_error import create_error, create_mask
-from .primitive import ImageProcPrimitive, image_proc
-from .satellites import mask_satellites
-from .stack_ops import (
+from .align_reproject import align_images
+from .combine_and_detrend import (
     add_stack_mask,
     compute_relative_scales,
     detrend_stack,
     stack_data,
 )
-from .wcs_geom import generate_wcs, get_fieldcenter, remove_pv_distortion
-from .worker import _image_proc_worker
+from .field_geometry import generate_wcs, get_fieldcenter, remove_pv_distortion
+from .mask_and_error import create_error, create_mask
+from .satellite_trails import mask_satellites
+from .stacking_pipeline_worker import _stacking_pipeline_worker
+from .stacking_primitive import ScienceStackingPrimitive, stack_science_frames
 
 __all__ = [
-    'ImageProcPrimitive',
+    'ScienceStackingPrimitive',
     '__version__',
-    '_image_proc_worker',
+    '_stacking_pipeline_worker',
     'add_stack_mask',
     'align_images',
     'compute_relative_scales',
@@ -33,8 +32,8 @@ __all__ = [
     'detrend_stack',
     'generate_wcs',
     'get_fieldcenter',
-    'image_proc',
     'mask_satellites',
     'remove_pv_distortion',
     'stack_data',
+    'stack_science_frames',
 ]

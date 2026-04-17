@@ -1,12 +1,14 @@
-"""File sorting and file-list generation for the main pipeline.
+"""Raw file discovery and classification for the main pipeline.
 
-Classifies raw files (science, flat, bias, dark, bad) from header keywords
-and writes a fixed-width file list used by calibration and reduction.
+Classifies FITS files (science, flat, bias, dark, bad) from header keywords
+and writes a fixed-width file list for calibration and stacking.
 Authors: Owen Eskandari, Kerry Paterson, Charlie Kilpatrick.
 """
 from __future__ import annotations
 
-from .classify import (
+from .collect_file_table import collect_file_table
+from .collect_file_table_worker import _collect_file_table_worker
+from .header_classification import (
     is_bad,
     is_bias,
     is_dark,
@@ -14,20 +16,18 @@ from .classify import (
     is_science,
     is_spec,
 )
-from .handle_files_fn import handle_files
-from .handle_files_impl import _handle_files_worker
-from .primitive import SortFilesPrimitive
-from .sort_table import sort_files
+from .raw_file_table import build_raw_file_table
+from .sorting_primitive import FileSortingPrimitive
 
 __all__ = [
-    'SortFilesPrimitive',
-    '_handle_files_worker',
-    'handle_files',
+    'FileSortingPrimitive',
+    '_collect_file_table_worker',
+    'build_raw_file_table',
+    'collect_file_table',
     'is_bad',
     'is_bias',
     'is_dark',
     'is_flat',
     'is_science',
     'is_spec',
-    'sort_files',
 ]

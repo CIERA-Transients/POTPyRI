@@ -108,7 +108,7 @@ def do_flat(file_table, tel, paths, nmin_images=3, log=None):
     Parameters
     ----------
     file_table : astropy.table.Table
-        File list from sort_files.
+        Pipeline file table from :mod:`~potpyri.primitives.sorting`.
     tel : Instrument
         Instrument instance (flat, match_type_keywords, create_flat, get_mflat_name).
     paths : dict

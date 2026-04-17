@@ -86,7 +86,7 @@ def do_dark(file_table, tel, paths, nmin_images=3, log=None):
     Parameters
     ----------
     file_table : astropy.table.Table
-        File list from sort_files.
+        Pipeline file table from :mod:`~potpyri.primitives.sorting`.
     tel : Instrument
         Instrument instance (dark, bias, load_bias, create_dark, get_mdark_name).
     paths : dict

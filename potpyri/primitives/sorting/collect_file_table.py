@@ -1,15 +1,15 @@
-"""Public handle_files entry point."""
+"""Public entry point to build or reload the pipeline file list table."""
 from __future__ import annotations
 
-from .primitive import SortFilesPrimitive
+from .sorting_primitive import FileSortingPrimitive
 
 
-def handle_files(file_list, paths, tel, incl_bad=False, proc=None,
+def collect_file_table(file_list, paths, tel, incl_bad=False, proc=None,
     no_redo=False, log=None):
-    """Build or read the file list: discover raw files, sort, and write table.
+    """Discover raw files, classify them, and write (or read) the fixed-width file list.
 
-    If no_redo and file_list exists, reads existing table. Otherwise globs
-    raw/bad/data, runs sort_files, and writes the fixed-width list.
+    If ``no_redo`` and ``file_list`` exists, reads the existing table. Otherwise
+    globs raw/data/bad, runs :func:`build_raw_file_table`, and writes the list.
 
     Parameters
     ----------
@@ -38,7 +38,7 @@ def handle_files(file_list, paths, tel, incl_bad=False, proc=None,
     SystemExit
         If no files found or no good files after sorting.
     """
-    return SortFilesPrimitive(
+    return FileSortingPrimitive(
         incl_bad=incl_bad,
         proc=proc,
         no_redo=no_redo,

@@ -9,19 +9,19 @@ import time
 import numpy as np
 from astropy.io import fits
 
-from .align import align_images
-from .mask_error import create_error, create_mask
-from .satellites import mask_satellites
-from .stack_ops import (
+from .align_reproject import align_images
+from .combine_and_detrend import (
     add_stack_mask,
     compute_relative_scales,
     detrend_stack,
     stack_data,
 )
-from .wcs_geom import generate_wcs
+from .field_geometry import generate_wcs
+from .mask_and_error import create_error, create_mask
+from .satellite_trails import mask_satellites
 
 
-def _image_proc_worker(image_data, tel, paths, skip_skysub=False,
+def _stacking_pipeline_worker(image_data, tel, paths, skip_skysub=False,
     fieldcenter=None, out_size=None, satellites=True, cosmic_ray=True,
     skip_gaia=False, keep_all_astro=False, relative_calibration=False,
     log=None):

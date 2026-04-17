@@ -9,7 +9,7 @@ from astropy.wcs import WCS
 from ccdproc import CCDData
 from ccdproc import wcs_project
 
-from potpyri.primitives import solve_wcs
+from potpyri.primitives import astrometry
 
 from .wcs_geom import generate_wcs, get_fieldcenter, remove_pv_distortion
 
@@ -54,7 +54,7 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
     aligned_data = []
     for file in reduced_files:
         # Coarse WCS solution using astrometry.net
-        success = solve_wcs.solve_astrometry(file, tel, binn, paths, 
+        success = astrometry.solve_astrometry(file, tel, binn, paths, 
             shift_only=False, log=log)
         if not success: continue
 
@@ -65,7 +65,7 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
             hdu[0].header['DEDISP']=0.0
             hdu.writeto(file, overwrite=True)
         else:
-            success = solve_wcs.align_to_gaia(file, tel, log=log)
+            success = astrometry.align_to_gaia(file, tel, log=log)
             if not success: continue
 
         solved_images.append(file)

@@ -1,4 +1,4 @@
-"""Worker that globs raw paths, runs sort_files, or reloads existing table."""
+"""Glob raw paths, run :func:`build_raw_file_table`, or reload an existing table."""
 from __future__ import annotations
 
 import glob
@@ -9,12 +9,12 @@ import sys
 import numpy as np
 from astropy.io import ascii
 
-from .sort_table import sort_files
+from .raw_file_table import build_raw_file_table
 
 
-def _handle_files_worker(file_list, paths, tel, incl_bad=False, proc=None,
+def _collect_file_table_worker(file_list, paths, tel, incl_bad=False, proc=None,
         no_redo=False, log=None):
-    """Implementation for :class:`SortFilesPrimitive` / :func:`handle_files`."""
+    """Implementation for :class:`FileSortingPrimitive` / :func:`collect_file_table`."""
     file_table = None
 
     if os.path.exists(file_list):
@@ -44,7 +44,7 @@ def _handle_files_worker(file_list, paths, tel, incl_bad=False, proc=None,
     if len(files) != 0:
         if log:
             log.info(f'{len(files)} files found.')
-        file_table = sort_files(files, file_list, tel, paths, incl_bad=incl_bad,
+        file_table = build_raw_file_table(files, file_list, tel, paths, incl_bad=incl_bad,
             log=log)
     else:
         if log:

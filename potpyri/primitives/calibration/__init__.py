@@ -1,8 +1,7 @@
-"""Master bias, dark, and flat creation from pipeline file tables.
+"""Master bias, dark, and flat frames from pipeline file tables.
 
 Submodules :mod:`bias`, :mod:`dark`, and :mod:`flat` each define a primitive
-class and ``do_*`` entry point. This package re-exports the public API for
-backward compatibility with ``from potpyri.primitives import calibration``.
+class and ``do_*`` entry point.
 
 Authors: Charlie Kilpatrick.
 """
@@ -18,11 +17,6 @@ from .flat import FlatPrimitive
 from .flat import flat_calibration_worker
 from .flat import do_flat
 
-# Deprecated aliases for tests / external code that used private worker names
-_bias_calibration_worker = bias_calibration_worker
-_dark_calibration_worker = dark_calibration_worker
-_flat_calibration_worker = flat_calibration_worker
-
 __all__ = [
     'BiasPrimitive',
     'DarkPrimitive',
@@ -33,7 +27,4 @@ __all__ = [
     'do_bias',
     'do_dark',
     'do_flat',
-    '_bias_calibration_worker',
-    '_dark_calibration_worker',
-    '_flat_calibration_worker',
 ]

@@ -63,7 +63,7 @@ def compute_relative_scales(data_images, paths, exptimes, log=None,
     Parameters
     ----------
     data_images : list of str
-        Paths to FITS with SCI extension (e.g. *_data.fits from image_proc).
+        Paths to FITS with SCI extension (e.g. ``*_data.fits`` from stacking).
     paths : dict
         Paths dict; paths.get('source_extractor') used for SExtractor binary.
     exptimes : array-like

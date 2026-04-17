@@ -15,7 +15,7 @@ from astropy.table import Table
 
 from potpyri._version import __version__
 
-from .classify import (
+from .header_classification import (
     is_bad,
     is_bias,
     is_dark,
@@ -25,7 +25,7 @@ from .classify import (
 )
 
 
-def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
+def build_raw_file_table(files, file_list, tel, paths, incl_bad=False, log=None):
     """Classify files by type (science, flat, bias, dark) and write file list table.
 
     Reads headers, applies instrument keyword rules, and writes a fixed-width
@@ -55,9 +55,9 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
     t_start = time.time()
 
     if log:
-        log.info(f'Running sort_files version: {__version__}')
+        log.info(f'Running build_raw_file_table version: {__version__}')
     else:
-        print(f'Running sort_files version: {__version__}')
+        print(f'Running build_raw_file_table version: {__version__}')
 
     bad_num = 0
     spec_num = 0
@@ -228,6 +228,6 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
     if spec_num>0 and log: log.info(f'{spec_num} spectroscopy files found and removed from reduction.')
 
     t_end = time.time()
-    if log: log.info(f'sort_files ran in {t_end-t_start} sec')
+    if log: log.info(f'build_raw_file_table ran in {t_end-t_start} sec')
 
     return(file_table)

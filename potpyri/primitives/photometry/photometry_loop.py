@@ -1,13 +1,13 @@
-"""Photometry primitive, photloop worker, and photloop API."""
+"""Stack photometry primitive, worker loop, and public API."""
 from __future__ import annotations
 
 from potpyri.primitives.base_primitive import BasePrimitive
 
-from .core import do_phot
+from .catalog_psf import do_phot
 
 
-def _photloop_worker(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
-    """Try PSF photometry with decreasing S/N threshold until do_phot succeeds."""
+def _stack_photometry_worker(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
+    """Try PSF photometry with decreasing S/N threshold until :func:`do_phot` succeeds."""
     signal_to_noise = phot_sn_max
 
     epsf = None
@@ -29,8 +29,8 @@ def _photloop_worker(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, lo
         break
 
 
-class PhotometryPrimitive(BasePrimitive):
-    """PSF/aperture photometry on a stacked image (see :func:`photloop`)."""
+class StackPhotometryPrimitive(BasePrimitive):
+    """PSF and aperture photometry on a stacked image (see :func:`run_stack_photometry`)."""
 
     ARGUMENTS = {
         **BasePrimitive.ARGUMENTS,
@@ -40,7 +40,7 @@ class PhotometryPrimitive(BasePrimitive):
     }
 
     def _perform(self):
-        _photloop_worker(
+        _stack_photometry_worker(
             self.input,
             phot_sn_min=self.phot_sn_min,
             phot_sn_max=self.phot_sn_max,
@@ -50,10 +50,10 @@ class PhotometryPrimitive(BasePrimitive):
         return {'output': None}
 
 
-def photloop(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
-    """Try PSF photometry with decreasing S/N threshold until do_phot succeeds.
+def run_stack_photometry(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
+    """Try PSF photometry with decreasing S/N threshold until :func:`do_phot` succeeds.
 
-    Delegates to :class:`PhotometryPrimitive`.
+    Delegates to :class:`StackPhotometryPrimitive`.
 
     Parameters
     ----------
@@ -73,7 +73,7 @@ def photloop(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
     None
         Stack FITS is updated in place when do_phot succeeds.
     """
-    return PhotometryPrimitive(
+    return StackPhotometryPrimitive(
         phot_sn_min=phot_sn_min,
         phot_sn_max=phot_sn_max,
         fwhm_init=fwhm_init,

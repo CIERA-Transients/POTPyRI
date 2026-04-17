@@ -1,13 +1,13 @@
-"""SortFilesPrimitive."""
+"""Primitive that builds the pipeline raw-file table."""
 from __future__ import annotations
 
 from potpyri.primitives.base_primitive import BasePrimitive
 
-from .handle_files_impl import _handle_files_worker
+from .collect_file_table_worker import _collect_file_table_worker
 
 
-class SortFilesPrimitive(BasePrimitive):
-    """Discover raw files, classify, and build the pipeline file list table."""
+class FileSortingPrimitive(BasePrimitive):
+    """Discover raw files, classify by header, and build the pipeline file list table."""
 
     ARGUMENTS = {
         **BasePrimitive.ARGUMENTS,
@@ -17,7 +17,7 @@ class SortFilesPrimitive(BasePrimitive):
     }
 
     def _perform(self):
-        out = _handle_files_worker(
+        out = _collect_file_table_worker(
             self.input,
             self.paths,
             self.tel,

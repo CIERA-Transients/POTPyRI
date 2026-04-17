@@ -83,7 +83,7 @@ def do_bias(file_table, tel, paths, nmin_images=3, log=None):
     Parameters
     ----------
     file_table : astropy.table.Table
-        File list from sort_files (Type, CalType, File, Amp, Binning).
+        Pipeline file table (Type, CalType, File, Amp, Binning).
     tel : Instrument
         Instrument instance (bias, match_type_keywords, create_bias, get_mbias_name).
     paths : dict
