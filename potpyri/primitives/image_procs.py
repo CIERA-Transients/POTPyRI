@@ -136,11 +136,13 @@ def generate_wcs(tel, binn, fieldcenter, out_size):
     return(w)
 
 def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None,
-    out_size=None, skip_gaia=False, keep_all_astro=False, log=None):
+    out_size=None, skip_gaia=False, skip_external_astrometry=False,
+    keep_all_astro=False, log=None):
     """Solve WCS and align reduced images to a common grid.
 
     Runs astrometry.net and optionally Gaia alignment, then reprojects to
-    a common WCS.
+    a common WCS. With ``skip_external_astrometry``, skips both and uses only
+    the WCS already in each FITS header (after validation).
 
     Parameters
     ----------
@@ -159,7 +161,11 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
     out_size : int, optional
         Output image size.
     skip_gaia : bool, optional
-        If True, skip Gaia alignment. Default is False.
+        If True, skip Gaia alignment. Default is False. Ignored if
+        ``skip_external_astrometry`` is True.
+    skip_external_astrometry : bool, optional
+        If True, do not run astrometry.net or Gaia; require valid WCS keywords
+        in the primary header. Default is False.
     keep_all_astro : bool, optional
         If True, keep all images regardless of astrometric dispersion.
     log : ColoredLogger, optional
@@ -173,7 +179,26 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
     solved_images = []
     aligned_images = []
     aligned_data = []
+    if skip_external_astrometry and log:
+        log.info('Using existing FITS header WCS only (no astrometry.net or Gaia).')
+
     for file in reduced_files:
+        if skip_external_astrometry:
+            hdu = fits.open(file)
+            ok, reason = solve_wcs.validate_existing_wcs_header(hdu[0].header)
+            if not ok:
+                if log:
+                    log.error(
+                        f'Skipping {file}: header WCS validation failed: {reason}')
+                hdu.close()
+                continue
+            hdu[0].header['RADISP'] = 0.0
+            hdu[0].header['DEDISP'] = 0.0
+            hdu.writeto(file, overwrite=True)
+            hdu.close()
+            solved_images.append(file)
+            continue
+
         # Coarse WCS solution using astrometry.net
         success = solve_wcs.solve_astrometry(file, tel, binn, paths, 
             shift_only=False, log=log)
@@ -267,7 +292,8 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
 
 def image_proc(image_data, tel, paths, skip_skysub=False,
     fieldcenter=None, out_size=None, satellites=True, cosmic_ray=True,
-    skip_gaia=False, keep_all_astro=False, relative_calibration=False,
+    skip_gaia=False, skip_external_astrometry=False, keep_all_astro=False,
+    relative_calibration=False,
     log=None):
     """Full image processing: align, mask, stack, and optionally detrend.
 
@@ -294,7 +320,11 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
     cosmic_ray : bool, optional
         If True, run cosmic-ray rejection. Default is True.
     skip_gaia : bool, optional
-        If True, skip Gaia alignment. Default is False.
+        If True, skip Gaia alignment. Default is False. Ignored if
+        ``skip_external_astrometry`` is True.
+    skip_external_astrometry : bool, optional
+        If True, skip astrometry.net and Gaia; use existing header WCS only.
+        Default is False.
     keep_all_astro : bool, optional
         If True, keep all images regardless of astrometric dispersion.
     relative_calibration : bool, optional
@@ -405,7 +435,8 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
 
     aligned_images, aligned_data = align_images(reduced_files, paths, tel, binn,
         use_wcs=use_wcs, fieldcenter=fieldcenter, out_size=out_size, 
-        skip_gaia=skip_gaia, keep_all_astro=keep_all_astro, log=log)
+        skip_gaia=skip_gaia, skip_external_astrometry=skip_external_astrometry,
+        keep_all_astro=keep_all_astro, log=log)
 
     if aligned_images is None or aligned_data is None:
         return(None)

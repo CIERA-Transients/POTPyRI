@@ -140,6 +140,58 @@ def test_align_to_gaia_fallback_when_no_gaia_catalog(tmp_path, monkeypatch):
         assert 'GAIAFAIL' in out[0].header
 
 
+def test_validate_existing_wcs_header_cd_matrix():
+    """validate_existing_wcs_header accepts a minimal TAN WCS with CD matrix."""
+    hdu = fits.PrimaryHDU(data=np.zeros((40, 40), dtype=np.float32))
+    hdu.header['NAXIS1'] = 40
+    hdu.header['NAXIS2'] = 40
+    hdu.header['CRPIX1'] = 20.0
+    hdu.header['CRPIX2'] = 20.0
+    hdu.header['CRVAL1'] = 30.0
+    hdu.header['CRVAL2'] = -30.0
+    hdu.header['CTYPE1'] = 'RA---TAN'
+    hdu.header['CTYPE2'] = 'DEC--TAN'
+    hdu.header['CD1_1'] = -2.2e-5
+    hdu.header['CD1_2'] = 0.0
+    hdu.header['CD2_1'] = 0.0
+    hdu.header['CD2_2'] = 2.2e-5
+    ok, reason = solve_wcs.validate_existing_wcs_header(hdu.header)
+    assert ok is True
+    assert reason == ''
+
+
+def test_validate_existing_wcs_header_cdelt():
+    """validate_existing_wcs_header accepts CDELT1/CDELT2 without CD matrix."""
+    hdu = fits.PrimaryHDU(data=np.zeros((40, 40), dtype=np.float32))
+    hdu.header['NAXIS1'] = 40
+    hdu.header['NAXIS2'] = 40
+    hdu.header['CRPIX1'] = 20.0
+    hdu.header['CRPIX2'] = 20.0
+    hdu.header['CRVAL1'] = 30.0
+    hdu.header['CRVAL2'] = -30.0
+    hdu.header['CTYPE1'] = 'RA---TAN'
+    hdu.header['CTYPE2'] = 'DEC--TAN'
+    hdu.header['CDELT1'] = -2.2e-5
+    hdu.header['CDELT2'] = 2.2e-5
+    ok, reason = solve_wcs.validate_existing_wcs_header(hdu.header)
+    assert ok is True
+    assert reason == ''
+
+
+def test_validate_existing_wcs_header_rejects_missing_crval():
+    """validate_existing_wcs_header fails when CRVAL keywords are absent."""
+    hdu = fits.PrimaryHDU(data=np.zeros((10, 10), dtype=np.float32))
+    hdu.header['CTYPE1'] = 'RA---TAN'
+    hdu.header['CTYPE2'] = 'DEC--TAN'
+    hdu.header['CRPIX1'] = 5.0
+    hdu.header['CRPIX2'] = 5.0
+    hdu.header['CDELT1'] = -1e-4
+    hdu.header['CDELT2'] = 1e-4
+    ok, reason = solve_wcs.validate_existing_wcs_header(hdu.header)
+    assert ok is False
+    assert 'CRVAL' in reason
+
+
 def test_align_to_gaia_fallback_when_no_sextractor_sources(tmp_path, monkeypatch):
     """align_to_gaia falls back and returns True when SExtractor has no detections."""
     file_path = os.path.join(tmp_path, 'test_no_sex.fits')

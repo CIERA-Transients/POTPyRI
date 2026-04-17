@@ -102,6 +102,40 @@ def _validate_refined_wcs(w, header, tel, log=None):
 
     return (True, '')
 
+def validate_existing_wcs_header(header):
+    """Check that a FITS header already defines a usable celestial WCS.
+
+    Requires CTYPE1, CTYPE2, CRVAL1, CRVAL2, CRPIX1, CRPIX2, and a linear
+    celestial transform via either the CD matrix (CD1_1..CD2_2) or CDELT1
+    and CDELT2 (optionally with PC matrix). Confirms :class:`astropy.wcs.WCS`
+    can parse the header and evaluate pixel-to-world for one point.
+
+    Parameters
+    ----------
+    header : astropy.io.fits.Header
+        Header to validate (typically primary HDU).
+
+    Returns
+    -------
+    tuple
+        (ok, reason) where *ok* is True if validation passed; *reason* is an
+        empty string on success, or a short message on failure.
+    """
+    required = ('CTYPE1', 'CTYPE2', 'CRVAL1', 'CRVAL2', 'CRPIX1', 'CRPIX2')
+    for k in required:
+        if k not in header:
+            return (False, f'missing keyword {k}')
+    has_cd = all(k in header for k in ('CD1_1', 'CD1_2', 'CD2_1', 'CD2_2'))
+    has_cdelt = 'CDELT1' in header and 'CDELT2' in header
+    if not has_cd and not has_cdelt:
+        return (False, 'need CD1_1..CD2_2 or both CDELT1 and CDELT2')
+    try:
+        w = WCS(header, naxis=2)
+        w.pixel_to_world(1.0, 1.0)
+    except Exception as e:
+        return (False, f'WCS not usable: {e}')
+    return (True, '')
+
 def get_gaia_catalog(input_file, log=None):
     """Query Gaia DR3 for stars in the field; return filtered catalog table.
 

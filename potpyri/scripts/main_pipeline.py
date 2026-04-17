@@ -46,6 +46,7 @@ def main_pipeline(instrument: str,
                   skip_flatten: bool = None,
                   skip_cr: bool = None,
                   skip_gaia: bool = None,
+                  skip_external_astrometry: bool = None,
                   keep_all_astro: bool = None,
                   relative_calibration: bool = None,
                   **kwargs) -> None:
@@ -89,7 +90,9 @@ def main_pipeline(instrument: str,
         log.info(f'Generating stack for {tar}')
         stack = image_procs.image_proc(file_table[file_table['TargType']==tar], tel, paths,
             skip_skysub=skip_skysub, fieldcenter=fieldcenter, out_size=out_size,
-            cosmic_ray=not skip_cr, skip_gaia=skip_gaia, keep_all_astro=keep_all_astro,
+            cosmic_ray=not skip_cr, skip_gaia=skip_gaia,
+            skip_external_astrometry=skip_external_astrometry or False,
+            keep_all_astro=keep_all_astro,
             relative_calibration=relative_calibration or False, log=log)
 
         # Photometry step
@@ -110,8 +113,9 @@ def main_pipeline(instrument: str,
 
 def main():
     """Entry point: check dependencies, parse args, and run main_pipeline."""
-    options.test_for_dependencies()
     args = options.add_options()
+    options.test_for_dependencies(
+        skip_external_astrometry=getattr(args, 'skip_external_astrometry', False))
     main_pipeline(**vars(args))
 
 if __name__ == "__main__":
