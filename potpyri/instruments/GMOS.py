@@ -150,12 +150,20 @@ class GMOS(instrument.Instrument):
 
     def import_image(self, filename, amp, log=None):
 
-        with fits.open(filename) as hdr:
-            header = hdr[0].header
+        # Load extensions without CCDData.read(...): that parses WCS from each
+        # extension header and raises FITSFixedWarning for deprecated RADECSYS /
+        # MJD-OBS. Use fixed headers and wcs=None until a reduced WCS exists.
+        with fits.open(filename, memmap=False) as hdr:
+            header = hdr[0].header.copy()
+            instrument.fix_deprecated_wcs_header_cards(header)
             binn = self.get_binning(hdr[1].header)
-
-        raw = [CCDData.read(filename, hdu=x+1, unit='adu') 
-            for x in range(int(amp))]
+            raw = []
+            for x in range(int(amp)):
+                hdu = hdr[x + 1]
+                meta = hdu.header.copy()
+                instrument.fix_deprecated_wcs_header_cards(meta)
+                raw.append(
+                    CCDData(np.asarray(hdu.data), meta=meta, unit=u.adu, wcs=None))
         red = [ccdproc.ccd_process(x, oscan=x.header['BIASSEC'], 
             oscan_model=models.Chebyshev1D(3), 
             trim=x.header['DATASEC'], 
