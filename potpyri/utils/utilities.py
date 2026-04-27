@@ -1,7 +1,7 @@
-"""General utilities for catalogs, coordinates, and numeric parsing.
+"""General utilities for coordinates and numeric parsing.
 
-Used by absolute photometry and other steps that need Vizier catalog IDs
-or coordinate handling.
+Vizier catalog IDs and :func:`find_catalog` live in :mod:`potpyri.utils.catalogs`;
+they are re-exported here for backward compatibility.
 """
 from astropy import units as u
 from astropy.coordinates import SkyCoord
@@ -12,86 +12,11 @@ csv.field_size_limit(sys.maxsize)
 
 warnings.filterwarnings('ignore')
 
-viziercat = {
-    'sdssdr12': {'name':'V/147',
-        'columns': ['RA_ICRS', 'DE_ICRS','class','umag', 'e_umag',
-            'gmag','e_gmag', 'rmag','e_rmag', 'imag','i_mag', 'zmag',
-            'e_zmag', 'zph']
-    },
-    '2mass': {'name':'II/246',
-        'columns':['RAJ2000', 'DEJ2000', 'Jmag','e_Jmag','Hmag','e_Hmag',
-            'Kmag', 'e_Kmag']
-    },
-    'unwise': {'name':'II/363',
-        'columns': ['RAJ2000', 'DEJ2000', 'FW1','e_FW1', 'FW2','e_FW2']
-    },
-    'glade': {'name':'VII/281',
-        'columns': ['RAJ2000', 'DEJ2000', 'Dist', 'e_Dist', 'Bmag', 'Jmag',
-            'Hmag', 'Kmag', 'z']
-    },
-    'des': {'name':'II/357',
-        'columns': ['RAJ2000', 'DEJ2000', 'S/Gg', 'S/Gr', 'S/Gi', 'S/Gz',
-            'gmag','e_gmag', 'rmag','e_rmag', 'imag','e_imag', 'zmag','e_zmag']
-    },
-    'skymapper': {'name': 'II/379/smssdr4',
-        'columns': ['RAICRS', 'DEICRS', 'uPSF', 'e_uPSF', 'gPSF', 'e_gPSF',
-            'rPSF', 'e_rPSF','iPSF', 'e_iPSF','zPSF', 'e_zPSF']
-    },
-}
+from . import catalogs as _catalogs
 
-def find_catalog(catalog, fil, coord_ra, coord_dec):
-    """Return Vizier catalog ID and column names for the given catalog and filter.
-
-    Supports SDSS, 2MASS, UKIRT, PS1, SKYMAPPER. For southern u-band, uses
-    SkyMapper automatically.
-
-    Parameters
-    ----------
-    catalog : str
-        Catalog name (e.g. 'PS1', 'SDSS', '2MASS').
-    fil : str
-        Filter band (e.g. 'r', 'g', 'J').
-    coord_ra : float
-        Right ascension (used for catalog selection).
-    coord_dec : float
-        Declination (used for catalog selection; <0 can trigger SkyMapper for u-band).
-
-    Returns
-    -------
-    tuple
-        (catalog, catalog_ID, ra_col, dec_col, mag_col, err_col) for use in
-        Vizier queries. catalog_ID/ra/dec/mag/err may be None if filter not supported.
-    """
-    catalog_ID, ra, dec, mag, err = None, None, None, None, None
-
-    # If declination is less than 0 and filter is u-band, use SkyMapper
-    if coord_dec < 0 and fil.lower()=='u':
-        catalog = 'skymapper'
-
-    # If these catalogs are to be updated in the future, select mag columns that correspond to the
-    # PSF mags.
-    if catalog.upper() == 'SDSS':
-        if fil.lower() not in ['u','g','r','i','z']: return(catalog, catalog_ID, ra, dec, mag, err)
-        catalog_ID, ra, dec, mag, err = 'V/154', 'RA_ICRS', 'DE_ICRS', fil.lower()+'mag', 'e_'+fil.lower()+'mag'
-    elif catalog.upper() == '2MASS':
-        # K, Ks, Kspec all use 2MASS K-band columns (Kmag, e_Kmag)
-        fil_2mass = fil.upper()
-        if fil_2mass in ('KS', 'KSPEC'):
-            fil_2mass = 'K'
-        if fil_2mass not in ['J', 'H', 'K']:
-            return(catalog, catalog_ID, ra, dec, mag, err)
-        catalog_ID, ra, dec, mag, err = 'II/246', 'RAJ2000', 'DEJ2000', fil_2mass+'mag', 'e_'+fil_2mass+'mag'
-    elif catalog.upper() == 'UKIRT':
-        if fil.upper() not in ['Y','J','H','K']: return(catalog, catalog_ID, ra, dec, mag, err)
-        catalog_ID, ra, dec, mag, err = 'II/319', 'ra', 'dec', fil.upper() + 'mag', 'e_'+fil.upper()+'mag'
-    elif catalog.upper() == 'PS1':
-        if fil.lower() not in ['g','r','i','z','y']: return(catalog, catalog_ID, ra, dec, mag, err)
-        catalog_ID, ra, dec, mag, err = 'II/349', 'RAJ2000', 'DEJ2000', fil.lower()+'mag', 'e_'+fil.lower()+'mag'
-    elif catalog.upper() == 'SKYMAPPER':
-        if fil.lower() not in ['u','v','g','r','i','z']: return(catalog, catalog_ID, ra, dec, mag, err)
-        catalog_ID, ra, dec, mag, err = 'II/379/smssdr4', 'RAICRS', 'DEICRS', fil.lower()+'PSF', 'e_'+fil.lower()+'PSF'
-
-    return(catalog, catalog_ID, ra, dec, mag, err)
+viziercat = _catalogs.viziercat
+find_catalog = _catalogs.find_catalog
+POINT_SOURCE_CALIBRATION_CATALOGS = _catalogs.POINT_SOURCE_CALIBRATION_CATALOGS
 
 def is_number(num):
     """Return True if the value can be interpreted as a number.

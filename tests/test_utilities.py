@@ -1,6 +1,7 @@
 """Unit tests for potpyri.utils.utilities (find_catalog, is_number, parse_coord)."""
 import pytest
 
+from potpyri.utils import catalogs
 from potpyri.utils import utilities
 
 
@@ -89,6 +90,34 @@ def test_find_catalog_ukirt():
     assert cid == "II/319"
     assert mag == "Kmag"
     assert err == "e_Kmag"
+
+
+def test_viziercat_sdss_key_no_glade():
+    """viziercat uses ``sdss`` (not sdssdr12); GLADE galaxy catalog is not included."""
+    assert 'sdss' in catalogs.viziercat
+    assert catalogs.viziercat['sdss']['name'] == 'V/147'
+    assert 'sdssdr12' not in catalogs.viziercat
+    assert 'glade' not in catalogs.viziercat
+
+
+def test_point_source_calibration_catalogs_registry():
+    """POINT_SOURCE_CALIBRATION_CATALOGS lists Gaia, SDSS, PS1, and extensions."""
+    reg = catalogs.POINT_SOURCE_CALIBRATION_CATALOGS
+    assert 'gaia_dr3' in reg and reg['gaia_dr3']['vizier_id'] == 'I/355/gaiadr3'
+    assert reg['sdss']['vizier_id'] == 'V/147'
+    assert 'apass9' in reg and reg['ucac4']['roles'][0] == 'astrometry'
+
+
+def test_normalize_fine_align_catalog():
+    """normalize_fine_align_catalog maps CLI aliases to internal keys."""
+    assert catalogs.normalize_fine_align_catalog('2mass') == 'twomass'
+    assert catalogs.normalize_fine_align_catalog('PS1') == 'panstarrs'
+    assert catalogs.normalize_fine_align_catalog('sdss') == 'sdss'
+    assert catalogs.normalize_fine_align_catalog('sdssdr12') == 'sdss'
+    assert catalogs.normalize_fine_align_catalog('legacy') == 'legacy'
+    assert catalogs.normalize_fine_align_catalog(None) == 'gaia'
+    with pytest.raises(ValueError):
+        catalogs.normalize_fine_align_catalog('bogus')
 
 
 def test_parse_coord_value_error():

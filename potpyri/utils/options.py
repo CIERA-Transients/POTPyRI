@@ -90,17 +90,30 @@ def init_options():
         default=False,
         action='store_true',
         help='Tell the pipeline to skip cosmic ray detection.')
+    params.add_argument('--skip-fine-align',
+        default=False,
+        action='store_true',
+        dest='skip_fine_align',
+        help='Skip fine WCS alignment (catalog matching after astrometry.net).')
     params.add_argument('--skip-gaia',
         default=False,
         action='store_true',
-        help='Tell the pipeline to skip Gaia alignment during WCS.')
+        dest='skip_fine_align',
+        help='Deprecated alias for --skip-fine-align.')
+    params.add_argument('--fine-align-catalog',
+        type=str,
+        default='gaia',
+        choices=['gaia', 'panstarrs', 'sdss', 'legacy', '2mass', 'skymapper'],
+        dest='fine_align_catalog',
+        help='Reference catalog for fine WCS alignment after astrometry.net: gaia (default), '
+             'panstarrs, sdss (SDSS V/147), legacy, 2mass, or skymapper.')
     params.add_argument('--skip-external-astrometry',
         default=False,
         action='store_true',
         dest='skip_external_astrometry',
-        help='Do not run astrometry.net or Gaia; require a valid WCS already in '
-             'the FITS header (CTYPE/CRVAL/CRPIX and CD or CDELT keywords). '
-             'Implies skipping Gaia.')
+        help='Do not run astrometry.net or fine catalog alignment; require a valid WCS '
+             'already in the FITS header (CTYPE/CRVAL/CRPIX and CD or CDELT keywords). '
+             'Implies --skip-fine-align.')
     params.add_argument('--keep-all-astro',
         default=False,
         action='store_true',

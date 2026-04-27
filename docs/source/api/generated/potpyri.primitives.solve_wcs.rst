@@ -7,9 +7,10 @@
    .. rubric:: Functions
 
    .. autosummary::
-   
-      align_to_gaia
+
       clean_up_astrometry
-      get_gaia_catalog
+      fine_align_wcs
+      get_fine_align_reference_catalog
       solve_astrometry
+      validate_existing_wcs_header
    

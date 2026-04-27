@@ -1,32 +1,21 @@
 """Absolute photometry zeropoint calibration using catalog magnitudes.
 
-Queries Vizier (e.g. PS1), matches sources, and fits zeropoint via
-iterative ODR. Writes ZPTMAG and related keywords to the stack header.
-Uses multiple Vizier mirrors (CDS, Tokyo, CfA, INASAN, IUCAA, IDIA) with
-fallback when the first attempt fails.
+Queries Vizier (e.g. PS1) via :mod:`potpyri.utils.catalogs`, matches sources,
+and fits zeropoint via iterative ODR. Writes ZPTMAG and related keywords to
+the stack header.
 Authors: Kerry Paterson, Charlie Kilpatrick.
 """
 from potpyri._version import __version__
 
 import numpy as np
 
-from astroquery.vizier import Vizier
 from astropy import units as u
-
-# Vizier mirror servers (hostnames only); tried in order when a query fails.
-VIZIER_MIRRORS = [
-    'vizier.cds.unistra.fr',   # CDS / Strasbourg, France
-    'vizier.nao.ac.jp',        # ADAC / Tokyo, Japan
-    'vizier.cfa.harvard.edu',  # CfA / Harvard, USA
-    'vizier.inasan.ru',        # INASAN / Moscow, Russia
-    'vizier.iucaa.in',         # IUCAA / Pune, India
-    'vizier.idia.ac.za',       # IDIA / South Africa
-]
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
 from astropy.io import fits
 
-# Internal dependency
+# Internal dependencies
+from potpyri.utils import catalogs
 from potpyri.utils import utilities
 
 class absphot(object):
@@ -184,7 +173,8 @@ class absphot(object):
         coord_ra = np.median([c.ra.degree for c in coords])
         coord_dec = np.median([c.dec.degree for c in coords])
 
-        catalog, cat_ID, cat_ra, cat_dec, cat_mag, cat_err = utilities.find_catalog(catalog, filt, coord_ra, coord_dec)
+        catalog, cat_ID, cat_ra, cat_dec, cat_mag, cat_err = catalogs.find_catalog(
+            catalog, filt, coord_ra, coord_dec)
         
         med_coord = SkyCoord(coord_ra, coord_dec, unit='deg')
 
@@ -199,33 +189,11 @@ class absphot(object):
         if log:
             log.info(f'Getting {catalog} catalog with ID {cat_ID} in filt {filt}')
             log.info(f'Querying around {coord_ra}, {coord_dec} deg')
-        Vizier.clear_cache()
         width = np.max([2.0 * max_sep, 0.5])
-        cat = None
-        last_error = None
-        for server in VIZIER_MIRRORS:
-            try:
-                vizier = Vizier(columns=cols, vizier_server=server)
-                vizier.ROW_LIMIT = -1
-                cat = vizier.query_region(med_coord, width=width*u.degree,
-                    catalog=cat_ID)
-                if cat is not None and len(cat) > 0:
-                    if log:
-                        log.info(f'Vizier query succeeded via {server}')
-                    break
-                cat = None
-            except Exception as e:
-                last_error = e
-                if log:
-                    log.warning(f'Vizier mirror {server} failed: {e}')
-                else:
-                    print(f'Vizier mirror {server} failed: {e}')
-                cat = None
-        if cat is None and last_error is not None and log:
-            log.warning('All Vizier mirrors failed; last error: {}'.format(last_error))
+        cat = catalogs.query_vizier_region(
+            med_coord, width * u.degree, cat_ID, cols, log=log)
 
-        if cat is not None and len(cat)>0:
-            cat = cat[0]
+        if cat is not None:
             cat = cat[~np.isnan(cat[cat_mag])]
             cat = cat[cat[cat_err]>0.]
 
