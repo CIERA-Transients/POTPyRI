@@ -16,7 +16,20 @@ from astropy.io import fits
 
 # Internal dependencies
 from potpyri.utils import catalogs
-from potpyri.utils import utilities
+
+
+def _fits_extension_names(hdulist):
+    """Return EXTNAME values for an HDUList (empty string if unset)."""
+    return [h.name if h.name else '' for h in hdulist]
+
+
+def _log_or_print(msg, log, level='info'):
+    """Emit *msg* via *log* at *level*, or print if *log* is None."""
+    if log is None:
+        print(msg, flush=True)
+        return
+    getattr(log, level)(msg)
+
 
 class absphot(object):
     """Zeropoint fitter using catalog magnitudes and iterative sigma clipping."""
@@ -266,122 +279,171 @@ class absphot(object):
 
         Returns
         -------
-        None
-            cmpfile is updated in place.
+        bool
+            True if ZPT keywords were written; False if photometry or catalog step
+            did not complete (cmpfile may be unchanged).
         """
-        if log:
-            log.info(f'Importing catalog from file: {cmpfile}')
-        else:
-            print(f'Importing catalog from file: {cmpfile}')
+        _log_or_print(f'Zeropoint: reading stack {cmpfile!r}', log)
 
-        hdu = fits.open(cmpfile)
-        header = hdu['SCI'].header
-        filtorig = header['FILTER']
-        catalog = tel.get_catalog(header)
+        with fits.open(cmpfile) as hdu:
+            extnames = _fits_extension_names(hdu)
+            if phottable not in hdu:
+                _log_or_print(
+                    f'Zeropoint aborted: FITS extension {phottable!r} not found in '
+                    f'{cmpfile!r}. Present extensions (EXTNAME): {extnames!r}. '
+                    'Run photometry first (photometry.photloop / pipeline photometry '
+                    'step) so APPPHOT is written; if photometry already ran, check logs '
+                    'for PhotometryError or earlier tracebacks.',
+                    log,
+                    level='error',
+                )
+                return False
 
+            header = hdu['SCI'].header
+            filtorig = header['FILTER']
+            catalog = tel.get_catalog(header)
 
-        table = Table(hdu[phottable].data, meta=hdu[phottable].header)
-        coords = SkyCoord(table['RA'], table['Dec'], unit='deg')
+            table = Table(hdu[phottable].data, meta=hdu[phottable].header)
+            required = ('RA', 'Dec', 'flux', 'flux_err')
+            missing = [c for c in required if c not in table.colnames]
+            if missing:
+                _log_or_print(
+                    f'Zeropoint aborted: extension {phottable!r} is missing columns '
+                    f'{missing!r}; have {list(table.colnames)!r}. Photometry output '
+                    'may be corrupt or from an incompatible version.',
+                    log,
+                    level='error',
+                )
+                return False
 
-        # New metadata to update
-        metadata = {}
+            coords = SkyCoord(table['RA'], table['Dec'], unit='deg')
 
-        cat = None ; cat_ID = None
+            # New metadata to update
+            metadata = {}
 
-        filt = self.convert_filter_name(filtorig)
-        if input_catalog is not None:
-            cat = input_catalog
-        else:
-            if log:
-                log.info(f'Downloading {catalog} catalog in {filt}')
+            cat = None
+            cat_ID = None
+
+            filt = self.convert_filter_name(filtorig)
+            if input_catalog is not None:
+                cat = input_catalog
             else:
-                print(f'Downloading {catalog} catalog in {filt}')
+                _log_or_print(
+                    f'Zeropoint: querying {catalog} catalog for filter {filt}', log)
 
-            cat, catalog, cat_ID = self.get_catalog(coords, catalog, filt, log=log)
+                cat, catalog, cat_ID = self.get_catalog(coords, catalog, filt, log=log)
 
-        if cat:
-            min_mag = self.get_minmag(filt)
-            cat = cat[cat['mag']>min_mag]
+            if cat is not None and len(cat) > 0:
+                min_mag = self.get_minmag(filt)
+                cat = cat[cat['mag'] > min_mag]
+                if len(cat) == 0:
+                    _log_or_print(
+                        f'Zeropoint not written: no catalog sources fainter than '
+                        f'bright limit min_mag={min_mag} for filter {filt!r}.',
+                        log,
+                        level='warning',
+                    )
+                    return False
 
-            coords_cat = SkyCoord(cat['ra'], cat['dec'], unit='deg')
+                coords_cat = SkyCoord(cat['ra'], cat['dec'], unit='deg')
 
-            idx, d2, d3 = coords_cat.match_to_catalog_sky(coords)
+                idx, d2, d3 = coords_cat.match_to_catalog_sky(coords)
 
-            # Get matches from calibration catalog and cmpfile
-            mask = d2 < match_radius
-            cat = cat[mask]
-            idx = idx[mask]
+                # Get matches from calibration catalog and cmpfile
+                mask = d2 < match_radius
+                cat = cat[mask]
+                idx = idx[mask]
 
-            if len(cat)==0:
-                if log:
-                    log.info('No star matches within match radius.')
-                else:
-                    print('No star matches within match radius.')
-                return(None, None)
+                if len(cat) == 0:
+                    _log_or_print(
+                        'Zeropoint not written: no catalog stars match photometry '
+                        f'within {match_radius} (try a larger match radius or check '
+                        'WCS/field).',
+                        log,
+                        level='warning',
+                    )
+                    return False
 
-            match_table = None
-            for i in idx:
-                if not match_table:
-                    match_table = Table(table[i])
-                else:
-                    match_table.add_row(table[i])
+                match_table = None
+                for i in idx:
+                    if not match_table:
+                        match_table = Table(table[i])
+                    else:
+                        match_table.add_row(table[i])
 
-            # Sort by flux
-            flux_idx = np.argsort(match_table['flux'])
-            match_table = match_table[flux_idx]
-            cat = cat[flux_idx]
-            
-            # Do basic cuts on flux, fluxerr, catalog magnitude, cat magerr
-            flux = match_table['flux'].data.astype('float32')
-            fluxerr = match_table['flux_err'].data.astype('float32')
-            cat_mag = cat['mag'].data.astype('float32')
-            cat_magerr = cat['mag_err'].data.astype('float32')
+                # Sort by flux
+                flux_idx = np.argsort(match_table['flux'])
+                match_table = match_table[flux_idx]
+                cat = cat[flux_idx]
 
-            if len(flux)==0:
-                if log:
-                    log.info('No suitable stars to calculate zeropoint .')
-                return(None, None)
+                # Do basic cuts on flux, fluxerr, catalog magnitude, cat magerr
+                flux = match_table['flux'].data.astype('float32')
+                fluxerr = match_table['flux_err'].data.astype('float32')
+                cat_mag = cat['mag'].data.astype('float32')
+                cat_magerr = cat['mag_err'].data.astype('float32')
 
-            zpt, zpterr, master_mask = self.zpt_iteration(flux, fluxerr,
-                cat_mag, cat_magerr, log=log)
+                if len(flux) == 0:
+                    _log_or_print(
+                        'Zeropoint not written: no rows left after flux/magnitude cuts.',
+                        log,
+                        level='warning',
+                    )
+                    return False
 
-            # Set header variables
-            metadata['ZPTNSTAR']=len(flux)
-            metadata['ZPTMAG']=zpt
-            metadata['ZPTMUCER']=zpterr
-            metadata['ZPTCAT']=catalog
-            metadata['ZPTCATID']=cat_ID
-            metadata['ZPTPHOT']=phottable
-            metadata['FILTER']=filtorig
+                zpt, zpterr, master_mask = self.zpt_iteration(flux, fluxerr,
+                    cat_mag, cat_magerr, log=log)
 
-            # Add limiting magnitudes
-            if 'FWHM' in header.keys() and 'SKYSIG' in header.keys():
-                fwhm = header['FWHM']
-                sky = header['SKYSIG']
-                Npix_per_FWHM_Area = 2.5 * 2.5 * fwhm * fwhm
-                skysig_per_FWHM_Area = np.sqrt(Npix_per_FWHM_Area * (sky*sky))
-                m3sigma = -2.5*np.log10(3.0*skysig_per_FWHM_Area)+zpt
-                m5sigma = -2.5*np.log10(5.0*skysig_per_FWHM_Area)+zpt
-                m10sigma = -2.5*np.log10(10.0*skysig_per_FWHM_Area)+zpt
-                m3sigma = float('%.6f'%m3sigma)
-                m5sigma = float('%.6f'%m5sigma)
-                m10sigma = float('%.6f'%m10sigma)
-                metadata['M3SIGMA']=m3sigma
-                metadata['M5SIGMA']=m5sigma
-                metadata['M10SIGMA']=m10sigma
-                if log:
-                    log.info(f'3-sigma limiting mag of image is {m3sigma}')
-                else:
-                    print(f'3-sigma limiting mag of image is {m3sigma}')
+                # Set header variables
+                metadata['ZPTNSTAR'] = len(flux)
+                metadata['ZPTMAG'] = zpt
+                metadata['ZPTMUCER'] = zpterr
+                metadata['ZPTCAT'] = catalog
+                metadata['ZPTCATID'] = cat_ID
+                metadata['ZPTPHOT'] = phottable
+                metadata['FILTER'] = filtorig
 
-            hdu['PRIMARY'].header.update(metadata)
-            hdu['SCI'].header.update(metadata)
-            hdu[phottable].header.update(metadata)
+                # Add limiting magnitudes
+                if 'FWHM' in header.keys() and 'SKYSIG' in header.keys():
+                    fwhm = header['FWHM']
+                    sky = header['SKYSIG']
+                    Npix_per_FWHM_Area = 2.5 * 2.5 * fwhm * fwhm
+                    skysig_per_FWHM_Area = np.sqrt(Npix_per_FWHM_Area * (sky * sky))
+                    m3sigma = -2.5 * np.log10(3.0 * skysig_per_FWHM_Area) + zpt
+                    m5sigma = -2.5 * np.log10(5.0 * skysig_per_FWHM_Area) + zpt
+                    m10sigma = -2.5 * np.log10(10.0 * skysig_per_FWHM_Area) + zpt
+                    m3sigma = float('%.6f' % m3sigma)
+                    m5sigma = float('%.6f' % m5sigma)
+                    m10sigma = float('%.6f' % m10sigma)
+                    metadata['M3SIGMA'] = m3sigma
+                    metadata['M5SIGMA'] = m5sigma
+                    metadata['M10SIGMA'] = m10sigma
+                    _log_or_print(f'3-sigma limiting mag of image is {m3sigma}', log)
 
-            hdu.writeto(cmpfile, overwrite=True)
-            
-        elif log:
-            log.info('No zeropoint calculated.')
+                hdu['PRIMARY'].header.update(metadata)
+                hdu['SCI'].header.update(metadata)
+                hdu[phottable].header.update(metadata)
+
+                hdu.writeto(cmpfile, overwrite=True)
+                _log_or_print(
+                    f'Zeropoint written to {cmpfile!r} (ZPTMAG={zpt:.4f}, N={len(flux)})',
+                    log,
+                )
+                return True
+
+            if input_catalog is not None:
+                _log_or_print(
+                    'Zeropoint not written: input_catalog is missing or has zero rows.',
+                    log,
+                    level='warning',
+                )
+            else:
+                _log_or_print(
+                    'Zeropoint not written: catalog query returned no usable table '
+                    f'(catalog_name={catalog!r}, filter={filt!r}).',
+                    log,
+                    level='warning',
+                )
+            return False
 
     def Y_band(self, J, J_err, K, K_err):
         """Compute Y-band mag and error from J and K (2MASS relation).
@@ -473,8 +535,8 @@ def find_zeropoint(stack, tel, log=None):
 
     Returns
     -------
-    None
-        Stack FITS is updated in place with ZPTMAG, ZPTNSTAR, etc.
+    bool
+        True if ZPT keywords were written; False otherwise (see log).
     """
     cal = absphot()
-    cal.find_zeropoint(stack, tel, log=log)
+    return cal.find_zeropoint(stack, tel, log=log)

@@ -109,7 +109,7 @@ def main_pipeline(instrument: str,
 
         # Zero point/flux calibration step
         ##################################
-        log.info('Calculating zeropint.')
+        log.info('Calculating zeropoint.')
         absphot.find_zeropoint(stack, tel, log=log)
         
     t2 = time.time()

@@ -40,6 +40,9 @@ env/
 *.sublime-project
 *.sublime-workspace
 
+# Examples: all contents local-only (data, scripts); not versioned
+examples/
+
 # Miscellaneous
 *.bak
 *.swp

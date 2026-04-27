@@ -34,7 +34,15 @@ import copy
 import os
 
 import warnings
+import traceback
+
 warnings.filterwarnings('ignore')
+
+
+class PhotometryError(RuntimeError):
+    """PSF/aperture photometry did not complete; stack is missing APPPHOT/PSFPHOT."""
+
+    pass
 
 
 def create_conv(outfile):
@@ -177,6 +185,9 @@ def extract_aperture_stats(img_data, img_mask, img_error, stars,
         'orientation','eccentricity','signal_to_noise',
         'flux_best', 'flux_best_err','Xpos','Ypos',
         'Xpos_err','Ypos_err')).copy()[:0]
+
+    if len(stars) == 0:
+        return apertable
 
     # Estimate a reasonable aperture radius and centroid for sources
     fwhms=[]
@@ -470,6 +481,13 @@ def do_phot(img_file,
     else:
         print(f'Found {len(stars)} stars')
 
+    if len(stars) == 0:
+        raise PhotometryError(
+            'Star detection returned zero sources after DAOStarFinder and peak>0 '
+            'cut. Check image depth, MASK coverage, ERROR array, fwhm_init, or '
+            'lower the photometry S/N threshold (phot_sn_max / photloop).'
+        )
+
     med_sharp = np.median(stars['sharpness'])
     med_round = np.median(stars['roundness1'])
     std_sharp = np.std(stars['sharpness'])
@@ -495,6 +513,12 @@ def do_phot(img_file,
 
     fwhm = float('%.4f'%fwhm)
     std_fwhm = float('%.4f'%std_fwhm)
+
+    if len(fwhm_stars) == 0:
+        raise PhotometryError(
+            'No stars left after sharpness/roundness/FWHM sigma-clipping for ePSF '
+            'construction. Try a larger fwhm_init or lower S/N thresholds.'
+        )
     
     if log:
         log.info(f'Masked to {len(fwhm_stars)} stars based on sharpness, roundness, FWHM')
@@ -516,6 +540,13 @@ def do_phot(img_file,
         log.info(f'Masked to {len(bright)} PSF stars based on flux.')
     else:
         print(f'Masked to {len(bright)} PSF stars based on flux.')
+
+    if len(bright) == 0:
+        raise PhotometryError(
+            'No stars passed S/N cuts for ePSF building (bright catalog empty after '
+            'PSF-star selection). Lower snthresh_psf / photometry S/N or inspect '
+            'image quality and MASK.'
+        )
 
     metadata['NPSFSTAR']=len(bright)
 
@@ -549,6 +580,11 @@ def do_phot(img_file,
 
     mask = (stars['signal_to_noise'] > star_param['snthresh_final'])
     final_stars = stars[mask]
+    if len(final_stars) == 0:
+        raise PhotometryError(
+            f"No stars above snthresh_final={star_param['snthresh_final']} for PSF "
+            'fitting. Lower the photometry S/N threshold (photloop phot_sn_*).'
+        )
 
     photometry, residual_image = run_photometry(img_file, epsf, fwhm, 
         star_param['snthresh_final'], size, final_stars)
@@ -704,20 +740,69 @@ def photloop(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
     -------
     None
         Stack FITS is updated in place when do_phot succeeds.
+
+    Raises
+    ------
+    PhotometryError
+        If every S/N attempt fails (no APPPHOT written).
     """
+    if phot_sn_max <= phot_sn_min:
+        raise PhotometryError(
+            f'phot_sn_max ({phot_sn_max}) must be greater than phot_sn_min ({phot_sn_min}).'
+        )
+
     signal_to_noise = phot_sn_max
+    last_exc = None
+    sn_tried = []
 
-    epsf = None ; fwhm = None
     while signal_to_noise > phot_sn_min:
+        sn_tried.append(signal_to_noise)
+        if log:
+            log.info(
+                f'Photometry: trying S/N threshold={signal_to_noise} '
+                f'(fwhm_init={fwhm_init}, stack={stack})'
+            )
+        else:
+            print(
+                f'Photometry: trying S/N threshold={signal_to_noise} '
+                f'(fwhm_init={fwhm_init})'
+            )
 
-        if log: log.info(f'Trying PSF generation with S/N={signal_to_noise}')
-        star_param = {'snthresh_psf': signal_to_noise*2.0,
+        star_param = {'snthresh_psf': signal_to_noise * 2.0,
                       'fwhm_init': fwhm_init,
                       'snthresh_final': signal_to_noise}
         try:
-            do_phot(stack, star_param=star_param) 
+            do_phot(stack, star_param=star_param, log=log)
         except Exception as e:
-            log.error(e)
+            last_exc = e
+            if log:
+                log.exception(
+                    'Photometry attempt failed for S/N threshold=%s: %s',
+                    signal_to_noise, e,
+                )
+            else:
+                traceback.print_exc()
             signal_to_noise = signal_to_noise / 2.0
             continue
-        break
+
+        if log:
+            log.info(
+                f'Photometry finished successfully at S/N threshold={signal_to_noise} '
+                f'(APPPHOT written to {stack})'
+            )
+        else:
+            print(f'Photometry succeeded at S/N threshold={signal_to_noise}')
+        return
+
+    msg = (
+        f'Photometry failed for {stack!r}: no successful run after trying S/N '
+        f'thresholds {sn_tried}. The stack has no APPPHOT extension, so downstream '
+        f'zeropoint fitting will fail. Last error: {last_exc!r}. '
+        f'Try lowering --phot-sn-min (currently {phot_sn_min}), raising '
+        f'--phot-sn-max, adjusting --fwhm-init, or inspect SCI/MASK/ERROR and WCS.'
+    )
+    if log:
+        log.error(msg)
+    else:
+        print(msg, flush=True)
+    raise PhotometryError(msg) from last_exc
