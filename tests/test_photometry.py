@@ -10,7 +10,7 @@ import os
 import numpy as np
 
 from astropy.io import fits
-from astropy.table import Table
+from astropy.table import Table, Column
 from photutils.psf import EPSFModel
 
 import pytest
@@ -66,6 +66,42 @@ def test_photometry(tmp_path):
         assert np.any(['APPPHOT' in h.name for h in hdu])
         assert np.any(['PSF' in h.name for h in hdu])
         assert len(hdu['APPPHOT'].data) > 100
+
+
+def test_normalize_daofind_catalog_aliases_photutils3():
+    """_normalize_daofind_catalog maps x_centroid/y_centroid to xcentroid/ycentroid."""
+    import astropy.units as u
+
+    tbl = Table(
+        {
+            'x_centroid': [10.0, 20.0] * u.pixel,
+            'y_centroid': [30.0, 40.0] * u.pixel,
+            'peak': Column([100.0, 200.0]),
+            'flux': Column([50.0, 60.0]),
+        },
+    )
+    out = photometry._normalize_daofind_catalog(tbl)
+    assert 'xcentroid' in out.colnames and 'ycentroid' in out.colnames
+    np.testing.assert_array_equal(out['xcentroid'], [10.0, 20.0])
+    np.testing.assert_array_equal(out['ycentroid'], [30.0, 40.0])
+
+
+def test_normalize_daofind_catalog_already_has_legacy_names():
+    """Legacy xcentroid/ycentroid tables are unchanged."""
+    tbl = Table(
+        {
+            'xcentroid': Column([1.0]),
+            'ycentroid': Column([2.0]),
+            'peak': Column([1.0]),
+        },
+    )
+    out = photometry._normalize_daofind_catalog(tbl)
+    assert 'xcentroid' in out.colnames
+
+
+def test_normalize_daofind_catalog_requires_centroid_columns():
+    with pytest.raises(photometry.PhotometryError):
+        photometry._normalize_daofind_catalog(Table({'flux': Column([1.0])}))
 
 
 def test_create_conv(tmp_path):

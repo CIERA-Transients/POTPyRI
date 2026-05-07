@@ -15,6 +15,7 @@ from photutils.psf import PSFPhotometry
 
 from astropy.io import fits
 from astropy.io import ascii
+from astropy import units as u
 from astropy.stats import sigma_clipped_stats
 from astropy.stats import SigmaClip
 from astropy.nddata import NDData
@@ -43,6 +44,32 @@ class PhotometryError(RuntimeError):
     """PSF/aperture photometry did not complete; stack is missing APPPHOT/PSFPHOT."""
 
     pass
+
+
+def _normalize_daofind_catalog(stars):
+    """Ensure DAOStarFinder columns use POTPyRI's expected names.
+
+    photutils 3.x renamed ``xcentroid``/``ycentroid`` to ``x_centroid``/
+    ``y_centroid``; older photutils used the legacy names. This keeps downstream
+    code working across versions.
+    """
+    if stars is None:
+        return None
+    if len(stars) == 0:
+        return stars
+    if 'xcentroid' in stars.colnames:
+        return stars
+    if 'x_centroid' in stars.colnames and 'y_centroid' in stars.colnames:
+        stars['xcentroid'] = np.asarray(
+            u.Quantity(stars['x_centroid'], copy=False).value, dtype=np.float64)
+        stars['ycentroid'] = np.asarray(
+            u.Quantity(stars['y_centroid'], copy=False).value, dtype=np.float64)
+        return stars
+    raise PhotometryError(
+        'DAOStarFinder output is missing centroid columns '
+        '(expected xcentroid/ycentroid or x_centroid/y_centroid). '
+        f'Got columns: {list(stars.colnames)}'
+    )
 
 
 def create_conv(outfile):
@@ -412,6 +439,15 @@ def get_star_catalog(img_data, img_mask, img_error, fwhm_init=5.0,
 
     # Do the finding...
     stars = daofind(img_data, mask=img_mask)
+
+    if stars is None:
+        raise PhotometryError(
+            'DAOStarFinder returned no source table (None): no detections passed '
+            'DAOStarFinder quality cuts, or the image is shallow / heavily masked. '
+            'Try a lower detection threshold or different fwhm_init.'
+        )
+
+    stars = _normalize_daofind_catalog(stars)
 
     # Ignore stars whose peak is below the background-subtracted level
     mask = stars['peak'] > 0.
