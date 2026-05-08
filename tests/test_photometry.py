@@ -86,6 +86,23 @@ def test_normalize_daofind_catalog_aliases_photutils3():
     np.testing.assert_array_equal(out['ycentroid'], [30.0, 40.0])
 
 
+def test_normalize_daofind_catalog_row_access_after_deprecated_wrapper():
+    """Tables with photutils-style deprecation_map coerce so Row['xcentroid'] works."""
+    tbl = Table(
+        {
+            'x_centroid': Column([1.0, 2.0]),
+            'y_centroid': Column([3.0, 4.0]),
+            'peak': Column([1.0, 1.0]),
+            'flux': Column([1.0, 2.0]),
+        },
+    )
+    tbl.deprecation_map = {'xcentroid': 'x_centroid', 'ycentroid': 'y_centroid'}
+    out = photometry._normalize_daofind_catalog(tbl)
+    assert not getattr(out, 'deprecation_map', None)
+    assert float(out[0]['xcentroid']) == 1.0
+    assert float(out[0]['ycentroid']) == 3.0
+
+
 def test_normalize_daofind_catalog_already_has_legacy_names():
     """Legacy xcentroid/ycentroid tables are unchanged."""
     tbl = Table(
