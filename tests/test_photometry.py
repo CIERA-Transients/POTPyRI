@@ -11,7 +11,7 @@ import numpy as np
 
 from astropy.io import fits
 from astropy.table import Table, Column
-from photutils.psf import EPSFModel
+from types import SimpleNamespace
 
 import pytest
 from tests.utils import download_gdrive_file
@@ -203,12 +203,13 @@ def test_get_star_catalog(tmp_path):
 
 
 def test_extract_fwhm_from_epsf():
-    """extract_fwhm_from_epsf returns finite FWHM from EPSFModel."""
-    # Build a minimal EPSF-like array (Gaussian blob)
+    """extract_fwhm_from_epsf returns finite FWHM from an ePSF-like array."""
+    # extract_fwhm_from_epsf only requires epsf.data (photutils 3 removed EPSFModel)
     size = 15
     y, x = np.ogrid[-size//2:size//2+1, -size//2:size//2+1]
     sigma = 2.0
     data = np.exp(-(x*x + y*y) / (2 * sigma**2)).astype(float)
+    epsf = SimpleNamespace(data=data)
     with warnings.catch_warnings():
         try:
             from astropy.utils.exceptions import AstropyDeprecationWarning, AstropyUserWarning
@@ -217,7 +218,6 @@ def test_extract_fwhm_from_epsf():
         except ImportError:
             warnings.simplefilter('ignore', DeprecationWarning)
             warnings.simplefilter('ignore', UserWarning)
-        epsf = EPSFModel(data)
         fwhm = photometry.extract_fwhm_from_epsf(epsf, fwhm_init=3.0)
     assert np.isfinite(fwhm)
     assert fwhm > 0

@@ -106,6 +106,37 @@ def _normalize_daofind_catalog(stars):
     )
 
 
+def _apstats_attr(stats, preferred, legacy=None):
+    """Return an ``ApertureStats`` attribute, preferring photutils 3.x names."""
+    for name in (preferred, legacy):
+        if name is None:
+            continue
+        if hasattr(stats, name):
+            return getattr(stats, name)
+    raise AttributeError(
+        f'ApertureStats has neither {preferred!r} nor {legacy!r}'
+    )
+
+
+def _apstats_float(stats, preferred, legacy=None):
+    """Coerce an ``ApertureStats`` scalar (possibly a Quantity) to float."""
+    val = _apstats_attr(stats, preferred, legacy)
+    if isinstance(val, (int, float, np.floating)):
+        return float(val)
+    return float(u.Quantity(val).value)
+
+
+def _make_psf_residual_image(psf_phot, image, shape):
+    """Build PSF residual image across photutils 2.x/3.x keyword names."""
+    kwargs = {'psf_shape': (shape, shape)}
+    try:
+        return psf_phot.make_residual_image(
+            image, **kwargs, include_local_bkg=True)
+    except TypeError:
+        return psf_phot.make_residual_image(
+            image, **kwargs, include_localbkg=True)
+
+
 def create_conv(outfile):
     """Write a 3x3 CONV NORM filter file for Source Extractor.
 
@@ -262,9 +293,9 @@ def extract_aperture_stats(img_data, img_mask, img_error, stars,
         aperstats = ApertureStats(img_data, aper, mask=img_mask, 
             error=img_error)
 
-        fwhms.append(aperstats.fwhm.value)
-        stars[i]['xcentroid']=aperstats.xcentroid
-        stars[i]['ycentroid']=aperstats.ycentroid
+        fwhms.append(_apstats_float(aperstats, 'fwhm'))
+        stars[i]['xcentroid'] = _apstats_float(aperstats, 'x_centroid', 'xcentroid')
+        stars[i]['ycentroid'] = _apstats_float(aperstats, 'y_centroid', 'ycentroid')
 
     if aperture_radius<2.5*np.nanmean(fwhms):
         aperture_radius=2.5*np.nanmean(fwhms)
@@ -281,14 +312,22 @@ def extract_aperture_stats(img_data, img_mask, img_error, stars,
         aperstats = ApertureStats(img_data, aper, mask=img_mask, 
             error=img_error)
 
-        covx = np.maximum(aperstats.covar_sigx2.value, 0.0)
-        covy = np.maximum(aperstats.covar_sigy2.value, 0.0)
-        apertable.add_row([aperstats.fwhm.value, aperstats.semimajor_sigma.value,
-            aperstats.semiminor_sigma.value, aperstats.orientation.value,
-            aperstats.eccentricity, aperstats.sum/aperstats.sum_err,
-            aperstats.sum, aperstats.sum_err, aperstats.xcentroid,
-            aperstats.ycentroid, np.sqrt(covx),
-            np.sqrt(covy)])
+        covx = np.maximum(
+            _apstats_float(aperstats, 'covariance_xx', 'covar_sigx2'), 0.0)
+        covy = np.maximum(
+            _apstats_float(aperstats, 'covariance_yy', 'covar_sigy2'), 0.0)
+        apertable.add_row([
+            _apstats_float(aperstats, 'fwhm'),
+            _apstats_float(aperstats, 'semimajor_axis', 'semimajor_sigma'),
+            _apstats_float(aperstats, 'semiminor_axis', 'semiminor_sigma'),
+            _apstats_float(aperstats, 'orientation'),
+            aperstats.eccentricity,
+            aperstats.sum / aperstats.sum_err,
+            aperstats.sum, aperstats.sum_err,
+            _apstats_float(aperstats, 'x_centroid', 'xcentroid'),
+            _apstats_float(aperstats, 'y_centroid', 'ycentroid'),
+            np.sqrt(covx), np.sqrt(covy),
+        ])
     
     return(apertable)
 
@@ -424,9 +463,8 @@ def run_photometry(img_file, epsf, fwhm, threshold, shape, stars):
             init_params=stars_tbl)
 
         # Also generate a residual image for quality control
-        residual_image = photometry.make_residual_image(
-            image, psf_shape=(shape, shape), include_localbkg=True
-        )
+        residual_image = _make_psf_residual_image(
+            photometry, image, shape)
     else:
         # photutils 1.x: BasicPSFPhotometry (no per-pixel error support)
         group_maker = DAOGroup(crit_separation=max(float(fwhm), 2.0))
