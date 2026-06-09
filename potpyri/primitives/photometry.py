@@ -11,10 +11,19 @@ from photutils.aperture import CircularAperture
 from photutils.detection import DAOStarFinder
 from photutils.psf import EPSFBuilder
 from photutils.psf import extract_stars
-from photutils.psf import PSFPhotometry
+try:
+    # photutils >= 2.x
+    from photutils.psf import PSFPhotometry  # type: ignore
+    _HAS_PSF_PHOTOMETRY = True
+except Exception:  # pragma: no cover (depends on photutils version)
+    # photutils 1.x fallback
+    from photutils.psf import BasicPSFPhotometry, DAOGroup  # type: ignore
+    from photutils.background import MMMBackground  # type: ignore
+    _HAS_PSF_PHOTOMETRY = False
 
 from astropy.io import fits
 from astropy.io import ascii
+from astropy import units as u
 from astropy.stats import sigma_clipped_stats
 from astropy.stats import SigmaClip
 from astropy.nddata import NDData
@@ -34,7 +43,98 @@ import copy
 import os
 
 import warnings
+import traceback
+
 warnings.filterwarnings('ignore')
+
+
+class PhotometryError(RuntimeError):
+    """PSF/aperture photometry did not complete; stack is missing APPPHOT/PSFPHOT."""
+
+    pass
+
+
+def _normalize_daofind_catalog(stars):
+    """Ensure DAOStarFinder columns use POTPyRI's expected names.
+
+    photutils 3.x renamed ``xcentroid``/``ycentroid`` to ``x_centroid``/
+    ``y_centroid``; older photutils used the legacy names. This keeps downstream
+    code working across versions.
+    """
+    if stars is None:
+        return None
+    if len(stars) == 0:
+        return stars
+    # photutils 3.x wraps DAOStarFinder output in ``DeprecatedColumnQTable``:
+    # ``stars['xcentroid']`` resolves to ``x_centroid``, but
+    # ``row['xcentroid']`` in ``extract_aperture_stats`` can still raise
+    # ``KeyError`` because rows index ``.columns`` without that translation.
+    # Materialize a plain ``Table`` so legacy centroid columns are real columns.
+    if getattr(stars, 'deprecation_map', None):
+        meta = dict(stars.meta) if stars.meta else {}
+        stars = Table(
+            {name: stars[name] for name in list(stars.colnames)},
+            meta=meta,
+            copy=True,
+        )
+    if 'xcentroid' in stars.colnames:
+        return stars
+    # photutils 3.x naming
+    if 'x_centroid' in stars.colnames and 'y_centroid' in stars.colnames:
+        stars['xcentroid'] = np.asarray(
+            u.Quantity(stars['x_centroid'], copy=False).value, dtype=np.float64)
+        stars['ycentroid'] = np.asarray(
+            u.Quantity(stars['y_centroid'], copy=False).value, dtype=np.float64)
+        return stars
+    # Additional centroid aliases seen across photutils / table producers.
+    # We prefer to coerce to plain float columns because downstream code expects
+    # numeric pixel positions (not Quantity mixins).
+    x_aliases = ['xcenter', 'x_center', 'x', 'x_0', 'xpos', 'Xpos']
+    y_aliases = ['ycenter', 'y_center', 'y', 'y_0', 'ypos', 'Ypos']
+    x_col = next((c for c in x_aliases if c in stars.colnames), None)
+    y_col = next((c for c in y_aliases if c in stars.colnames), None)
+    if x_col and y_col:
+        stars['xcentroid'] = np.asarray(
+            u.Quantity(stars[x_col], copy=False).value, dtype=np.float64)
+        stars['ycentroid'] = np.asarray(
+            u.Quantity(stars[y_col], copy=False).value, dtype=np.float64)
+        return stars
+    raise PhotometryError(
+        'DAOStarFinder output is missing centroid columns '
+        '(expected xcentroid/ycentroid, x_centroid/y_centroid, or a known alias). '
+        f'Got columns: {list(stars.colnames)}'
+    )
+
+
+def _apstats_attr(stats, preferred, legacy=None):
+    """Return an ``ApertureStats`` attribute, preferring photutils 3.x names."""
+    for name in (preferred, legacy):
+        if name is None:
+            continue
+        if hasattr(stats, name):
+            return getattr(stats, name)
+    raise AttributeError(
+        f'ApertureStats has neither {preferred!r} nor {legacy!r}'
+    )
+
+
+def _apstats_float(stats, preferred, legacy=None):
+    """Coerce an ``ApertureStats`` scalar (possibly a Quantity) to float."""
+    val = _apstats_attr(stats, preferred, legacy)
+    if isinstance(val, (int, float, np.floating)):
+        return float(val)
+    return float(u.Quantity(val).value)
+
+
+def _make_psf_residual_image(psf_phot, image, shape):
+    """Build PSF residual image across photutils 2.x/3.x keyword names."""
+    kwargs = {'psf_shape': (shape, shape)}
+    try:
+        return psf_phot.make_residual_image(
+            image, **kwargs, include_local_bkg=True)
+    except TypeError:
+        return psf_phot.make_residual_image(
+            image, **kwargs, include_localbkg=True)
 
 
 def create_conv(outfile):
@@ -178,6 +278,13 @@ def extract_aperture_stats(img_data, img_mask, img_error, stars,
         'flux_best', 'flux_best_err','Xpos','Ypos',
         'Xpos_err','Ypos_err')).copy()[:0]
 
+    if len(stars) == 0:
+        return apertable
+
+    # Be defensive: some call sites may pass tables that didn't come from
+    # get_star_catalog() (or DAOStarFinder output with new column names).
+    stars = _normalize_daofind_catalog(stars)
+
     # Estimate a reasonable aperture radius and centroid for sources
     fwhms=[]
     for i,star in enumerate(stars):
@@ -186,9 +293,9 @@ def extract_aperture_stats(img_data, img_mask, img_error, stars,
         aperstats = ApertureStats(img_data, aper, mask=img_mask, 
             error=img_error)
 
-        fwhms.append(aperstats.fwhm.value)
-        stars[i]['xcentroid']=aperstats.xcentroid
-        stars[i]['ycentroid']=aperstats.ycentroid
+        fwhms.append(_apstats_float(aperstats, 'fwhm'))
+        stars[i]['xcentroid'] = _apstats_float(aperstats, 'x_centroid', 'xcentroid')
+        stars[i]['ycentroid'] = _apstats_float(aperstats, 'y_centroid', 'ycentroid')
 
     if aperture_radius<2.5*np.nanmean(fwhms):
         aperture_radius=2.5*np.nanmean(fwhms)
@@ -205,14 +312,22 @@ def extract_aperture_stats(img_data, img_mask, img_error, stars,
         aperstats = ApertureStats(img_data, aper, mask=img_mask, 
             error=img_error)
 
-        covx = np.maximum(aperstats.covar_sigx2.value, 0.0)
-        covy = np.maximum(aperstats.covar_sigy2.value, 0.0)
-        apertable.add_row([aperstats.fwhm.value, aperstats.semimajor_sigma.value,
-            aperstats.semiminor_sigma.value, aperstats.orientation.value,
-            aperstats.eccentricity, aperstats.sum/aperstats.sum_err,
-            aperstats.sum, aperstats.sum_err, aperstats.xcentroid,
-            aperstats.ycentroid, np.sqrt(covx),
-            np.sqrt(covy)])
+        covx = np.maximum(
+            _apstats_float(aperstats, 'covariance_xx', 'covar_sigx2'), 0.0)
+        covy = np.maximum(
+            _apstats_float(aperstats, 'covariance_yy', 'covar_sigy2'), 0.0)
+        apertable.add_row([
+            _apstats_float(aperstats, 'fwhm'),
+            _apstats_float(aperstats, 'semimajor_axis', 'semimajor_sigma'),
+            _apstats_float(aperstats, 'semiminor_axis', 'semiminor_sigma'),
+            _apstats_float(aperstats, 'orientation'),
+            aperstats.eccentricity,
+            aperstats.sum / aperstats.sum_err,
+            aperstats.sum, aperstats.sum_err,
+            _apstats_float(aperstats, 'x_centroid', 'xcentroid'),
+            _apstats_float(aperstats, 'y_centroid', 'ycentroid'),
+            np.sqrt(covx), np.sqrt(covy),
+        ])
     
     return(apertable)
 
@@ -257,7 +372,7 @@ def generate_epsf(img_file, x, y, size=11, oversampling=2, maxiters=11,
         print(f'Extracted {len(stars)} stars.  Building EPSF...')
 
     epsf_builder = EPSFBuilder(oversampling=oversampling,
-        maxiters=maxiters, progress_bar=True, smoothing_kernel='quadratic',
+        maxiters=maxiters, progress_bar=False, smoothing_kernel='quadratic',
         sigma_clip=SigmaClip(sigma=5, sigma_lower=5, sigma_upper=5, 
             maxiters=20, cenfunc='median', stdfunc='std', grow=False))
 
@@ -340,15 +455,47 @@ def run_photometry(img_file, epsf, fwhm, threshold, shape, stars):
     stars_tbl['flux_0'] = stars['flux_best']
     stars_tbl['local_bkg'] = np.array([0.]*len(stars))
 
-    photometry = PSFPhotometry(psf_model=psf, fit_shape=(shape,shape),
-        aperture_radius=int(shape*1.5), progress_bar=True)
+    if _HAS_PSF_PHOTOMETRY:
+        photometry = PSFPhotometry(psf_model=psf, fit_shape=(shape, shape),
+            aperture_radius=int(shape*1.5), progress_bar=False)
 
-    result_tab = photometry(image, mask=mask, error=error,
-        init_params=stars_tbl)
+        result_tab = photometry(image, mask=mask, error=error,
+            init_params=stars_tbl)
 
-    # Also generate a residual image for quality control
-    residual_image = photometry.make_residual_image(image, 
-        psf_shape=(shape, shape), include_localbkg=True)
+        # Also generate a residual image for quality control
+        residual_image = _make_psf_residual_image(
+            photometry, image, shape)
+    else:
+        # photutils 1.x: BasicPSFPhotometry (no per-pixel error support)
+        group_maker = DAOGroup(crit_separation=max(float(fwhm), 2.0))
+        bkg_estimator = MMMBackground()
+        photometry = BasicPSFPhotometry(
+            group_maker=group_maker,
+            bkg_estimator=bkg_estimator,
+            psf_model=psf,
+            fitshape=(shape, shape),
+            aperture_radius=int(shape * 1.5),
+        )
+        result_tab = photometry(image, mask=mask, init_guesses=stars_tbl, progress_bar=False)
+        residual_image = photometry.get_residual_image()
+
+        # Normalize output column names to match newer photutils expectations.
+        if 'flux_err' not in result_tab.colnames and 'flux_unc' in result_tab.colnames:
+            result_tab.rename_column('flux_unc', 'flux_err')
+        if 'x_err' not in result_tab.colnames and 'x_unc' in result_tab.colnames:
+            result_tab.rename_column('x_unc', 'x_err')
+        if 'y_err' not in result_tab.colnames and 'y_unc' in result_tab.colnames:
+            result_tab.rename_column('y_unc', 'y_err')
+
+        # If uncertainties are not provided, estimate something finite so downstream
+        # filtering doesn't drop all sources.
+        if 'flux_err' not in result_tab.colnames:
+            flux_fit = np.asarray(result_tab['flux_fit'], dtype=float)
+            result_tab['flux_err'] = np.sqrt(np.maximum(np.abs(flux_fit), 1.0))
+        if 'x_err' not in result_tab.colnames:
+            result_tab['x_err'] = np.full(len(result_tab), 0.1, dtype=float)
+        if 'y_err' not in result_tab.colnames:
+            result_tab['y_err'] = np.full(len(result_tab), 0.1, dtype=float)
 
     # Mask results table for sources with bad flux error, fit flux, or centroid
     mask = ~np.isnan(result_tab['flux_err'])
@@ -389,9 +536,22 @@ def get_star_catalog(img_data, img_mask, img_error, fwhm_init=5.0,
         Star table with centroid, flux, fwhm, flux_best, etc.
     """
 
-    # Construct the finder with input FWHM and threshold
-    daofind = DAOStarFinder(fwhm=fwhm_init, threshold=threshold,
-        exclude_border=True, min_separation=fwhm_init)
+    # Construct the finder with input FWHM and threshold.
+    # photutils has changed DAOStarFinder kwargs across versions (e.g. older
+    # releases do not accept min_separation).
+    try:
+        daofind = DAOStarFinder(
+            fwhm=fwhm_init,
+            threshold=threshold,
+            exclude_border=True,
+            min_separation=fwhm_init,
+        )
+    except TypeError:  # pragma: no cover (depends on photutils version)
+        daofind = DAOStarFinder(
+            fwhm=fwhm_init,
+            threshold=threshold,
+            exclude_border=True,
+        )
 
     # Get initial set of stars in image with iraffind
     if log:
@@ -402,11 +562,26 @@ def get_star_catalog(img_data, img_mask, img_error, fwhm_init=5.0,
     # Do the finding...
     stars = daofind(img_data, mask=img_mask)
 
+    if stars is None:
+        raise PhotometryError(
+            'DAOStarFinder returned no source table (None): no detections passed '
+            'DAOStarFinder quality cuts, or the image is shallow / heavily masked. '
+            'Try a lower detection threshold or different fwhm_init.'
+        )
+
+    stars = _normalize_daofind_catalog(stars)
+
     # Ignore stars whose peak is below the background-subtracted level
     mask = stars['peak'] > 0.
     stars = stars[mask]
 
     stars.sort('flux')
+
+    # Limit the number of stars passed into the (expensive) ApertureStats loops.
+    # We keep the brightest sources, which are the most useful for PSF building.
+    max_sources = 2000
+    if len(stars) > max_sources:
+        stars = stars[-max_sources:]
 
     # Extract the aperture stats from each star and append to the output catalog
     stats = extract_aperture_stats(img_data, img_mask, img_error, stars, 
@@ -470,6 +645,13 @@ def do_phot(img_file,
     else:
         print(f'Found {len(stars)} stars')
 
+    if len(stars) == 0:
+        raise PhotometryError(
+            'Star detection returned zero sources after DAOStarFinder and peak>0 '
+            'cut. Check image depth, MASK coverage, ERROR array, fwhm_init, or '
+            'lower the photometry S/N threshold (phot_sn_max / photloop).'
+        )
+
     med_sharp = np.median(stars['sharpness'])
     med_round = np.median(stars['roundness1'])
     std_sharp = np.std(stars['sharpness'])
@@ -495,6 +677,12 @@ def do_phot(img_file,
 
     fwhm = float('%.4f'%fwhm)
     std_fwhm = float('%.4f'%std_fwhm)
+
+    if len(fwhm_stars) == 0:
+        raise PhotometryError(
+            'No stars left after sharpness/roundness/FWHM sigma-clipping for ePSF '
+            'construction. Try a larger fwhm_init or lower S/N thresholds.'
+        )
     
     if log:
         log.info(f'Masked to {len(fwhm_stars)} stars based on sharpness, roundness, FWHM')
@@ -516,6 +704,13 @@ def do_phot(img_file,
         log.info(f'Masked to {len(bright)} PSF stars based on flux.')
     else:
         print(f'Masked to {len(bright)} PSF stars based on flux.')
+
+    if len(bright) == 0:
+        raise PhotometryError(
+            'No stars passed S/N cuts for ePSF building (bright catalog empty after '
+            'PSF-star selection). Lower snthresh_psf / photometry S/N or inspect '
+            'image quality and MASK.'
+        )
 
     metadata['NPSFSTAR']=len(bright)
 
@@ -549,6 +744,11 @@ def do_phot(img_file,
 
     mask = (stars['signal_to_noise'] > star_param['snthresh_final'])
     final_stars = stars[mask]
+    if len(final_stars) == 0:
+        raise PhotometryError(
+            f"No stars above snthresh_final={star_param['snthresh_final']} for PSF "
+            'fitting. Lower the photometry S/N threshold (photloop phot_sn_*).'
+        )
 
     photometry, residual_image = run_photometry(img_file, epsf, fwhm, 
         star_param['snthresh_final'], size, final_stars)
@@ -574,7 +774,7 @@ def do_phot(img_file,
         'flux_err','SN','FWHM','sky','RA','Dec']
     sigfig=[4,4,4,4,4,4,4,4,4,4,4,7,7]
 
-    final_stars = final_stars[*colnames]
+    final_stars = final_stars[colnames]
     for col,sig in zip(colnames, sigfig):
         final_stars[col] = np.array([float(f'%.{sig}f'%val) 
             for val in final_stars[col].data])
@@ -626,7 +826,7 @@ def do_phot(img_file,
         'flux_err','SN','FWHM','sky','RA','Dec']
     sigfig=[4,4,4,4,4,4,4,4,4,4,4,7,7]
 
-    photometry = photometry[*colnames]
+    photometry = photometry[colnames]
     for col,sig in zip(colnames, sigfig):
         photometry[col] = np.array([float(f'%.{sig}f'%val) 
             for val in photometry[col].data])
@@ -704,20 +904,69 @@ def photloop(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
     -------
     None
         Stack FITS is updated in place when do_phot succeeds.
+
+    Raises
+    ------
+    PhotometryError
+        If every S/N attempt fails (no APPPHOT written).
     """
+    if phot_sn_max <= phot_sn_min:
+        raise PhotometryError(
+            f'phot_sn_max ({phot_sn_max}) must be greater than phot_sn_min ({phot_sn_min}).'
+        )
+
     signal_to_noise = phot_sn_max
+    last_exc = None
+    sn_tried = []
 
-    epsf = None ; fwhm = None
     while signal_to_noise > phot_sn_min:
+        sn_tried.append(signal_to_noise)
+        if log:
+            log.info(
+                f'Photometry: trying S/N threshold={signal_to_noise} '
+                f'(fwhm_init={fwhm_init}, stack={stack})'
+            )
+        else:
+            print(
+                f'Photometry: trying S/N threshold={signal_to_noise} '
+                f'(fwhm_init={fwhm_init})'
+            )
 
-        if log: log.info(f'Trying PSF generation with S/N={signal_to_noise}')
-        star_param = {'snthresh_psf': signal_to_noise*2.0,
+        star_param = {'snthresh_psf': signal_to_noise * 2.0,
                       'fwhm_init': fwhm_init,
                       'snthresh_final': signal_to_noise}
         try:
-            do_phot(stack, star_param=star_param) 
+            do_phot(stack, star_param=star_param, log=log)
         except Exception as e:
-            log.error(e)
+            last_exc = e
+            if log:
+                log.exception(
+                    'Photometry attempt failed for S/N threshold=%s: %s',
+                    signal_to_noise, e,
+                )
+            else:
+                traceback.print_exc()
             signal_to_noise = signal_to_noise / 2.0
             continue
-        break
+
+        if log:
+            log.info(
+                f'Photometry finished successfully at S/N threshold={signal_to_noise} '
+                f'(APPPHOT written to {stack})'
+            )
+        else:
+            print(f'Photometry succeeded at S/N threshold={signal_to_noise}')
+        return
+
+    msg = (
+        f'Photometry failed for {stack!r}: no successful run after trying S/N '
+        f'thresholds {sn_tried}. The stack has no APPPHOT extension, so downstream '
+        f'zeropoint fitting will fail. Last error: {last_exc!r}. '
+        f'Try lowering --phot-sn-min (currently {phot_sn_min}), raising '
+        f'--phot-sn-max, adjusting --fwhm-init, or inspect SCI/MASK/ERROR and WCS.'
+    )
+    if log:
+        log.error(msg)
+    else:
+        print(msg, flush=True)
+    raise PhotometryError(msg) from last_exc

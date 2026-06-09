@@ -81,23 +81,31 @@ def resolve_relative_path(shared_folder_url, relative_path):
 
     def _parse_google_drive_file(url, content):
         folder_soup = bs4.BeautifulSoup(content, features="html.parser")
-        encoded_data = None
+        folder_arr = None
         for script in folder_soup.select("script"):
             inner_html = script.decode_contents()
-            if "_DRIVE_ivd" in inner_html:
-                regex_iter = re.compile(r"'((?:[^'\\]|\\.)*)'").finditer(inner_html)
+            # Drive embeds folder listing in escaped JSON; marker string has changed
+            # over time (_DRIVE_ivd, _DRIVE_ivdc, etc.). Do not assume the first
+            # quoted string is JSON—Google may inject short quoted tokens first.
+            if "_DRIVE_ivd" not in inner_html:
+                continue
+            for m in re.compile(r"'((?:[^'\\]|\\.)*)'").finditer(inner_html):
+                encoded_data = m.group(1)
                 try:
-                    encoded_data = next(itertools.islice(regex_iter, 1, None)).group(1)
-                except StopIteration:
-                    raise RuntimeError("Couldn't find the folder encoded JS string")
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings("ignore", category=DeprecationWarning)
+                        decoded = encoded_data.encode("utf-8").decode("unicode_escape")
+                    if not decoded.strip().startswith("["):
+                        continue
+                    folder_arr = json.loads(decoded)
+                    break
+                except (json.JSONDecodeError, UnicodeDecodeError, UnicodeEncodeError):
+                    continue
+            if folder_arr is not None:
                 break
-        if encoded_data is None:
-            raise RuntimeError("Cannot retrieve folder info")
+        if folder_arr is None:
+            raise RuntimeError("Cannot retrieve folder info (no valid Drive JSON in page scripts)")
 
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=DeprecationWarning)
-            decoded = encoded_data.encode("utf-8").decode("unicode_escape")
-        folder_arr = json.loads(decoded)
         folder_contents = [] if folder_arr[0] is None else folder_arr[0]
 
         sep = " - "

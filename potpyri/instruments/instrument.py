@@ -37,6 +37,52 @@ _CAL_HEADER_WCS_KEYS = (
 )
 
 
+def fix_deprecated_wcs_header_cards(header):
+    """Normalize WCS-related FITS cards before :class:`~astropy.wcs.WCS` parses the header.
+
+    Archive and Gemini raw frames often use deprecated ``RADECSYS`` instead of
+    ``RADESYS``, and leave ``MJD-OBS`` in a form that makes WCSLib run ``datfix``
+    and emit ``FITSFixedWarning``. Updating the header in place avoids those
+    warnings without globally filtering them.
+
+    Parameters
+    ----------
+    header : astropy.io.fits.Header
+        Header to modify in place (pass a copy if the on-disk HDU must be
+        unchanged).
+    """
+    if header is None:
+        return
+
+    if 'RADECSYS' in header:
+        if 'RADESYS' not in header:
+            header['RADESYS'] = str(header['RADECSYS']).strip()
+        try:
+            del header['RADECSYS']
+        except KeyError:
+            pass
+
+    if 'RADESYS' in header:
+        v = header['RADESYS']
+        if isinstance(v, str):
+            header['RADESYS'] = v.strip()
+
+    if 'MJD-OBS' in header:
+        try:
+            mjd = float(header['MJD-OBS'])
+            t = Time(mjd, format='mjd', scale='utc')
+            isot = t.isot
+            if 'T' in isot:
+                date_part, time_part = isot.split('T', 1)
+                header['DATE-OBS'] = date_part
+                header['TIME-OBS'] = time_part
+            # Having both MJD-OBS and DATE-OBS can still trigger WCSLib datfix;
+            # remove MJD-OBS from this in-memory header once UTC date/time are set.
+            del header['MJD-OBS']
+        except (ValueError, TypeError, KeyError):
+            pass
+
+
 def _sanitize_calibration_header(header):
     """Remove WCS and coordinate keywords from a header so it can be written safely.
 
@@ -65,7 +111,9 @@ def _read_calibration_ccd(path, unit, hdu_index=0):
     """
     with fits.open(path) as hdu_list:
         hdu = hdu_list[hdu_index]
-        return CCDData(hdu.data, meta=hdu.header.copy(), unit=unit, wcs=None)
+        meta = hdu.header.copy()
+        fix_deprecated_wcs_header_cards(meta)
+        return CCDData(hdu.data, meta=meta, unit=unit, wcs=None)
 
 
 class Instrument(object):
@@ -946,8 +994,23 @@ class Instrument(object):
 
             skys.append(sky_full)
 
-        msky = ccdproc.combine(skys, method='median', sigma_clip=True,
-            clip_extrema=True)
+        n_sky = len(skys)
+        if n_sky == 0:
+            if log:
+                log.error('create_sky: no valid sky frames after masking; skipping master sky.')
+            return
+
+        # Per-frame masking already sigma-clips; stacking sigma_clip needs >=3
+        # samples per pixel to be stable. With 1–2 frames it produces all-NaN
+        # slices in ccdproc (RuntimeWarning) and no real outlier rejection gain.
+        if n_sky == 1:
+            msky = skys[0].copy()
+        elif n_sky == 2:
+            msky = ccdproc.combine(
+                skys, method='median', sigma_clip=False, clip_extrema=False)
+        else:
+            msky = ccdproc.combine(
+                skys, method='median', sigma_clip=True, clip_extrema=True)
 
         # Robust masking of combined master sky: iterative sigma clipping
         # for accurate median/std, then mask excess flux and defects
@@ -959,6 +1022,10 @@ class Instrument(object):
             sigma_lower=3.0,
             maxiters=msky_maxiters,
         )
+        if not np.isfinite(stddev) or stddev <= 0:
+            stddev = float(np.nanstd(msky.data, dtype=float))
+        if not np.isfinite(stddev) or stddev <= 0:
+            stddev = 1e-12
         mask_high = msky.data > median + msky_n_sigma_high * stddev
         mask_low = msky.data < median - msky_n_sigma_low * stddev
         msky.data[mask_high] = 1.0
@@ -1022,10 +1089,6 @@ class Instrument(object):
         np.ndarray
             Boolean mask (True = bad).
         """
-        # Get image statistics
-        mean, median, stddev = sigma_clipped_stats(input_data.data)
-        
-        # Add to input mask
         add_mask = np.isnan(input_data.data)
         add_mask = add_mask  | np.isinf(input_data.data)
         add_mask = add_mask  | (input_data.data==0.0) 
@@ -1150,7 +1213,12 @@ class Instrument(object):
                 final_img.header['SKYBKG'] = 0.0
 
             # Apply final masking based on excessively negative values
-            mean, median, stddev = sigma_clipped_stats(final_img.data)
+            finite = np.isfinite(final_img.data)
+            if np.any(finite):
+                mean, median, stddev = sigma_clipped_stats(
+                    final_img.data, mask=~finite)
+            else:
+                mean = median = stddev = np.nan
             mask = final_img.data < median - 10 * stddev
             final_img.data[mask] = np.nan
             final_img.mask = final_img.mask | mask

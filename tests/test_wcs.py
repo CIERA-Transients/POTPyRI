@@ -1,4 +1,4 @@
-"""Tests for solve_wcs (solve_astrometry, align_to_gaia on GMOS stack) and helpers (clean_up_astrometry)."""
+"""Tests for solve_wcs (solve_astrometry, fine_align_wcs on GMOS stack) and helpers."""
 import os
 
 import numpy as np
@@ -17,9 +17,8 @@ from tests.utils import download_gdrive_file
 def test_wcs(tmp_path):
     """Check RADISP/DEDISP and scale from a FITS file (no network required).
 
-    Uses a minimal FITS file with RADISP/DEDISP set as align_to_gaia would
-    write them, so the test passes consistently without being skipped.
-    Full solve_astrometry + align_to_gaia flow is covered by test_wcs_integration.
+    Uses a minimal FITS file with RADISP/DEDISP as fine_align_wcs would write.
+    Full solve_astrometry + fine_align_wcs flow is covered by test_wcs_integration.
     """
     instrument = 'GMOS'
     tel = instrument_getter(instrument)
@@ -27,7 +26,7 @@ def test_wcs(tmp_path):
     # Must be < 0.5 and < tel.pixscale so disp/pixscale < 1 (GMOS pixscale ≈ 0.08).
     ra_disp_val = dec_disp_val = 0.05
 
-    # Create minimal FITS with RADISP/DEDISP as align_to_gaia writes them
+    # Create minimal FITS with RADISP/DEDISP as fine alignment writes them
     file_path = os.path.join(tmp_path, 'test_solved.fits')
     hdu = fits.PrimaryHDU(data=np.zeros((50, 50), dtype=np.float32))
     hdu.header['NAXIS1'] = 50
@@ -48,7 +47,7 @@ def test_wcs(tmp_path):
 
 @pytest.mark.integration
 def test_wcs_integration(tmp_path):
-    """Full pipeline: solve_astrometry and align_to_gaia on GMOS slice (requires network and astrometry index)."""
+    """Full pipeline: solve_astrometry and fine_align_wcs on GMOS slice (requires network and index)."""
     instrument = 'GMOS'
     file_list_name = 'files.txt'
 
@@ -74,7 +73,7 @@ def test_wcs_integration(tmp_path):
 
     try:
         solve_wcs.solve_astrometry(file_path, tel, binn, paths, index=astm_path, log=log)
-        solve_wcs.align_to_gaia(file_path, tel, radius=0.5, log=log)
+        solve_wcs.fine_align_wcs(file_path, tel, catalog='gaia', radius=0.5, log=log)
     except (requests.exceptions.ConnectionError, OSError) as e:
         pytest.skip(f"VizieR/network unreachable (Gaia catalog): {e}")
     finally:
@@ -112,8 +111,8 @@ def test_clean_up_astrometry(tmp_path):
         assert not os.path.exists(path), f'{f} should have been removed'
 
 
-def test_align_to_gaia_fallback_when_no_gaia_catalog(tmp_path, monkeypatch):
-    """align_to_gaia falls back to coarse WCS and returns True when Gaia catalog is unavailable."""
+def test_fine_align_wcs_fallback_when_no_catalog(tmp_path, monkeypatch):
+    """fine_align_wcs falls back to coarse WCS when the reference catalog is unavailable."""
     file_path = os.path.join(tmp_path, 'test_no_gaia.fits')
     hdu = fits.PrimaryHDU(data=np.zeros((40, 40), dtype=np.float32))
     hdu.header['NAXIS1'] = 40
@@ -130,18 +129,71 @@ def test_align_to_gaia_fallback_when_no_gaia_catalog(tmp_path, monkeypatch):
     hdu.header['CD2_2'] = 2.2e-5
     hdu.writeto(file_path, overwrite=True)
 
-    monkeypatch.setattr(solve_wcs, 'get_gaia_catalog', lambda *args, **kwargs: None)
+    monkeypatch.setattr(solve_wcs, 'get_fine_align_reference_catalog',
+        lambda *args, **kwargs: None)
     tel = instrument_getter('GMOS')
-    ok = solve_wcs.align_to_gaia(file_path, tel, log=None)
+    ok = solve_wcs.fine_align_wcs(file_path, tel, catalog='gaia', log=None)
     assert ok is True
     with fits.open(file_path) as out:
         assert out[0].header['RADISP'] == 1.0
         assert out[0].header['DEDISP'] == 1.0
-        assert 'GAIAFAIL' in out[0].header
+        assert 'ALGNFAIL' in out[0].header
 
 
-def test_align_to_gaia_fallback_when_no_sextractor_sources(tmp_path, monkeypatch):
-    """align_to_gaia falls back and returns True when SExtractor has no detections."""
+def test_validate_existing_wcs_header_cd_matrix():
+    """validate_existing_wcs_header accepts a minimal TAN WCS with CD matrix."""
+    hdu = fits.PrimaryHDU(data=np.zeros((40, 40), dtype=np.float32))
+    hdu.header['NAXIS1'] = 40
+    hdu.header['NAXIS2'] = 40
+    hdu.header['CRPIX1'] = 20.0
+    hdu.header['CRPIX2'] = 20.0
+    hdu.header['CRVAL1'] = 30.0
+    hdu.header['CRVAL2'] = -30.0
+    hdu.header['CTYPE1'] = 'RA---TAN'
+    hdu.header['CTYPE2'] = 'DEC--TAN'
+    hdu.header['CD1_1'] = -2.2e-5
+    hdu.header['CD1_2'] = 0.0
+    hdu.header['CD2_1'] = 0.0
+    hdu.header['CD2_2'] = 2.2e-5
+    ok, reason = solve_wcs.validate_existing_wcs_header(hdu.header)
+    assert ok is True
+    assert reason == ''
+
+
+def test_validate_existing_wcs_header_cdelt():
+    """validate_existing_wcs_header accepts CDELT1/CDELT2 without CD matrix."""
+    hdu = fits.PrimaryHDU(data=np.zeros((40, 40), dtype=np.float32))
+    hdu.header['NAXIS1'] = 40
+    hdu.header['NAXIS2'] = 40
+    hdu.header['CRPIX1'] = 20.0
+    hdu.header['CRPIX2'] = 20.0
+    hdu.header['CRVAL1'] = 30.0
+    hdu.header['CRVAL2'] = -30.0
+    hdu.header['CTYPE1'] = 'RA---TAN'
+    hdu.header['CTYPE2'] = 'DEC--TAN'
+    hdu.header['CDELT1'] = -2.2e-5
+    hdu.header['CDELT2'] = 2.2e-5
+    ok, reason = solve_wcs.validate_existing_wcs_header(hdu.header)
+    assert ok is True
+    assert reason == ''
+
+
+def test_validate_existing_wcs_header_rejects_missing_crval():
+    """validate_existing_wcs_header fails when CRVAL keywords are absent."""
+    hdu = fits.PrimaryHDU(data=np.zeros((10, 10), dtype=np.float32))
+    hdu.header['CTYPE1'] = 'RA---TAN'
+    hdu.header['CTYPE2'] = 'DEC--TAN'
+    hdu.header['CRPIX1'] = 5.0
+    hdu.header['CRPIX2'] = 5.0
+    hdu.header['CDELT1'] = -1e-4
+    hdu.header['CDELT2'] = 1e-4
+    ok, reason = solve_wcs.validate_existing_wcs_header(hdu.header)
+    assert ok is False
+    assert 'CRVAL' in reason
+
+
+def test_fine_align_wcs_fallback_when_no_sextractor_sources(tmp_path, monkeypatch):
+    """fine_align_wcs falls back when SExtractor has no detections."""
     file_path = os.path.join(tmp_path, 'test_no_sex.fits')
     hdu = fits.PrimaryHDU(data=np.zeros((40, 40), dtype=np.float32))
     hdu.header['NAXIS1'] = 40
@@ -165,13 +217,14 @@ def test_align_to_gaia_fallback_when_no_sextractor_sources(tmp_path, monkeypatch
     cat['PSS'] = [1.0] * 8
     cat['Plx'] = [1.0] * 8
     cat['PM'] = [1.0] * 8
-    monkeypatch.setattr(solve_wcs, 'get_gaia_catalog', lambda *args, **kwargs: cat)
+    monkeypatch.setattr(solve_wcs, 'get_fine_align_reference_catalog',
+        lambda *args, **kwargs: cat)
     monkeypatch.setattr(solve_wcs.photometry, 'run_sextractor', lambda *args, **kwargs: None)
 
     tel = instrument_getter('GMOS')
-    ok = solve_wcs.align_to_gaia(file_path, tel, log=None)
+    ok = solve_wcs.fine_align_wcs(file_path, tel, catalog='gaia', log=None)
     assert ok is True
     with fits.open(file_path) as out:
         assert out[0].header['RADISP'] == 1.0
         assert out[0].header['DEDISP'] == 1.0
-        assert 'GAIAFAIL' in out[0].header
+        assert 'ALGNFAIL' in out[0].header

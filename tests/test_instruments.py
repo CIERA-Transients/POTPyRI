@@ -14,9 +14,22 @@ from potpyri.instruments.instrument import (
     Instrument,
     _sanitize_calibration_header,
     _read_calibration_ccd,
+    fix_deprecated_wcs_header_cards,
 )
 from potpyri.utils import options
 from potpyri.utils import logger
+
+
+def test_fix_deprecated_wcs_header_cards_radecsys_and_mjd():
+    """fix_deprecated_wcs_header_cards migrates RADECSYS and DATE/TIME from MJD-OBS."""
+    h = fits.Header()
+    h['RADECSYS'] = 'FK5 '
+    h['MJD-OBS'] = 60480.0
+    fix_deprecated_wcs_header_cards(h)
+    assert 'RADECSYS' not in h
+    assert h['RADESYS'] == 'FK5'
+    assert 'DATE-OBS' in h and 'TIME-OBS' in h
+    assert 'MJD-OBS' not in h
 
 
 def test_instrument_getter_unsupported_raises():

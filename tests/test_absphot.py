@@ -53,6 +53,28 @@ def test_absphot(tmp_path):
     assert header['ZPTMUCER']<0.01
 
 
+def test_find_zeropoint_missing_appphot(tmp_path):
+    """Stack without APPPHOT returns False and does not raise KeyError."""
+    from astropy.io import fits
+
+    data = np.ones((8, 8), dtype=np.float32)
+    mask = np.zeros((8, 8), dtype=np.uint8)
+    err = np.ones((8, 8), dtype=np.float32)
+    hdr = fits.Header()
+    hdr['FILTER'] = 'r'
+    hdr['EXTNAME'] = 'SCI'
+    ph = fits.PrimaryHDU(data=data, header=hdr)
+    ph.name = 'SCI'
+    mh = fits.ImageHDU(data=mask, name='MASK')
+    eh = fits.ImageHDU(data=err, name='ERROR')
+    path = tmp_path / 'nostack.fits'
+    fits.HDUList([ph, mh, eh]).writeto(path, overwrite=True)
+
+    tel = instrument_getter('BINOSPEC')
+    ok = absphot.find_zeropoint(str(path), tel, log=None)
+    assert ok is False
+
+
 def test_get_zeropoint():
     """get_zeropoint returns (zpt, zpterr) consistent with mag = zpt - 2.5*log10(flux)."""
     cal = absphot.absphot()

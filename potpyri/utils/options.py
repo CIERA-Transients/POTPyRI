@@ -90,10 +90,30 @@ def init_options():
         default=False,
         action='store_true',
         help='Tell the pipeline to skip cosmic ray detection.')
+    params.add_argument('--skip-fine-align',
+        default=False,
+        action='store_true',
+        dest='skip_fine_align',
+        help='Skip fine WCS alignment (catalog matching after astrometry.net).')
     params.add_argument('--skip-gaia',
         default=False,
         action='store_true',
-        help='Tell the pipeline to skip Gaia alignment during WCS.')
+        dest='skip_fine_align',
+        help='Deprecated alias for --skip-fine-align.')
+    params.add_argument('--fine-align-catalog',
+        type=str,
+        default='gaia',
+        choices=['gaia', 'panstarrs', 'sdss', 'legacy', '2mass', 'skymapper'],
+        dest='fine_align_catalog',
+        help='Reference catalog for fine WCS alignment after astrometry.net: gaia (default), '
+             'panstarrs, sdss (SDSS V/147), legacy, 2mass, or skymapper.')
+    params.add_argument('--skip-external-astrometry',
+        default=False,
+        action='store_true',
+        dest='skip_external_astrometry',
+        help='Do not run astrometry.net or fine catalog alignment; require a valid WCS '
+             'already in the FITS header (CTYPE/CRVAL/CRPIX and CD or CDELT keywords). '
+             'Implies --skip-fine-align.')
     params.add_argument('--keep-all-astro',
         default=False,
         action='store_true',
@@ -128,8 +148,14 @@ def add_options():
 
     return(args)
 
-def test_for_dependencies():
+def test_for_dependencies(skip_external_astrometry=False):
     """Check that astrometry.net and Source Extractor are on the system path.
+
+    Parameters
+    ----------
+    skip_external_astrometry : bool, optional
+        If True, do not require astrometry.net (solve-field); useful when using
+        only header WCS with ``--skip-external-astrometry``.
 
     Raises
     ------
@@ -137,14 +163,15 @@ def test_for_dependencies():
         If solve-field (astrometry.net) or sex (sextractor) is not found
         or does not report expected help text.
     """
-    p = subprocess.run(['solve-field','-h'], capture_output=True)
-    data = p.stdout.decode().lower()
+    if not skip_external_astrometry:
+        p = subprocess.run(['solve-field','-h'], capture_output=True)
+        data = p.stdout.decode().lower()
 
-    # Check for astrometry.net in output
-    if 'astrometry.net' not in data:
-        raise Exception(f'''Astrometry.net is a dependency of POTPyRI.  Download
-            and install the binaries and required index files from:
-            https://astrometry.net/use.html''')
+        # Check for astrometry.net in output
+        if 'astrometry.net' not in data:
+            raise Exception(f'''Astrometry.net is a dependency of POTPyRI.  Download
+                and install the binaries and required index files from:
+                https://astrometry.net/use.html''')
 
     p = subprocess.run(['sex','-h'], capture_output=True)
     data = p.stderr.decode().lower()

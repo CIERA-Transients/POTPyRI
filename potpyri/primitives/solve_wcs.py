@@ -10,14 +10,10 @@ import numpy as np
 import subprocess
 import os
 import progressbar
-import requests
-
 import matplotlib.pyplot as plt
 
 from photutils.aperture import ApertureStats
 from photutils.aperture import CircularAperture
-
-from astroquery.vizier import Vizier
 
 import astropy.units as u
 from astropy.stats import sigma_clipped_stats
@@ -30,7 +26,8 @@ from astropy.utils.exceptions import AstropyWarning
 from astropy.wcs import WCS
 from astropy.wcs.utils import fit_wcs_from_points
 
-# Internal dependency
+# Internal dependencies
+from potpyri.utils import catalogs
 from potpyri.utils import utilities
 from potpyri.primitives import photometry
 
@@ -38,25 +35,25 @@ from potpyri.primitives import photometry
 import warnings
 warnings.simplefilter('ignore', category=AstropyWarning)
 
-def _log_gaia(log, level, message):
-    """Small helper to keep Gaia-stage logging consistent."""
+def _log_fine_align(log, level, message):
+    """Small helper to keep fine-alignment logging consistent."""
     if log:
         getattr(log, level)(message)
     else:
         print(message)
 
-def _write_gaia_fallback_header(hdu, file, reason, log=None, disp_arcsec=1.0):
-    """Write fallback astrometric dispersion values when Gaia refinement fails.
+def _write_fine_align_fallback_header(hdu, file, reason, log=None, disp_arcsec=1.0):
+    """Write fallback astrometric dispersion when fine catalog alignment fails.
 
-    This preserves a coarse astrometry.net WCS solution while making the
-    failure mode explicit in the header and logs.
+    Preserves the coarse astrometry.net WCS while recording the failure in the
+    header and logs.
     """
-    _log_gaia(log, 'warning',
-        f'Gaia alignment fallback for {file}: {reason}. '
+    _log_fine_align(log, 'warning',
+        f'Fine alignment fallback for {file}: {reason}. '
         f'Keeping coarse astrometry.net WCS.')
     hdu[0].header['RADISP'] = (disp_arcsec, 'Dispersion in R.A. of WCS [Arcsec]')
     hdu[0].header['DEDISP'] = (disp_arcsec, 'Dispersion in Decl. of WCS [Arcsec]')
-    hdu[0].header['GAIAFAIL'] = (reason[:32], 'Gaia fallback reason')
+    hdu[0].header['ALGNFAIL'] = (reason[:32], 'Fine alignment fallback reason')
     hdu.writeto(file, overwrite=True, output_verify='silentfix')
 
 def _validate_refined_wcs(w, header, tel, log=None):
@@ -86,8 +83,8 @@ def _validate_refined_wcs(w, header, tel, log=None):
     except Exception:
         expected = None
 
-    _log_gaia(log, 'info',
-        f'Gaia WCS diagnostics: scales={scales_arcsec}, anisotropy={aniso:.3f}, det={det:.3e}, expected_scale={expected}')
+    _log_fine_align(log, 'info',
+        f'Fine-align WCS diagnostics: scales={scales_arcsec}, anisotropy={aniso:.3f}, det={det:.3e}, expected_scale={expected}')
 
     # Basic physical sanity
     if min_scale <= 0.0 or max_scale <= 0.0:
@@ -102,78 +99,93 @@ def _validate_refined_wcs(w, header, tel, log=None):
 
     return (True, '')
 
-def get_gaia_catalog(input_file, log=None):
-    """Query Gaia DR3 for stars in the field; return filtered catalog table.
+def validate_existing_wcs_header(header):
+    """Check that a FITS header already defines a usable celestial WCS.
 
-    Uses header RA/DEC to define field; filters by PSS, Plx, PM.
+    Requires CTYPE1, CTYPE2, CRVAL1, CRVAL2, CRPIX1, CRPIX2, and a linear
+    celestial transform via either the CD matrix (CD1_1..CD2_2) or CDELT1
+    and CDELT2 (optionally with PC matrix). Confirms :class:`astropy.wcs.WCS`
+    can parse the header and evaluate pixel-to-world for one point.
 
     Parameters
     ----------
-    input_file : str
-        Path to FITS file; header used for CRVAL1/CRVAL2 or RA/DEC.
-    log : ColoredLogger, optional
-        Logger for progress and errors.
+    header : astropy.io.fits.Header
+        Header to validate (typically primary HDU).
 
     Returns
     -------
-    astropy.table.Table or None or False
-        Filtered Gaia DR3 table (PSS>0.99, Plx<20, PM<10), or None if empty,
-        or False if coordinates could not be parsed.
+    tuple
+        (ok, reason) where *ok* is True if validation passed; *reason* is an
+        empty string on success, or a short message on failure.
+    """
+    required = ('CTYPE1', 'CTYPE2', 'CRVAL1', 'CRVAL2', 'CRPIX1', 'CRPIX2')
+    for k in required:
+        if k not in header:
+            return (False, f'missing keyword {k}')
+    has_cd = all(k in header for k in ('CD1_1', 'CD1_2', 'CD2_1', 'CD2_2'))
+    has_cdelt = 'CDELT1' in header and 'CDELT2' in header
+    if not has_cd and not has_cdelt:
+        return (False, 'need CD1_1..CD2_2 or both CDELT1 and CDELT2')
+    try:
+        w = WCS(header, naxis=2)
+        w.pixel_to_world(1.0, 1.0)
+    except Exception as e:
+        return (False, f'WCS not usable: {e}')
+    return (True, '')
 
-    Raises
-    ------
-    Exception
-        If Gaia query fails after retries.
+def _field_center_from_fits_primary(input_file, log=None):
+    """Parse a field-center SkyCoord from the primary FITS header.
+
+    Returns
+    -------
+    SkyCoord or False
+        ICRS center, or False if RA/Dec could not be parsed.
     """
     with fits.open(input_file) as hdu:
-        data = hdu[0].data
         header = hdu[0].header
-    hkeys = list(header.keys())
 
-    check_pairs = [('CRVAL1','CRVAL2'),('RA','DEC'),('OBJCTRA','OBJCTDEC')]
-    coord = None
-
+    check_pairs = [('CRVAL1', 'CRVAL2'), ('RA', 'DEC'), ('OBJCTRA', 'OBJCTDEC')]
     for pair in check_pairs:
         if pair[0] in header.keys() and pair[1] in header.keys():
             ra = header[pair[0]]
             dec = header[pair[1]]
             coord = utilities.parse_coord(ra, dec)
             if coord:
-                break
+                return coord
 
-    if not coord:
-        if log: log.error(f'Could not parse RA/DEC from header of {input_file}')
-        return(False)
+    if log:
+        log.error(f'Could not parse RA/DEC from header of {input_file}')
+    return False
 
-    vizier = Vizier(columns=['RA_ICRS', 'DE_ICRS', 'Plx', 'PSS','PM'])
-    vizier.ROW_LIMIT = -1
 
-    tries = 0
-    cat = None
-    while tries<4:
-        try:
-            cat = vizier.query_region(coord, width=20 * u.arcmin, 
-                catalog='I/355/gaiadr3')
-            if cat is None:
-                if log: log.error(f'Gaia did not return catalog.  Try #{tries+1}')
-            else:
-                break
-        except requests.exceptions.ReadTimeout:
-            if log: log.error(f'Gaia catalog timeout.  Try #{tries+1}')
-            tries += 1
+def get_fine_align_reference_catalog(input_file, catalog='gaia', radius_deg=0.5,
+    log=None):
+    """Query the configured reference catalog for fine WCS alignment.
 
-    if cat is None:
-        raise Exception('ERROR: could not get Gaia catalog')
+    Parameters
+    ----------
+    input_file : str
+        Path to FITS file; primary header used for field center.
+    catalog : str, optional
+        Catalog key (see :data:`potpyri.utils.catalogs.FINE_ALIGN_CATALOG_CHOICES`).
+        Default is ``'gaia'``.
+    radius_deg : float, optional
+        Half-width of the VizieR query box in degrees. Default 0.5.
+    log : ColoredLogger, optional
+        Logger.
 
-    if len(cat)>0:
-        cat = cat[0]
-    else:
-        return(None)
-
-    mask = (cat['PSS'] > 0.99) & (cat['Plx']<20) & (cat['PM']<10)
-    cat = cat[mask]
-
-    return(cat)
+    Returns
+    -------
+    astropy.table.Table or None or False
+        Table with ``RA_ICRS``, ``DE_ICRS`` in degrees, None if empty or query
+        failed, False if field center could not be parsed from the header.
+    """
+    coord = _field_center_from_fits_primary(input_file, log=log)
+    if coord is False:
+        return False
+    field_width = float(radius_deg) * u.deg
+    return catalogs.fetch_astrometry_reference_table(
+        coord, catalog, field_width, log=log)
 
 def clean_up_astrometry(directory, file, exten):
     """Remove astrometry.net temporary files (.axy, .corr, .solved, .wcs, etc.).
@@ -459,9 +471,9 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
         clean_up_astrometry(directory, file, exten)
         return(False)
 
-def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
-    save_centroids=False, min_gaia_match=7, log=None):
-    """Refine WCS by matching detected sources to Gaia DR3 and fitting WCS.
+def fine_align_wcs(file, tel, catalog='gaia', radius=0.5,
+    max_search_radius=5.0*u.arcsec, save_centroids=False, min_cat_match=7, log=None):
+    """Refine WCS by matching detections to a reference catalog (fine alignment).
 
     Parameters
     ----------
@@ -469,14 +481,19 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
         Path to FITS file with WCS (e.g. after solve_astrometry).
     tel : Instrument
         Instrument instance.
+    catalog : str, optional
+        Reference catalog: ``gaia`` (default), ``panstarrs``, ``sdss``, ``legacy``,
+        ``twomass``, or ``skymapper``. See
+        :data:`potpyri.utils.catalogs.FINE_ALIGN_CATALOG_CHOICES`.
     radius : float, optional
-        Gaia query radius in degrees. Default is 0.5.
+        Catalog query half-width in degrees. Default is 0.5.
     max_search_radius : astropy.units.Quantity, optional
-        Match radius for source-Gaia matching. Default is 5 arcsec.
+        Match radius between detections and catalog positions. Default is 5 arcsec.
     save_centroids : bool, optional
         If True, save centroid table. Default is False.
-    min_gaia_match : int, optional
-        Minimum number of Gaia matches required. Default is 7.
+    min_cat_match : int, optional
+        Minimum number of in-frame catalog sources required before matching.
+        Default is 7.
     log : ColoredLogger, optional
         Logger for progress.
 
@@ -485,64 +502,63 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
     bool
         True if alignment succeeded and WCS was updated, False otherwise.
     """
-    cat = get_gaia_catalog(file, log=log)
+    catalog = catalogs.normalize_fine_align_catalog(catalog)
+    cat = get_fine_align_reference_catalog(
+        file, catalog=catalog, radius_deg=radius, log=log)
 
     with fits.open(file) as hdu:
         header = hdu[0].header
 
         if cat is False:
-            _write_gaia_fallback_header(hdu, file,
+            _write_fine_align_fallback_header(hdu, file,
                 'could not parse coordinate keywords', log=log)
             return(True)
-        if cat is None or len(cat)==0:
-            _write_gaia_fallback_header(hdu, file,
-                'Gaia query returned no alignment stars', log=log)
+        if cat is None or len(cat) == 0:
+            _write_fine_align_fallback_header(hdu, file,
+                f'{catalog} query returned no alignment stars', log=log)
             return(True)
 
-        _log_gaia(log, 'info', f'Got {len(cat)} Gaia DR3 alignment stars')
+        _log_fine_align(log, 'info', f'Got {len(cat)} {catalog} alignment stars')
 
         # Estimate sources that land within the image using WCS from header
         w = WCS(header, relax=True)
         naxis1 = header['NAXIS1']
         naxis2 = header['NAXIS2']
 
-        # Get pixel coordinates of all stars in image
-        gaia_coords = SkyCoord(cat['RA_ICRS'], cat['DE_ICRS'], unit=(u.deg, u.deg))
-        x_pix, y_pix = w.world_to_pixel(gaia_coords)
+        ref_coords = SkyCoord(cat['RA_ICRS'], cat['DE_ICRS'], unit=(u.deg, u.deg))
+        x_pix, y_pix = w.world_to_pixel(ref_coords)
 
-        # Mask to stars that are nominally in image
         mask = (x_pix > 0) & (x_pix < naxis1) & (y_pix > 0) & (y_pix < naxis2)
-        x_pix = x_pix[mask] ; y_pix = y_pix[mask]
-        # Also mask catalog and coordinates
+        x_pix = x_pix[mask]
+        y_pix = y_pix[mask]
         cat = cat[mask]
-        gaia_coords = gaia_coords[mask]
+        ref_coords = ref_coords[mask]
 
-        if cat is None or len(cat)==0:
-            _write_gaia_fallback_header(hdu, file,
-                'no Gaia stars project into image bounds', log=log)
+        if cat is None or len(cat) == 0:
+            _write_fine_align_fallback_header(hdu, file,
+                f'no {catalog} stars project into image bounds', log=log)
             return(True)
 
-        _log_gaia(log, 'info',
-            f'Gaia stars projected into image bounds: {len(cat)} (of {len(mask)})')
+        _log_fine_align(log, 'info',
+            f'{catalog} stars projected into image bounds: {len(cat)}')
 
-        if len(cat)<min_gaia_match:
-            _write_gaia_fallback_header(hdu, file,
-                f'too few in-frame Gaia stars ({len(cat)} < {min_gaia_match})',
+        if len(cat) < min_cat_match:
+            _write_fine_align_fallback_header(hdu, file,
+                f'too few in-frame catalog stars ({len(cat)} < {min_cat_match})',
                 log=log)
             return(True)
 
         sky_cat = photometry.run_sextractor(file, log=log)
         if sky_cat is None or len(sky_cat) == 0:
-            _write_gaia_fallback_header(hdu, file,
-                'Source Extractor returned no sources for Gaia alignment', log=log)
+            _write_fine_align_fallback_header(hdu, file,
+                'Source Extractor returned no sources for fine alignment', log=log)
             return(True)
-        _log_gaia(log, 'info', f'SExtractor sources available for matching: {len(sky_cat)}')
+        _log_fine_align(log, 'info', f'SExtractor sources available for matching: {len(sky_cat)}')
 
-        # Get central coordinate of image based on centroiding
         central_pix = (float(naxis1)/2., float(naxis2)/2.)
         central_coo = w.pixel_to_world(*central_pix)
 
-        _log_gaia(log, 'info', 'Converging on fine WCS solution')
+        _log_fine_align(log, 'info', 'Converging on fine WCS solution')
 
         bar = progressbar.ProgressBar(maxval=10)
         bar.start()
@@ -556,7 +572,7 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
 
             cat_coords = w.pixel_to_world(sky_cat['X_IMAGE'], sky_cat['Y_IMAGE'])
 
-            idx, d2d, d3d = match_coordinates_sky(gaia_coords, cat_coords)
+            idx, d2d, d3d = match_coordinates_sky(ref_coords, cat_coords)
 
             sep_mask = d2d < max_search_radius
             n_match = int(np.sum(sep_mask))
@@ -567,7 +583,7 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
                 n_iter_no_match += 1
                 continue
 
-            sky_coords_match = gaia_coords[sep_mask]
+            sky_coords_match = ref_coords[sep_mask]
             cat_coords_match = sky_cat[idx[sep_mask]]
 
             sip_degree = 0
@@ -600,37 +616,35 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
                 continue
 
         bar.finish()
-        _log_gaia(log, 'info',
-            f'Gaia match summary for {file}: '
+        _log_fine_align(log, 'info',
+            f'Fine-align match summary for {file} ({catalog}): '
             f'best matches={best_n_match} at iter={best_iter}, '
             f'iters with zero matches={n_iter_no_match}/10, '
-            f'min required={min_gaia_match}, match radius={max_search_radius}.')
+            f'min required={min_cat_match}, match radius={max_search_radius}.')
 
         if not succeeded:
-            _write_gaia_fallback_header(hdu, file,
-                'fine WCS fit failed during iterative Gaia matching', log=log)
+            _write_fine_align_fallback_header(hdu, file,
+                'fine WCS fit failed during iterative catalog matching', log=log)
             return(True)
 
-        _log_gaia(log, 'info', f'Solved with SIP degree = {sip_degree}')
+        _log_fine_align(log, 'info', f'Solved with SIP degree = {sip_degree}')
 
         if cat_coords_match is None or len(cat_coords_match)==0:
-            _write_gaia_fallback_header(hdu, file,
-                'zero matched Gaia/SExtractor sources after iterations', log=log)
+            _write_fine_align_fallback_header(hdu, file,
+                'zero matched catalog/SExtractor sources after iterations', log=log)
             return(True)
         else:
-            _log_gaia(log, 'info', f'Matched to {len(cat_coords_match)} coordinates')
+            _log_fine_align(log, 'info', f'Matched to {len(cat_coords_match)} coordinates')
 
-        if len(cat_coords_match)<min_gaia_match:
-            _write_gaia_fallback_header(hdu, file,
-                f'too few matched stars ({len(cat_coords_match)} < {min_gaia_match})',
+        if len(cat_coords_match)<min_cat_match:
+            _write_fine_align_fallback_header(hdu, file,
+                f'too few matched stars ({len(cat_coords_match)} < {min_cat_match})',
                 log=log)
             return(True)
 
-        # If matching collapsed on most iterations and only barely met threshold,
-        # this fit is often unstable; prefer coarse astrometry in that case.
-        if n_iter_no_match >= 8 and len(cat_coords_match) <= (min_gaia_match + 1):
-            _write_gaia_fallback_header(hdu, file,
-                f'unstable Gaia matching (zero-match iters={n_iter_no_match}/10, matched={len(cat_coords_match)})',
+        if n_iter_no_match >= 8 and len(cat_coords_match) <= (min_cat_match + 1):
+            _write_fine_align_fallback_header(hdu, file,
+                f'unstable catalog matching (zero-match iters={n_iter_no_match}/10, matched={len(cat_coords_match)})',
                 log=log)
             return(True)
 
@@ -703,7 +717,7 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
         # Validate refined WCS; if pathological, fall back to coarse solution.
         is_valid, reason = _validate_refined_wcs(w, hdu[0].header, tel, log=log)
         if not is_valid:
-            _write_gaia_fallback_header(hdu, file, f'pathological refined WCS: {reason}', log=log)
+            _write_fine_align_fallback_header(hdu, file, f'pathological refined WCS: {reason}', log=log)
             return(True)
 
         # Delete all old WCS keys
@@ -727,13 +741,12 @@ def align_to_gaia(file, tel, radius=0.5, max_search_radius=5.0*u.arcsec,
         ra_disp = float('%.6f'%ra_disp)
         de_disp = float('%.6f'%de_disp)
 
-        _log_gaia(log, 'info', f'R.A. dispersion ={ra_disp}\", Decl. dispersion={de_disp}\"')
+        _log_fine_align(log, 'info', f'R.A. dispersion ={ra_disp}\", Decl. dispersion={de_disp}\"')
 
-        # Add header variables for dispersion in WCS solution
         hdu[0].header['RADISP']=(ra_disp, 'Dispersion in R.A. of WCS [Arcsec]')
         hdu[0].header['DEDISP']=(de_disp, 'Dispersion in Decl. of WCS [Arcsec]')
-        if 'GAIAFAIL' in hdu[0].header:
-            del hdu[0].header['GAIAFAIL']
+        if 'ALGNFAIL' in hdu[0].header:
+            del hdu[0].header['ALGNFAIL']
 
         hdu.writeto(file, overwrite=True, output_verify='silentfix')
     return(True)

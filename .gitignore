@@ -1,6 +1,10 @@
+# Examples: entire directory local-only (scripts, data, outputs); not versioned
+examples/
+
 # Python
 *.pyc
 __pycache__/
+.coverage
 *.pyo
 *.pyd
 *.pyz

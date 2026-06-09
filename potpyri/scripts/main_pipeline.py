@@ -28,8 +28,8 @@ from potpyri.primitives import absphot
 from potpyri.primitives import calibration
 from potpyri.primitives import image_procs
 
-# Check options.py - all named parameters need to correspond to options that are
-# provided via argparse.
+# Check options.py: named parameters here should match argparse dest names (and
+# optional backward-compat aliases such as skip_gaia).
 def main_pipeline(instrument: str,
                   data_path: str,
                   target: list = None,
@@ -45,7 +45,10 @@ def main_pipeline(instrument: str,
                   out_size: int = None,
                   skip_flatten: bool = None,
                   skip_cr: bool = None,
+                  skip_fine_align: bool = None,
                   skip_gaia: bool = None,
+                  fine_align_catalog: str = None,
+                  skip_external_astrometry: bool = None,
                   keep_all_astro: bool = None,
                   relative_calibration: bool = None,
                   **kwargs) -> None:
@@ -61,6 +64,9 @@ def main_pipeline(instrument: str,
     tel = instrument_getter(instrument)
 
     if skip_flatten: tel.flat=False
+
+    skip_fa = bool(skip_fine_align) or bool(skip_gaia)
+    fac = fine_align_catalog if fine_align_catalog is not None else 'gaia'
 
     # Generate code and data paths based on input path
     paths = options.add_paths(data_path, file_list_name, tel)
@@ -89,7 +95,10 @@ def main_pipeline(instrument: str,
         log.info(f'Generating stack for {tar}')
         stack = image_procs.image_proc(file_table[file_table['TargType']==tar], tel, paths,
             skip_skysub=skip_skysub, fieldcenter=fieldcenter, out_size=out_size,
-            cosmic_ray=not skip_cr, skip_gaia=skip_gaia, keep_all_astro=keep_all_astro,
+            cosmic_ray=not skip_cr, skip_fine_align=skip_fa,
+            fine_align_catalog=fac,
+            skip_external_astrometry=skip_external_astrometry or False,
+            keep_all_astro=keep_all_astro,
             relative_calibration=relative_calibration or False, log=log)
 
         # Photometry step
@@ -100,7 +109,7 @@ def main_pipeline(instrument: str,
 
         # Zero point/flux calibration step
         ##################################
-        log.info('Calculating zeropint.')
+        log.info('Calculating zeropoint.')
         absphot.find_zeropoint(stack, tel, log=log)
         
     t2 = time.time()
@@ -110,8 +119,9 @@ def main_pipeline(instrument: str,
 
 def main():
     """Entry point: check dependencies, parse args, and run main_pipeline."""
-    options.test_for_dependencies()
     args = options.add_options()
+    options.test_for_dependencies(
+        skip_external_astrometry=getattr(args, 'skip_external_astrometry', False))
     main_pipeline(**vars(args))
 
 if __name__ == "__main__":

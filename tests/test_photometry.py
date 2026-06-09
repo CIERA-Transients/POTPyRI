@@ -10,8 +10,8 @@ import os
 import numpy as np
 
 from astropy.io import fits
-from astropy.table import Table
-from photutils.psf import EPSFModel
+from astropy.table import Table, Column
+from types import SimpleNamespace
 
 import pytest
 from tests.utils import download_gdrive_file
@@ -66,6 +66,59 @@ def test_photometry(tmp_path):
         assert np.any(['APPPHOT' in h.name for h in hdu])
         assert np.any(['PSF' in h.name for h in hdu])
         assert len(hdu['APPPHOT'].data) > 100
+
+
+def test_normalize_daofind_catalog_aliases_photutils3():
+    """_normalize_daofind_catalog maps x_centroid/y_centroid to xcentroid/ycentroid."""
+    import astropy.units as u
+
+    tbl = Table(
+        {
+            'x_centroid': [10.0, 20.0] * u.pixel,
+            'y_centroid': [30.0, 40.0] * u.pixel,
+            'peak': Column([100.0, 200.0]),
+            'flux': Column([50.0, 60.0]),
+        },
+    )
+    out = photometry._normalize_daofind_catalog(tbl)
+    assert 'xcentroid' in out.colnames and 'ycentroid' in out.colnames
+    np.testing.assert_array_equal(out['xcentroid'], [10.0, 20.0])
+    np.testing.assert_array_equal(out['ycentroid'], [30.0, 40.0])
+
+
+def test_normalize_daofind_catalog_row_access_after_deprecated_wrapper():
+    """Tables with photutils-style deprecation_map coerce so Row['xcentroid'] works."""
+    tbl = Table(
+        {
+            'x_centroid': Column([1.0, 2.0]),
+            'y_centroid': Column([3.0, 4.0]),
+            'peak': Column([1.0, 1.0]),
+            'flux': Column([1.0, 2.0]),
+        },
+    )
+    tbl.deprecation_map = {'xcentroid': 'x_centroid', 'ycentroid': 'y_centroid'}
+    out = photometry._normalize_daofind_catalog(tbl)
+    assert not getattr(out, 'deprecation_map', None)
+    assert float(out[0]['xcentroid']) == 1.0
+    assert float(out[0]['ycentroid']) == 3.0
+
+
+def test_normalize_daofind_catalog_already_has_legacy_names():
+    """Legacy xcentroid/ycentroid tables are unchanged."""
+    tbl = Table(
+        {
+            'xcentroid': Column([1.0]),
+            'ycentroid': Column([2.0]),
+            'peak': Column([1.0]),
+        },
+    )
+    out = photometry._normalize_daofind_catalog(tbl)
+    assert 'xcentroid' in out.colnames
+
+
+def test_normalize_daofind_catalog_requires_centroid_columns():
+    with pytest.raises(photometry.PhotometryError):
+        photometry._normalize_daofind_catalog(Table({'flux': Column([1.0])}))
 
 
 def test_create_conv(tmp_path):
@@ -150,12 +203,13 @@ def test_get_star_catalog(tmp_path):
 
 
 def test_extract_fwhm_from_epsf():
-    """extract_fwhm_from_epsf returns finite FWHM from EPSFModel."""
-    # Build a minimal EPSF-like array (Gaussian blob)
+    """extract_fwhm_from_epsf returns finite FWHM from an ePSF-like array."""
+    # extract_fwhm_from_epsf only requires epsf.data (photutils 3 removed EPSFModel)
     size = 15
     y, x = np.ogrid[-size//2:size//2+1, -size//2:size//2+1]
     sigma = 2.0
     data = np.exp(-(x*x + y*y) / (2 * sigma**2)).astype(float)
+    epsf = SimpleNamespace(data=data)
     with warnings.catch_warnings():
         try:
             from astropy.utils.exceptions import AstropyDeprecationWarning, AstropyUserWarning
@@ -164,7 +218,6 @@ def test_extract_fwhm_from_epsf():
         except ImportError:
             warnings.simplefilter('ignore', DeprecationWarning)
             warnings.simplefilter('ignore', UserWarning)
-        epsf = EPSFModel(data)
         fwhm = photometry.extract_fwhm_from_epsf(epsf, fwhm_init=3.0)
     assert np.isfinite(fwhm)
     assert fwhm > 0
