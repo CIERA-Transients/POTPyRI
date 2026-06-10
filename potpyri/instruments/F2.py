@@ -93,6 +93,15 @@ class F2(instrument.Instrument):
         return(self.saturation*hdr['NREADS']*hdr['GAIN'])
 
     def raw_format(self, proc):
+        """Return glob pattern for discovering raw F2 files.
+
+        Default (Gemini archive): ``*.fits.bz2``.  Pass ``--proc fits`` or
+        ``--proc .fits`` for uncompressed ``*.fits`` files.
+        """
+        if proc is not None and str(proc).lower() in (
+            'fits', '.fits', 'uncompressed',
+        ):
+            return('*.fits')
         return('*.fits.bz2')
 
     def get_filter(self, hdr):

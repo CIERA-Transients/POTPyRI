@@ -161,6 +161,11 @@ def test_raw_format():
     gmos = GMOS()
     assert gmos.raw_format("dragons") == "*.fits"
     assert gmos.raw_format("other") == "*.fits.bz2"
+    f2 = instrument_getter("F2")
+    assert f2.raw_format(True) == "*.fits.bz2"
+    assert f2.raw_format("fits") == "*.fits"
+    assert f2.raw_format(".fits") == "*.fits"
+    assert f2.raw_format("uncompressed") == "*.fits"
 
 
 def test_get_stk_name_get_sci_name_get_bkg_name():
