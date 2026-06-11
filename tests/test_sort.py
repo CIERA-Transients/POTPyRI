@@ -134,3 +134,28 @@ def test_is_bias_gmos():
     assert sort_files.is_bias(hdr, tel) == True
     hdr['OBSTYPE'] = 'object'
     assert sort_files.is_bias(hdr, tel) == False
+
+
+def test_handle_files_logs_discovery_when_no_files(tmp_path, capsys):
+    """handle_files prints search paths and glob pattern before exiting on empty input."""
+    tel = instrument_getter('F2')
+    raw_dir = tmp_path / 'raw'
+    data_dir = tmp_path
+    bad_dir = tmp_path / 'bad'
+    for d in (raw_dir, bad_dir):
+        d.mkdir()
+    paths = {
+        'raw': str(raw_dir),
+        'data': str(data_dir),
+        'bad': str(bad_dir),
+        'filelist': str(tmp_path / 'file_list.txt'),
+    }
+    with pytest.raises(SystemExit):
+        sort_files.handle_files(
+            paths['filelist'], paths, tel, proc='fits', log=None,
+        )
+    out = capsys.readouterr().out
+    assert 'Glob pattern' in out
+    assert '*.fits' in out
+    assert str(raw_dir) in out
+    assert 'No files matched' in out 

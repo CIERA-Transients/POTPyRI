@@ -91,8 +91,8 @@ class MOSFIRE(instrument.Instrument):
     def get_saturation(self, hdr):
         return(hdr['SATURATE']*hdr['SYSGAIN'])
 
-    def raw_format(self, proc):
-        return('*.fits.gz')
+    def _default_raw_format(self, proc):
+        return '*.fits.gz'
 
     def get_filter(self, hdr):
         filt = hdr['FILTER'].replace(' ','').split('_')[0]

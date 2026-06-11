@@ -40,10 +40,13 @@ def init_options():
         help='''Option to only reduce a specific target. String used here must 
         be contained within the target name in file headers. Optional 
         parameter.''')
-    params.add_argument('--proc', 
-        type=str, 
-        default=True, 
-        help='''Option to specify file processing for data ingestion.''')
+    params.add_argument('--proc',
+        type=str,
+        default=True,
+        help='''File-ingestion mode for raw discovery (instrument-specific glob).
+        Use ``fits`` (or ``.fits``) on any instrument for uncompressed ``*.fits``.
+        Other values depend on the instrument (e.g. GMOS ``dragons``, LRIS
+        ``archive``/``raw``, BINOSPEC ``proc``).''')
     params.add_argument('--include-bad','--incl-bad', 
         default=False,
         action='store_true', 
@@ -130,7 +133,7 @@ def init_options():
 def add_options():
     """Parse command-line options and return normalized args.
 
-    Handles instrument aliases (e.g. BINO -> BINOSPEC, MMIR -> MMIRS).
+    Normalizes instrument aliases via :func:`potpyri.instruments.resolve_instrument_name`.
 
     Returns
     -------
@@ -140,11 +143,8 @@ def add_options():
     params = init_options()
     args = params.parse_args()
 
-    # Handle/parse options
-    if 'BINO' in args.instrument:
-        args.instrument = 'BINOSPEC'
-    if 'MMIR' in args.instrument:
-        args.instrument = 'MMIRS'
+    if args.instrument is not None:
+        args.instrument = instruments.resolve_instrument_name(args.instrument)
 
     return(args)
 

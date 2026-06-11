@@ -97,14 +97,12 @@ class LRIS(instrument.Instrument):
         number = str(header['FRAMENO']).zfill(5)
         return(number)
 
-    def raw_format(self, proc):
-
-        if str(proc)=='archive':
-            return('*.fits*')
-        elif str(proc)=='raw':
-            return('*[b,r]*.fits')
-        else:
-            return('*.fits*')
+    def _default_raw_format(self, proc):
+        if str(proc) == 'archive':
+            return '*.fits*'
+        if str(proc) == 'raw':
+            return '*[b,r]*.fits'
+        return '*.fits*'
 
     def get_instrument_name(self, hdr):
         instrument = hdr['INSTRUME']

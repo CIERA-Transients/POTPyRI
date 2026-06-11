@@ -7,6 +7,7 @@ instrument-specific attributes.
 """
 from potpyri._version import __version__
 
+import glob
 import os
 import astropy
 import datetime
@@ -123,6 +124,10 @@ class Instrument(object):
     keyword names, file-sorting rules, and methods for calibration and
     science processing. Subclasses override attributes as needed.
     """
+
+    # ``--proc fits`` (and aliases) force this glob on every instrument.
+    PROC_FITS_GLOB = '*.fits'
+    PROC_FITS_ALIASES = frozenset({'fits', '.fits', 'uncompressed'})
 
     def __init__(self):
 
@@ -388,12 +393,92 @@ class Instrument(object):
 
         return(sec_string)
 
+    def _proc_requests_fits(self, proc):
+        """True when ``--proc`` requests uncompressed ``*.fits`` (all instruments)."""
+        return proc is not None and str(proc).lower() in self.PROC_FITS_ALIASES
+
     def raw_format(self, proc):
-        """Return glob pattern for raw files (e.g. 'sci_img_*.fits' or 'sci_img*[!proc].fits')."""
+        """Return glob pattern for raw file discovery under ``data/raw``, ``data``, ``bad``.
+
+        If ``proc`` is ``fits`` / ``.fits`` / ``uncompressed``, returns ``*.fits``
+        regardless of instrument. Otherwise delegates to :meth:`_default_raw_format`.
+        """
+        if self._proc_requests_fits(proc):
+            return self.PROC_FITS_GLOB
+        return self._default_raw_format(proc)
+
+    def _default_raw_format(self, proc):
+        """Instrument-specific glob; override in subclasses."""
         if proc:
-            return('sci_img_*.fits')
+            return 'sci_img_*.fits'
+        return 'sci_img*[!proc].fits'
+
+    def discover_raw_files(self, paths, proc=None):
+        """Glob raw inputs under ``paths['raw']``, ``paths['data']``, and ``paths['bad']``.
+
+        Returns
+        -------
+        dict
+            ``pattern``, ``instrument_pattern``, ``proc``, ``proc_fits_override``,
+            ``per_dir`` (list of label, directory, glob_path, matched paths),
+            and ``files`` (combined matches).
+        """
+        pattern = self.raw_format(proc)
+        instrument_pattern = self._default_raw_format(proc)
+        per_dir = []
+        files = []
+        for label, key in (('raw', 'raw'), ('data', 'data'), ('bad', 'bad')):
+            directory = paths[key]
+            glob_path = os.path.join(directory, pattern)
+            matched = sorted(glob.glob(glob_path))
+            per_dir.append((label, directory, glob_path, matched))
+            files.extend(matched)
+        return {
+            'pattern': pattern,
+            'instrument_pattern': instrument_pattern,
+            'proc': proc,
+            'proc_fits_override': self._proc_requests_fits(proc),
+            'per_dir': per_dir,
+            'files': files,
+        }
+
+    def format_raw_discovery_message(self, paths, proc=None):
+        """Human-readable summary of where raw files are searched and what matched."""
+        info = self.discover_raw_files(paths, proc)
+        n_total = len(info['files'])
+        lines = [
+            f'Raw input discovery ({self.name}, --proc={info["proc"]!r}):',
+            (
+                f'  Glob pattern: {info["pattern"]!r}  '
+                '(Python glob: * = any substring; ? = one character; '
+                '[seq] = one character in seq)'
+            ),
+        ]
+        if info['proc_fits_override']:
+            lines.append(
+                f'  --proc fits: using {self.PROC_FITS_GLOB!r} on all instruments '
+                f'(instrument-specific pattern for this --proc would be '
+                f'{info["instrument_pattern"]!r})'
+            )
         else:
-            return('sci_img*[!proc].fits')
+            lines.append(
+                f'  Instrument pattern for --proc={info["proc"]!r}: '
+                f'{info["instrument_pattern"]!r}'
+            )
+        lines.append('  Search directories (pattern applied in each):')
+        for label, directory, glob_path, matched in info['per_dir']:
+            lines.append(
+                f'    [{label}] {glob_path}  ->  {len(matched)} file(s)'
+            )
+        if n_total == 0:
+            lines.append(
+                '  No files matched. Place raw data under data/raw/ or data/ '
+                f'with basenames matching {info["pattern"]!r}. '
+                'For uncompressed .fits on any instrument, pass --proc fits.'
+            )
+        else:
+            lines.append(f'  Total: {n_total} raw file(s) to classify.')
+        return '\n'.join(lines)
 
     def get_stk_name(self, hdr, red_path):
         """Return full path for stacked output FITS (target.filter.utYYMMDD.amp.binn.stk.fits)."""

@@ -89,11 +89,10 @@ class DEIMOS(instrument.Instrument):
 
         self.out_size = 9000
 
-    def raw_format(self, proc):
-        if proc and str(proc)=='raw':
-            return('d*.fits')
-        else:
-            return('DE*.fits.gz')
+    def _default_raw_format(self, proc):
+        if proc and str(proc) == 'raw':
+            return 'd*.fits'
+        return 'DE*.fits.gz'
 
     def get_number(self, hdr):
         elap = Time(hdr['MJD'], format='mjd')-Time('1980-01-01')

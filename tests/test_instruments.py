@@ -8,7 +8,13 @@ from astropy.table import Table
 from astropy.nddata import CCDData
 from astropy import units as u
 
-from potpyri.instruments import instrument_getter
+from potpyri.instruments import (
+    UnknownInstrumentError,
+    __all__ as INSTRUMENT_NAMES,
+    instrument_getter,
+    resolve_instrument_name,
+    supported_instruments,
+)
 from potpyri.instruments.GMOS import GMOS
 from potpyri.instruments.instrument import (
     Instrument,
@@ -32,15 +38,31 @@ def test_fix_deprecated_wcs_header_cards_radecsys_and_mjd():
     assert 'MJD-OBS' not in h
 
 
+def test_resolve_instrument_name_aliases():
+    """resolve_instrument_name maps aliases and canonical names."""
+    assert resolve_instrument_name('gmos') == 'GMOS'
+    assert resolve_instrument_name('BINO') == 'BINOSPEC'
+    assert resolve_instrument_name('MMIR') == 'MMIRS'
+    assert resolve_instrument_name('BINOSPEC') == 'BINOSPEC'
+
+
+def test_supported_instruments_matches_all():
+    assert set(supported_instruments()) == set(INSTRUMENT_NAMES)
+
+
 def test_instrument_getter_unsupported_raises():
-    """instrument_getter raises when instrument is not supported and log is None."""
-    with pytest.raises(Exception, match="not supported"):
+    """instrument_getter raises UnknownInstrumentError when log is None."""
+    with pytest.raises(UnknownInstrumentError, match="not supported"):
         instrument_getter("UNKNOWN_INSTRUMENT", log=None)
+
+
+def test_instrument_getter_invalid_name_type():
+    with pytest.raises(TypeError):
+        instrument_getter("", log=None)
 
 
 def test_instrument_getter_unsupported_with_log(tmp_path):
     """instrument_getter with log calls log.error and returns None for unsupported name."""
-    from potpyri.instruments import __init__ as instruments_init
     tel = instrument_getter("GMOS")
     paths = options.add_paths(str(tmp_path), "files.txt", tel)
     log = logger.get_log(paths["log"])
@@ -154,18 +176,56 @@ def test_format_datasec():
 
 
 def test_raw_format():
-    """Base raw_format and GMOS raw_format."""
+    """raw_format and --proc fits override across instruments."""
     base = Instrument()
     assert base.raw_format(True) == "sci_img_*.fits"
     assert base.raw_format(False) == "sci_img*[!proc].fits"
+    assert base.raw_format("fits") == "*.fits"
     gmos = GMOS()
     assert gmos.raw_format("dragons") == "*.fits"
     assert gmos.raw_format("other") == "*.fits.bz2"
+    assert gmos.raw_format("fits") == "*.fits"
     f2 = instrument_getter("F2")
     assert f2.raw_format(True) == "*.fits.bz2"
     assert f2.raw_format("fits") == "*.fits"
     assert f2.raw_format(".fits") == "*.fits"
     assert f2.raw_format("uncompressed") == "*.fits"
+    mosfire = instrument_getter("MOSFIRE")
+    assert mosfire.raw_format(None) == "*.fits.gz"
+    assert mosfire.raw_format("fits") == "*.fits"
+    lris = instrument_getter("LRIS")
+    assert lris.raw_format("archive") == "*.fits*"
+    assert lris.raw_format("fits") == "*.fits"
+
+
+def test_discover_raw_files_and_message(tmp_path):
+    """discover_raw_files reports search paths and glob matches."""
+    raw_dir = tmp_path / 'raw'
+    data_dir = tmp_path / 'data'
+    bad_dir = tmp_path / 'bad'
+    for d in (raw_dir, data_dir, bad_dir):
+        d.mkdir()
+    (raw_dir / 'science.fits').write_bytes(b'\x00')
+    (data_dir / 'other.fits.bz2').write_bytes(b'\x00')
+
+    tel = instrument_getter("F2")
+    paths = {'raw': str(raw_dir), 'data': str(data_dir), 'bad': str(bad_dir)}
+
+    info = tel.discover_raw_files(paths, proc='fits')
+    assert info['pattern'] == '*.fits'
+    assert len(info['files']) == 1
+    assert info['files'][0].endswith('science.fits')
+
+    msg = tel.format_raw_discovery_message(paths, proc='fits')
+    assert 'Glob pattern' in msg
+    assert str(raw_dir) in msg
+    assert 'science.fits' not in msg or '1 file(s)' in msg
+    assert 'Search directories' in msg
+
+    info_bz2 = tel.discover_raw_files(paths, proc=True)
+    assert info_bz2['pattern'] == '*.fits.bz2'
+    assert len(info_bz2['files']) == 1
+    assert info_bz2['files'][0].endswith('other.fits.bz2')
 
 
 def test_get_stk_name_get_sci_name_get_bkg_name():

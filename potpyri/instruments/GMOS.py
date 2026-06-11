@@ -110,11 +110,10 @@ class GMOS(instrument.Instrument):
         except KeyError:
             return(self.gain)
 
-    def raw_format(self, proc):
-        if str(proc).lower()=='dragons':
-            return('*.fits')
-        else:
-            return('*.fits.bz2')
+    def _default_raw_format(self, proc):
+        if str(proc).lower() == 'dragons':
+            return '*.fits'
+        return '*.fits.bz2'
 
     def get_ampl(self, hdr):
         nccd = hdr['NCCDS']
