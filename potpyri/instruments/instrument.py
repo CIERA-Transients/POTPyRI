@@ -26,6 +26,12 @@ from astropy.stats import sigma_clipped_stats
 from astropy.stats import SigmaClip
 from astropy.time import Time
 
+# Per-frame optical background subtraction modes (see apply_optical_background_subtraction).
+BKG_SUB_LOCAL = 'local'
+BKG_SUB_CONSTANT = 'constant'
+BKG_SUB_NONE = 'none'
+VALID_BKG_SUB_MODES = (BKG_SUB_LOCAL, BKG_SUB_CONSTANT, BKG_SUB_NONE)
+
 # WCS-related keywords to remove from calibration headers so saved files never
 # trigger InvalidTransformError (e.g. DEC=-100, ill-conditioned CD matrix).
 _CAL_HEADER_WCS_KEYS = (
@@ -1186,8 +1192,118 @@ class Instrument(object):
 
         return(input_mask)
 
+    def apply_optical_background_subtraction(self, processed_data, bkg_sub='local',
+            save_bkg=False, paths=None, log=None):
+        """Subtract per-frame background for optical data (not NIR master sky).
+
+        Parameters
+        ----------
+        processed_data : ccdproc.CCDData
+            Bias/dark/flat-corrected science frame with mask set.
+        bkg_sub : str, optional
+            ``'local'`` (default): photutils ``Background2D`` mesh model.
+            ``'constant'``: single sigma-clipped median subtracted from every pixel.
+            ``'none'``: no subtraction; ``SKYBKG`` set to 0.
+        save_bkg : bool, optional
+            If True and ``bkg_sub='local'``, write the 2D background model.
+        paths : dict, optional
+            Paths dict (``work`` key) required when ``save_bkg`` is True.
+        log : ColoredLogger, optional
+            Logger for progress.
+
+        Returns
+        -------
+        ccdproc.CCDData
+            Background-subtracted frame with ``SKYBKG`` and ``BKGSUB`` header keys.
+        """
+        mode = (bkg_sub or BKG_SUB_LOCAL).lower()
+        if mode not in VALID_BKG_SUB_MODES:
+            raise ValueError(
+                f'bkg_sub must be one of {VALID_BKG_SUB_MODES}, got {bkg_sub!r}'
+            )
+
+        if mode == BKG_SUB_NONE:
+            final_img = processed_data
+            final_img.header['SKYBKG'] = 0.0
+            final_img.header['BKGSUB'] = BKG_SUB_NONE
+            return final_img
+
+        if mode == BKG_SUB_CONSTANT:
+            if log:
+                log.info('Calculating constant frame background.')
+            _, med, _ = sigma_clipped_stats(
+                processed_data.data,
+                mask=processed_data.mask,
+                sigma=3.0,
+                maxiters=5,
+            )
+            if not np.isfinite(med):
+                med = np.nanmedian(processed_data.data)
+            background = med * u.electron
+            if log:
+                log.info(f'Constant background value: {background}')
+            final_img = processed_data.subtract(background)
+            final_img.header = processed_data.header
+            if 'SATURATE' in final_img.header:
+                final_img.header['SATURATE'] -= background.value
+            final_img.header['SKYBKG'] = background.value
+            final_img.header['BKGSUB'] = BKG_SUB_CONSTANT
+            return final_img
+
+        if log:
+            log.info('Calculating 2D background.')
+        approx_background = np.nanmedian(processed_data.data) * u.electron
+        if log:
+            log.info(f'Approximate background value: {approx_background}')
+        bkg = Background2D(
+            processed_data,
+            (64, 64),
+            filter_size=(3, 3),
+            sigma_clip=SigmaClip(sigma=3),
+            exclude_percentile=80,
+            bkg_estimator=MeanBackground(),
+            mask=processed_data.mask,
+            fill_value=np.nanmedian(processed_data.data),
+        )
+
+        med_background = np.nanmedian(bkg.background)
+        if log:
+            log.info(f'Median background: {med_background}')
+
+        if np.isnan(med_background.value):
+            final_img = processed_data.subtract(approx_background)
+            final_img.header = processed_data.header
+            if 'SATURATE' in final_img.header:
+                final_img.header['SATURATE'] -= approx_background.value
+            final_img.header['SKYBKG'] = approx_background.value
+            final_img.header['BKGSUB'] = BKG_SUB_CONSTANT
+        else:
+            if save_bkg:
+                if paths is None:
+                    raise ValueError('paths is required when save_bkg=True')
+                bkg_filename = self.get_bkg_name(processed_data.header, paths['work'])
+                if log:
+                    log.info(f'Writing background file: {bkg_filename}')
+                bkg_hdu = fits.PrimaryHDU(bkg.background.value)
+                bkg_hdu.header = processed_data.header
+                bkg_hdu.writeto(bkg_filename, overwrite=True, output_verify='silentfix')
+
+            final_img = processed_data.subtract(
+                CCDData(bkg.background, unit=u.electron),
+                propagate_uncertainties=True,
+                handle_meta='first_found',
+            )
+            if 'SATURATE' in final_img.header:
+                final_img.header['SATURATE'] -= med_background.value
+            final_img.header['SKYBKG'] = med_background.value
+            final_img.header['BKGSUB'] = BKG_SUB_LOCAL
+        if log:
+            log.info('Updating background and saturation values.')
+        return final_img
+
     def process_science(self, sci_list, fil, amp, binn, paths, mbias=None,
-        mflat=None, mdark=None, skip_skysub=False, save_bkg=False, log=None):
+        mflat=None, mdark=None, skip_skysub=False, bkg_sub='local',
+        save_bkg=False, log=None):
         """Reduce science frames: bias/dark/flat, optional sky subtraction; return CCDData list.
 
         Parameters
@@ -1209,7 +1325,13 @@ class Instrument(object):
         mdark : ccdproc.CCDData, optional
             Master dark.
         skip_skysub : bool, optional
-            If True, skip 2D background subtraction. Default is False.
+            If True, skip 2D background subtraction. Deprecated; use
+            ``bkg_sub='none'``. Default is False.
+        bkg_sub : str, optional
+            Per-frame background subtraction for optical data: ``'local'``
+            (2D mesh, default), ``'constant'`` (single value per frame), or
+            ``'none'``. Ignored when ``needs_sky_subtraction(fil)`` is True
+            (NIR / GMOS z-band use master sky instead).
         save_bkg : bool, optional
             If True, save background model. Default is False.
         log : ColoredLogger, optional
@@ -1222,6 +1344,8 @@ class Instrument(object):
         """
         processed = []
         processed_names = []
+        if skip_skysub:
+            bkg_sub = BKG_SUB_NONE
         for sci in sorted(sci_list):
             if log: log.info(f'Importing {sci}')
             sci_full = self.import_image(sci, amp, log=log)
@@ -1261,41 +1385,18 @@ class Instrument(object):
             processed_data.data[processed_data.mask]=np.nan
 
             if log: log.info(f'Wavelength is {self.wavelength}')
-            if not skip_skysub and not self.needs_sky_subtraction(fil):
-                if log: log.info('Calculating 2D background.')
-                approx_background=np.nanmedian(processed_data.data) * u.electron
-                if log: log.info(f'Approximate background value: {approx_background}')
-                bkg = Background2D(processed_data, (64, 64), filter_size=(3, 3),
-                    sigma_clip=SigmaClip(sigma=3), exclude_percentile=80,
-                    bkg_estimator=MeanBackground(), mask=processed_data.mask, 
-                    fill_value=np.nanmedian(processed_data.data))
-                
-                med_background = np.nanmedian(bkg.background)
-                if log: log.info(f'Median background: {med_background}')
-
-                if np.isnan(med_background.value):
-                    final_img = processed_data.subtract(approx_background)
-                    final_img.header = processed_data.header
-                    final_img.header['SATURATE'] -= approx_background.value
-                    final_img.header['SKYBKG'] = approx_background.value
-                else:
-                    if save_bkg:
-                        bkg_filename = self.get_bkg_name(processed_data.header, paths['work'])
-                        if log: log.info(f'Writing background file: {bkg_filename}')
-                        bkg_hdu = fits.PrimaryHDU(bkg.background.value)
-                        bkg_hdu.header = processed_data.header
-                        bkg_hdu.writeto(bkg_filename, overwrite=True,
-                            output_verify='silentfix')
-
-                    final_img = processed_data.subtract(CCDData(bkg.background,
-                        unit=u.electron), propagate_uncertainties=True, 
-                        handle_meta='first_found')
-                    final_img.header['SATURATE'] -= med_background.value
-                    final_img.header['SKYBKG'] = med_background.value
-                if log: log.info('Updating background and saturation values.')
+            if not self.needs_sky_subtraction(fil):
+                final_img = self.apply_optical_background_subtraction(
+                    processed_data,
+                    bkg_sub=bkg_sub,
+                    save_bkg=save_bkg,
+                    paths=paths,
+                    log=log,
+                )
             else:
                 final_img = processed_data
                 final_img.header['SKYBKG'] = 0.0
+                final_img.header['BKGSUB'] = BKG_SUB_NONE
 
             # Apply final masking based on excessively negative values
             finite = np.isfinite(final_img.data)

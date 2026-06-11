@@ -74,7 +74,15 @@ def init_options():
     params.add_argument('--skip-skysub',
         default=False,
         action='store_true', 
-        help='''Do not perform sky subtraction during image processing.''')
+        help='''Do not perform sky subtraction during image processing. Equivalent
+        to ``--bkg-sub none``.''')
+    params.add_argument('--bkg-sub',
+        default='local',
+        choices=['local', 'constant', 'none'],
+        dest='bkg_sub',
+        help='''Per-frame background subtraction for optical data: ``local`` uses a
+        spatially varying 2D mesh (default); ``constant`` subtracts one
+        sigma-clipped median per frame; ``none`` skips subtraction.''')
     params.add_argument('--fieldcenter',
         default=None,
         nargs=2,
@@ -145,6 +153,9 @@ def add_options():
 
     if args.instrument is not None:
         args.instrument = instruments.resolve_instrument_name(args.instrument)
+
+    if args.skip_skysub:
+        args.bkg_sub = 'none'
 
     return(args)
 
