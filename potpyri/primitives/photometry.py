@@ -247,7 +247,7 @@ def run_sextractor(img_file, log=None, sextractor_path=None):
     return(table)
 
 def extract_aperture_stats(img_data, img_mask, img_error, stars,
-    aperture_radius=10.0, log=None):
+    aperture_radius=10.0, fwhm_measure_radius=None, log=None):
     """Compute aperture flux and error for a star table; return table with added columns.
 
     Parameters
@@ -261,7 +261,10 @@ def extract_aperture_stats(img_data, img_mask, img_error, stars,
     stars : astropy.table.Table
         Table with xcentroid, ycentroid (modified in place with refined centroids).
     aperture_radius : float, optional
-        Aperture radius in pixels. Default is 10.0.
+        Aperture radius in pixels for flux and centroid statistics. Default 10.0.
+    fwhm_measure_radius : float, optional
+        Smaller aperture for ``ApertureStats.fwhm`` only. If omitted, uses
+        ``aperture_radius``. FWHM from large apertures is biased high.
     log : ColoredLogger, optional
         Logger for progress.
 
@@ -285,39 +288,49 @@ def extract_aperture_stats(img_data, img_mask, img_error, stars,
     # get_star_catalog() (or DAOStarFinder output with new column names).
     stars = _normalize_daofind_catalog(stars)
 
-    # Estimate a reasonable aperture radius and centroid for sources
-    fwhms=[]
-    for i,star in enumerate(stars):
+    # Refine centroids at a fixed aperture. Do not grow the aperture from
+    # ApertureStats FWHM values: that statistic scales with aperture radius
+    # and can diverge (e.g. 12 px -> 30 px -> ~34 px FWHM estimates).
+    # FWHM is measured in a compact aperture; flux uses a larger aperture.
+    fwhm_radius = fwhm_measure_radius if fwhm_measure_radius is not None else aperture_radius
+    fwhms = []
+    for i, star in enumerate(stars):
         aper = CircularAperture((star['xcentroid'], star['ycentroid']),
-            aperture_radius)
-        aperstats = ApertureStats(img_data, aper, mask=img_mask, 
+            fwhm_radius)
+        aperstats = ApertureStats(img_data, aper, mask=img_mask,
             error=img_error)
 
         fwhms.append(_apstats_float(aperstats, 'fwhm'))
         stars[i]['xcentroid'] = _apstats_float(aperstats, 'x_centroid', 'xcentroid')
         stars[i]['ycentroid'] = _apstats_float(aperstats, 'y_centroid', 'ycentroid')
 
-    if aperture_radius<2.5*np.nanmean(fwhms):
-        aperture_radius=2.5*np.nanmean(fwhms)
-
+    flux_radius = max(aperture_radius, 2.5 * np.nanmedian(fwhms))
     if log:
-        log.info(f'New aperture radius={aperture_radius}')
+        log.info(
+            f'Aperture radii: fwhm={fwhm_radius:.2f} px, flux={flux_radius:.2f} px'
+        )
     else:
-        print(f'New aperture radius={aperture_radius}')
+        print(
+            f'Aperture radii: fwhm={fwhm_radius:.2f} px, flux={flux_radius:.2f} px'
+        )
 
     for star in stars:
         aper = CircularAperture((star['xcentroid'], star['ycentroid']),
-            aperture_radius)
+            flux_radius)
 
-        aperstats = ApertureStats(img_data, aper, mask=img_mask, 
+        aperstats = ApertureStats(img_data, aper, mask=img_mask,
             error=img_error)
 
         covx = np.maximum(
             _apstats_float(aperstats, 'covariance_xx', 'covar_sigx2'), 0.0)
         covy = np.maximum(
             _apstats_float(aperstats, 'covariance_yy', 'covar_sigy2'), 0.0)
+        aper_fwhm = CircularAperture((star['xcentroid'], star['ycentroid']),
+            fwhm_radius)
+        fwhm_stats = ApertureStats(img_data, aper_fwhm, mask=img_mask,
+            error=img_error)
         apertable.add_row([
-            _apstats_float(aperstats, 'fwhm'),
+            _apstats_float(fwhm_stats, 'fwhm'),
             _apstats_float(aperstats, 'semimajor_axis', 'semimajor_sigma'),
             _apstats_float(aperstats, 'semiminor_axis', 'semiminor_sigma'),
             _apstats_float(aperstats, 'orientation'),
@@ -330,6 +343,49 @@ def extract_aperture_stats(img_data, img_mask, img_error, stars,
         ])
     
     return(apertable)
+
+
+def _radial_fwhm_from_array(data, center=None, max_radius=None):
+    """Estimate FWHM (pixels) from a 2D profile via a circular radial average."""
+    data = np.asarray(data, dtype=float)
+    cy, cx = center if center is not None else (data.shape[0] // 2, data.shape[1] // 2)
+    if max_radius is None:
+        max_radius = min(cy, cx, data.shape[0] - cy - 1, data.shape[1] - cx - 1)
+    yy, xx = np.indices(data.shape)
+    r = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2)
+    peak = data[cy, cx]
+    if not np.isfinite(peak) or peak <= 0:
+        peak = np.nanmax(data)
+    if not np.isfinite(peak) or peak <= 0:
+        return np.nan
+
+    rs, vs = [], []
+    step = 0.1
+    rb = 0.0
+    while rb < max_radius:
+        m = (r >= rb) & (r < rb + step)
+        if m.any():
+            rs.append(rb + step / 2.0)
+            vs.append(float(np.nanmean(data[m])))
+        rb += step
+    if len(vs) < 3:
+        return np.nan
+
+    rs = np.asarray(rs)
+    vs = np.asarray(vs)
+    half_level = peak / 2.0
+    below = np.where(vs < half_level)[0]
+    if len(below) == 0:
+        return np.nan
+    i = int(below[0])
+    if i == 0:
+        return 2.0 * rs[0]
+    r1, r2 = rs[i - 1], rs[i]
+    v1, v2 = vs[i - 1], vs[i]
+    if v1 == v2:
+        return 2.0 * r1
+    r_half = r1 + (half_level - v1) * (r2 - r1) / (v2 - v1)
+    return 2.0 * r_half
 
 
 def generate_epsf(img_file, x, y, size=11, oversampling=2, maxiters=11,
@@ -381,7 +437,7 @@ def generate_epsf(img_file, x, y, size=11, oversampling=2, maxiters=11,
     return(epsf)
 
 def extract_fwhm_from_epsf(epsf, fwhm_init):
-    """Estimate FWHM from ePSF model (Moffat2D fit).
+    """Estimate FWHM from ePSF model (Moffat2D fit on the PSF core).
 
     Parameters
     ----------
@@ -395,27 +451,36 @@ def extract_fwhm_from_epsf(epsf, fwhm_init):
     float
         FWHM in pixels from fitted Moffat2D.
     """
-    # Get the raw data for the FWHM and size in x and y
-    data = epsf.data
-    x = np.arange(data.shape[0])
-    y = np.arange(data.shape[1])
-    xx, yy = np.meshgrid(x, y) 
+    data = np.asarray(epsf.data, dtype=float)
+    cy, cx = data.shape[0] // 2, data.shape[1] // 2
+    # Fit only the core: a Moffat2D on the full ePSF array matches extended
+    # wings in large cutouts and can return FWHM >> the true PSF width.
+    half = min(cy, cx, max(5, min(int(2.5 * float(fwhm_init)), 12)))
+    sub = data[cy - half:cy + half + 1, cx - half:cx + half + 1]
+    xs = np.arange(sub.shape[0])
+    ys = np.arange(sub.shape[1])
+    xxs, yys = np.meshgrid(xs, ys)
 
-    # Fit to Moffat2D model in astropy, initial guess is amplitude,
-    # centroid in x and y, core width of
-    # Moffat model and power index scaling of model
-    p_init = functional_models.Moffat2D(amplitude=0.5, x_0=data.shape[0]/2.,
-        y_0=data.shape[1]/2., gamma=fwhm_init, alpha=1.)
-    
+    peak = float(np.nanmax(sub))
+    p_init = functional_models.Moffat2D(
+        amplitude=peak if peak > 0 else 0.5,
+        x_0=half,
+        y_0=half,
+        gamma=max(float(fwhm_init), 1.0),
+        alpha=2.0,
+    )
+
     fit_p = fitting.LevMarLSQFitter()
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        p = fit_p(p_init, xxs, yys, sub)
 
-    # Fit functional model to the data
-    p = fit_p(p_init, xx, yy, data)
-
-    # Extract and round FWHM
-    fwhm = float('%.4f'%p.fwhm)
-
-    return(p.fwhm)
+    fwhm = float(p.fwhm)
+    if not np.isfinite(fwhm) or fwhm <= 0:
+        fwhm = _radial_fwhm_from_array(sub, center=(half, half), max_radius=half)
+    if not np.isfinite(fwhm) or fwhm <= 0:
+        fwhm = float(fwhm_init)
+    return float('%.4f' % fwhm)
 
 def run_photometry(img_file, epsf, fwhm, threshold, shape, stars):
     """Run PSF photometry and aperture photometry; append result tables to FITS.
@@ -585,7 +650,9 @@ def get_star_catalog(img_data, img_mask, img_error, fwhm_init=5.0,
 
     # Extract the aperture stats from each star and append to the output catalog
     stats = extract_aperture_stats(img_data, img_mask, img_error, stars, 
-        aperture_radius=2.5*fwhm_init, log=log)
+        aperture_radius=2.5*fwhm_init,
+        fwhm_measure_radius=max(4.0, float(fwhm_init)),
+        log=log)
     stars = hstack([stars, stats])
     
     return(stars)
@@ -714,9 +781,14 @@ def do_phot(img_file,
 
     metadata['NPSFSTAR']=len(bright)
 
+    fwhm_catalog = fwhm
+
     # Instantiate EPSF
-    size=int(fwhm*fwhm_scale_psf)
-    if size%2==0: size=size+1
+    size = int(max(fwhm_catalog, star_param['fwhm_init']) * fwhm_scale_psf)
+    size_cap = max(25, int(star_param['fwhm_init'] * fwhm_scale_psf * 2))
+    size = min(size, size_cap)
+    if size % 2 == 0:
+        size = size + 1
 
     if log:
         log.info(f'EPSF size will be {size} pixels')
@@ -726,10 +798,19 @@ def do_phot(img_file,
     epsf = generate_epsf(img_file, bright['xcentroid'], bright['ycentroid'], 
         size=size, oversampling=oversampling, maxiters=11, log=log)
 
-    fwhm = extract_fwhm_from_epsf(epsf, fwhm*oversampling)
-    # Scale by oversampling
-    fwhm = fwhm/oversampling
-    fwhm = float('%.4f'%fwhm)
+    fwhm_epsf = extract_fwhm_from_epsf(epsf, fwhm_catalog * oversampling)
+    fwhm_epsf = fwhm_epsf / oversampling
+    if (np.isfinite(fwhm_epsf) and fwhm_epsf > 0
+            and 0.5 * fwhm_catalog <= fwhm_epsf <= 3.0 * fwhm_catalog):
+        fwhm = fwhm_epsf
+    else:
+        fwhm = fwhm_catalog
+        if log:
+            log.info(
+                f'Using catalog FWHM={fwhm:.4f} px '
+                f'(ePSF fit {fwhm_epsf:.4f} px outside 0.5-3x range)'
+            )
+    fwhm = float('%.4f' % fwhm)
 
     if log:
         log.info(f'FWHM={fwhm} pixels')
