@@ -96,8 +96,8 @@ class FOURSTAR(instrument.Instrument):
         elap = int(np.round(elap.to(u.second).value))
         return(elap)
 
-    def raw_format(self, proc):
-        return('*.fits')
+    def _default_raw_format(self, proc):
+        return '*.fits'
 
     def get_rdnoise(self, hdr):
         return(hdr['RDNOISE'])

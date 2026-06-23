@@ -7,6 +7,7 @@ instrument-specific attributes.
 """
 from potpyri._version import __version__
 
+import glob
 import os
 import astropy
 import datetime
@@ -24,6 +25,12 @@ from astropy.nddata import CCDData
 from astropy.stats import sigma_clipped_stats
 from astropy.stats import SigmaClip
 from astropy.time import Time
+
+# Per-frame optical background subtraction modes (see apply_optical_background_subtraction).
+BKG_SUB_LOCAL = 'local'
+BKG_SUB_CONSTANT = 'constant'
+BKG_SUB_NONE = 'none'
+VALID_BKG_SUB_MODES = (BKG_SUB_LOCAL, BKG_SUB_CONSTANT, BKG_SUB_NONE)
 
 # WCS-related keywords to remove from calibration headers so saved files never
 # trigger InvalidTransformError (e.g. DEC=-100, ill-conditioned CD matrix).
@@ -123,6 +130,10 @@ class Instrument(object):
     keyword names, file-sorting rules, and methods for calibration and
     science processing. Subclasses override attributes as needed.
     """
+
+    # ``--proc fits`` (and aliases) force this glob on every instrument.
+    PROC_FITS_GLOB = '*.fits'
+    PROC_FITS_ALIASES = frozenset({'fits', '.fits', 'uncompressed'})
 
     def __init__(self):
 
@@ -388,12 +399,92 @@ class Instrument(object):
 
         return(sec_string)
 
+    def _proc_requests_fits(self, proc):
+        """True when ``--proc`` requests uncompressed ``*.fits`` (all instruments)."""
+        return proc is not None and str(proc).lower() in self.PROC_FITS_ALIASES
+
     def raw_format(self, proc):
-        """Return glob pattern for raw files (e.g. 'sci_img_*.fits' or 'sci_img*[!proc].fits')."""
+        """Return glob pattern for raw file discovery under ``data/raw``, ``data``, ``bad``.
+
+        If ``proc`` is ``fits`` / ``.fits`` / ``uncompressed``, returns ``*.fits``
+        regardless of instrument. Otherwise delegates to :meth:`_default_raw_format`.
+        """
+        if self._proc_requests_fits(proc):
+            return self.PROC_FITS_GLOB
+        return self._default_raw_format(proc)
+
+    def _default_raw_format(self, proc):
+        """Instrument-specific glob; override in subclasses."""
         if proc:
-            return('sci_img_*.fits')
+            return 'sci_img_*.fits'
+        return 'sci_img*[!proc].fits'
+
+    def discover_raw_files(self, paths, proc=None):
+        """Glob raw inputs under ``paths['raw']``, ``paths['data']``, and ``paths['bad']``.
+
+        Returns
+        -------
+        dict
+            ``pattern``, ``instrument_pattern``, ``proc``, ``proc_fits_override``,
+            ``per_dir`` (list of label, directory, glob_path, matched paths),
+            and ``files`` (combined matches).
+        """
+        pattern = self.raw_format(proc)
+        instrument_pattern = self._default_raw_format(proc)
+        per_dir = []
+        files = []
+        for label, key in (('raw', 'raw'), ('data', 'data'), ('bad', 'bad')):
+            directory = paths[key]
+            glob_path = os.path.join(directory, pattern)
+            matched = sorted(glob.glob(glob_path))
+            per_dir.append((label, directory, glob_path, matched))
+            files.extend(matched)
+        return {
+            'pattern': pattern,
+            'instrument_pattern': instrument_pattern,
+            'proc': proc,
+            'proc_fits_override': self._proc_requests_fits(proc),
+            'per_dir': per_dir,
+            'files': files,
+        }
+
+    def format_raw_discovery_message(self, paths, proc=None):
+        """Human-readable summary of where raw files are searched and what matched."""
+        info = self.discover_raw_files(paths, proc)
+        n_total = len(info['files'])
+        lines = [
+            f'Raw input discovery ({self.name}, --proc={info["proc"]!r}):',
+            (
+                f'  Glob pattern: {info["pattern"]!r}  '
+                '(Python glob: * = any substring; ? = one character; '
+                '[seq] = one character in seq)'
+            ),
+        ]
+        if info['proc_fits_override']:
+            lines.append(
+                f'  --proc fits: using {self.PROC_FITS_GLOB!r} on all instruments '
+                f'(instrument-specific pattern for this --proc would be '
+                f'{info["instrument_pattern"]!r})'
+            )
         else:
-            return('sci_img*[!proc].fits')
+            lines.append(
+                f'  Instrument pattern for --proc={info["proc"]!r}: '
+                f'{info["instrument_pattern"]!r}'
+            )
+        lines.append('  Search directories (pattern applied in each):')
+        for label, directory, glob_path, matched in info['per_dir']:
+            lines.append(
+                f'    [{label}] {glob_path}  ->  {len(matched)} file(s)'
+            )
+        if n_total == 0:
+            lines.append(
+                '  No files matched. Place raw data under data/raw/ or data/ '
+                f'with basenames matching {info["pattern"]!r}. '
+                'For uncompressed .fits on any instrument, pass --proc fits.'
+            )
+        else:
+            lines.append(f'  Total: {n_total} raw file(s) to classify.')
+        return '\n'.join(lines)
 
     def get_stk_name(self, hdr, red_path):
         """Return full path for stacked output FITS (target.filter.utYYMMDD.amp.binn.stk.fits)."""
@@ -1101,8 +1192,118 @@ class Instrument(object):
 
         return(input_mask)
 
+    def apply_optical_background_subtraction(self, processed_data, bkg_sub='local',
+            save_bkg=False, paths=None, log=None):
+        """Subtract per-frame background for optical data (not NIR master sky).
+
+        Parameters
+        ----------
+        processed_data : ccdproc.CCDData
+            Bias/dark/flat-corrected science frame with mask set.
+        bkg_sub : str, optional
+            ``'local'`` (default): photutils ``Background2D`` mesh model.
+            ``'constant'``: single sigma-clipped median subtracted from every pixel.
+            ``'none'``: no subtraction; ``SKYBKG`` set to 0.
+        save_bkg : bool, optional
+            If True and ``bkg_sub='local'``, write the 2D background model.
+        paths : dict, optional
+            Paths dict (``work`` key) required when ``save_bkg`` is True.
+        log : ColoredLogger, optional
+            Logger for progress.
+
+        Returns
+        -------
+        ccdproc.CCDData
+            Background-subtracted frame with ``SKYBKG`` and ``BKGSUB`` header keys.
+        """
+        mode = (bkg_sub or BKG_SUB_LOCAL).lower()
+        if mode not in VALID_BKG_SUB_MODES:
+            raise ValueError(
+                f'bkg_sub must be one of {VALID_BKG_SUB_MODES}, got {bkg_sub!r}'
+            )
+
+        if mode == BKG_SUB_NONE:
+            final_img = processed_data
+            final_img.header['SKYBKG'] = 0.0
+            final_img.header['BKGSUB'] = BKG_SUB_NONE
+            return final_img
+
+        if mode == BKG_SUB_CONSTANT:
+            if log:
+                log.info('Calculating constant frame background.')
+            _, med, _ = sigma_clipped_stats(
+                processed_data.data,
+                mask=processed_data.mask,
+                sigma=3.0,
+                maxiters=5,
+            )
+            if not np.isfinite(med):
+                med = np.nanmedian(processed_data.data)
+            background = med * u.electron
+            if log:
+                log.info(f'Constant background value: {background}')
+            final_img = processed_data.subtract(background)
+            final_img.header = processed_data.header
+            if 'SATURATE' in final_img.header:
+                final_img.header['SATURATE'] -= background.value
+            final_img.header['SKYBKG'] = background.value
+            final_img.header['BKGSUB'] = BKG_SUB_CONSTANT
+            return final_img
+
+        if log:
+            log.info('Calculating 2D background.')
+        approx_background = np.nanmedian(processed_data.data) * u.electron
+        if log:
+            log.info(f'Approximate background value: {approx_background}')
+        bkg = Background2D(
+            processed_data,
+            (64, 64),
+            filter_size=(3, 3),
+            sigma_clip=SigmaClip(sigma=3),
+            exclude_percentile=80,
+            bkg_estimator=MeanBackground(),
+            mask=processed_data.mask,
+            fill_value=np.nanmedian(processed_data.data),
+        )
+
+        med_background = np.nanmedian(bkg.background)
+        if log:
+            log.info(f'Median background: {med_background}')
+
+        if np.isnan(med_background.value):
+            final_img = processed_data.subtract(approx_background)
+            final_img.header = processed_data.header
+            if 'SATURATE' in final_img.header:
+                final_img.header['SATURATE'] -= approx_background.value
+            final_img.header['SKYBKG'] = approx_background.value
+            final_img.header['BKGSUB'] = BKG_SUB_CONSTANT
+        else:
+            if save_bkg:
+                if paths is None:
+                    raise ValueError('paths is required when save_bkg=True')
+                bkg_filename = self.get_bkg_name(processed_data.header, paths['work'])
+                if log:
+                    log.info(f'Writing background file: {bkg_filename}')
+                bkg_hdu = fits.PrimaryHDU(bkg.background.value)
+                bkg_hdu.header = processed_data.header
+                bkg_hdu.writeto(bkg_filename, overwrite=True, output_verify='silentfix')
+
+            final_img = processed_data.subtract(
+                CCDData(bkg.background, unit=u.electron),
+                propagate_uncertainties=True,
+                handle_meta='first_found',
+            )
+            if 'SATURATE' in final_img.header:
+                final_img.header['SATURATE'] -= med_background.value
+            final_img.header['SKYBKG'] = med_background.value
+            final_img.header['BKGSUB'] = BKG_SUB_LOCAL
+        if log:
+            log.info('Updating background and saturation values.')
+        return final_img
+
     def process_science(self, sci_list, fil, amp, binn, paths, mbias=None,
-        mflat=None, mdark=None, skip_skysub=False, save_bkg=False, log=None):
+        mflat=None, mdark=None, skip_skysub=False, bkg_sub='local',
+        save_bkg=False, log=None):
         """Reduce science frames: bias/dark/flat, optional sky subtraction; return CCDData list.
 
         Parameters
@@ -1124,7 +1325,13 @@ class Instrument(object):
         mdark : ccdproc.CCDData, optional
             Master dark.
         skip_skysub : bool, optional
-            If True, skip 2D background subtraction. Default is False.
+            If True, skip 2D background subtraction. Deprecated; use
+            ``bkg_sub='none'``. Default is False.
+        bkg_sub : str, optional
+            Per-frame background subtraction for optical data: ``'local'``
+            (2D mesh, default), ``'constant'`` (single value per frame), or
+            ``'none'``. Ignored when ``needs_sky_subtraction(fil)`` is True
+            (NIR / GMOS z-band use master sky instead).
         save_bkg : bool, optional
             If True, save background model. Default is False.
         log : ColoredLogger, optional
@@ -1137,6 +1344,8 @@ class Instrument(object):
         """
         processed = []
         processed_names = []
+        if skip_skysub:
+            bkg_sub = BKG_SUB_NONE
         for sci in sorted(sci_list):
             if log: log.info(f'Importing {sci}')
             sci_full = self.import_image(sci, amp, log=log)
@@ -1176,41 +1385,18 @@ class Instrument(object):
             processed_data.data[processed_data.mask]=np.nan
 
             if log: log.info(f'Wavelength is {self.wavelength}')
-            if not skip_skysub and not self.needs_sky_subtraction(fil):
-                if log: log.info('Calculating 2D background.')
-                approx_background=np.nanmedian(processed_data.data) * u.electron
-                if log: log.info(f'Approximate background value: {approx_background}')
-                bkg = Background2D(processed_data, (64, 64), filter_size=(3, 3),
-                    sigma_clip=SigmaClip(sigma=3), exclude_percentile=80,
-                    bkg_estimator=MeanBackground(), mask=processed_data.mask, 
-                    fill_value=np.nanmedian(processed_data.data))
-                
-                med_background = np.nanmedian(bkg.background)
-                if log: log.info(f'Median background: {med_background}')
-
-                if np.isnan(med_background.value):
-                    final_img = processed_data.subtract(approx_background)
-                    final_img.header = processed_data.header
-                    final_img.header['SATURATE'] -= approx_background.value
-                    final_img.header['SKYBKG'] = approx_background.value
-                else:
-                    if save_bkg:
-                        bkg_filename = self.get_bkg_name(processed_data.header, paths['work'])
-                        if log: log.info(f'Writing background file: {bkg_filename}')
-                        bkg_hdu = fits.PrimaryHDU(bkg.background.value)
-                        bkg_hdu.header = processed_data.header
-                        bkg_hdu.writeto(bkg_filename, overwrite=True,
-                            output_verify='silentfix')
-
-                    final_img = processed_data.subtract(CCDData(bkg.background,
-                        unit=u.electron), propagate_uncertainties=True, 
-                        handle_meta='first_found')
-                    final_img.header['SATURATE'] -= med_background.value
-                    final_img.header['SKYBKG'] = med_background.value
-                if log: log.info('Updating background and saturation values.')
+            if not self.needs_sky_subtraction(fil):
+                final_img = self.apply_optical_background_subtraction(
+                    processed_data,
+                    bkg_sub=bkg_sub,
+                    save_bkg=save_bkg,
+                    paths=paths,
+                    log=log,
+                )
             else:
                 final_img = processed_data
                 final_img.header['SKYBKG'] = 0.0
+                final_img.header['BKGSUB'] = BKG_SUB_NONE
 
             # Apply final masking based on excessively negative values
             finite = np.isfinite(final_img.data)

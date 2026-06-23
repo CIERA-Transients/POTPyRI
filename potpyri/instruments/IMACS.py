@@ -117,8 +117,8 @@ class IMACS(instrument.Instrument):
         return(amp)
 
     # Raw image format for ingestion
-    def raw_format(self, proc):
-        return('iff*.fits*')
+    def _default_raw_format(self, proc):
+        return 'iff*.fits*'
 
     def import_image(self, filename, amp, log=None):
         filename = os.path.abspath(filename)

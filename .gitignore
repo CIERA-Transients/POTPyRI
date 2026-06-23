@@ -5,6 +5,8 @@ examples/
 *.pyc
 __pycache__/
 .coverage
+# Generated at build/install time by setuptools_scm (see pyproject.toml)
+potpyri/_version.py
 *.pyo
 *.pyd
 *.pyz

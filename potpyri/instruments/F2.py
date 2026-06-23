@@ -92,8 +92,9 @@ class F2(instrument.Instrument):
         # Gives the saturation level in e-
         return(self.saturation*hdr['NREADS']*hdr['GAIN'])
 
-    def raw_format(self, proc):
-        return('*.fits.bz2')
+    def _default_raw_format(self, proc):
+        """Gemini archive default: ``*.fits.bz2`` (use ``--proc fits`` for ``*.fits``)."""
+        return '*.fits.bz2'
 
     def get_filter(self, hdr):
         filt = hdr['FILTER'].replace(' ','').split('_')[0]

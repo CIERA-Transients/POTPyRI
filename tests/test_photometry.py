@@ -221,3 +221,42 @@ def test_extract_fwhm_from_epsf():
         fwhm = photometry.extract_fwhm_from_epsf(epsf, fwhm_init=3.0)
     assert np.isfinite(fwhm)
     assert fwhm > 0
+
+
+def test_extract_fwhm_from_epsf_wide_array_uses_core():
+    """A broad flat ePSF array must not return FWHM ~ array size."""
+    size = 45
+    y, x = np.ogrid[-size // 2:size // 2 + 1, -size // 2:size // 2 + 1]
+    data = np.exp(-(x * x + y * y) / (2 * 2.0**2)).astype(float)
+    data += 0.02  # extended pedestal like stacked ePSF wings
+    epsf = SimpleNamespace(data=data)
+    fwhm = photometry.extract_fwhm_from_epsf(epsf, fwhm_init=5.0)
+    assert np.isfinite(fwhm)
+    assert fwhm < 15.0
+
+
+def test_extract_aperture_stats_fwhm_uses_compact_radius():
+    """FWHM must be measured at fwhm_measure_radius, not the flux aperture."""
+    stars = Table(
+        {
+            'xcentroid': Column([32.0]),
+            'ycentroid': Column([32.0]),
+            'peak': Column([100.0]),
+            'flux': Column([50.0]),
+        },
+    )
+    img = np.ones((64, 64), dtype=float) * 50.0
+    y, x = np.ogrid[:64, :64]
+    img += 500.0 * np.exp(-((x - 32) ** 2 + (y - 32) ** 2) / (2 * 2.0**2))
+    mask = np.zeros((64, 64), dtype=bool)
+    err = np.ones((64, 64), dtype=float) * 5.0
+
+    stats_small = photometry.extract_aperture_stats(
+        img, mask, err, stars, aperture_radius=20.0,
+        fwhm_measure_radius=5.0, log=None,
+    )
+    stats_large = photometry.extract_aperture_stats(
+        img, mask, err, stars, aperture_radius=20.0,
+        fwhm_measure_radius=20.0, log=None,
+    )
+    assert stats_small['fwhm'][0] < stats_large['fwhm'][0]

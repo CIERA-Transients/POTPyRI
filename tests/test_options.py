@@ -43,3 +43,13 @@ def test_add_paths_creates_dirs(tmp_path):
     assert os.path.exists(paths["raw"])
     assert os.path.exists(paths["red"])
     assert os.path.exists(paths["log"])
+
+
+def test_skip_skysub_sets_bkg_sub_none(monkeypatch):
+    """--skip-skysub overrides --bkg-sub to none."""
+    monkeypatch.setattr(
+        'sys.argv',
+        ['main_pipeline', 'GMOS', '/tmp/data', '--skip-skysub', '--bkg-sub', 'constant'],
+    )
+    args = options.add_options()
+    assert args.bkg_sub == 'none'

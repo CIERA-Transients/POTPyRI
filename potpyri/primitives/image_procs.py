@@ -298,7 +298,7 @@ def align_images(reduced_files, paths, tel, binn, use_wcs=None, fieldcenter=None
 
     return(aligned_images, aligned_data)
 
-def image_proc(image_data, tel, paths, skip_skysub=False,
+def image_proc(image_data, tel, paths, skip_skysub=False, bkg_sub='local',
     fieldcenter=None, out_size=None, satellites=True, cosmic_ray=True,
     skip_fine_align=False, skip_gaia=None, fine_align_catalog='gaia',
     skip_external_astrometry=False, keep_all_astro=False,
@@ -319,7 +319,12 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
     paths : dict
         Paths dict from options.add_paths.
     skip_skysub : bool, optional
-        If True, skip sky subtraction. Default is False.
+        If True, skip sky subtraction. Deprecated; use ``bkg_sub='none'``.
+        Default is False.
+    bkg_sub : str, optional
+        Per-frame background mode for optical data: ``'local'`` (2D mesh),
+        ``'constant'`` (single median per frame), or ``'none'``. Default
+        is ``'local'``.
     fieldcenter : sequence, optional
         [ra, dec] for alignment.
     out_size : int, optional
@@ -415,8 +420,10 @@ def image_proc(image_data, tel, paths, skip_skysub=False,
 
     # Bias subtraction, gain correction, flat correction, and flat fielding
     files = image_data['File']
+    if skip_skysub:
+        bkg_sub = 'none'
     processed = tel.process_science(files, fil, amp, binn, paths,
-        mbias=mbias, mflat=mflat, mdark=mdark, skip_skysub=skip_skysub, log=log)
+        mbias=mbias, mflat=mflat, mdark=mdark, bkg_sub=bkg_sub, log=log)
     
     # Get filenames for output processed data
     reduced_files = [p.header['FILENAME'] for p in processed]

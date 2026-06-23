@@ -260,18 +260,32 @@ def handle_files(file_list, paths, tel, incl_bad=False, proc=None,
         elif os.path.exists(file_list):
             os.remove(file_list)
 
-    files = glob.glob(os.path.join(paths['raw'], tel.raw_format(proc)))+\
-            glob.glob(os.path.join(paths['data'], tel.raw_format(proc)))+\
-            glob.glob(os.path.join(paths['bad'], tel.raw_format(proc)))
+    discovery_msg = tel.format_raw_discovery_message(paths, proc)
+    if log:
+        log.info(discovery_msg)
+    else:
+        print(discovery_msg, flush=True)
 
+    files = tel.discover_raw_files(paths, proc)['files']
 
-    if log: log.info('Sorting files and creating file lists.')
-    if len(files)!=0:
-        if log: log.info(f'{len(files)} files found.')
-        file_table = sort_files(files, file_list, tel, paths, incl_bad=incl_bad, 
+    if log:
+        log.info('Sorting files and creating file lists.')
+    if len(files) != 0:
+        if log:
+            log.info(f'{len(files)} files found.')
+        file_table = sort_files(files, file_list, tel, paths, incl_bad=incl_bad,
             log=log)
     else:
-        if log: log.critical('No files found, please check data path and rerun.')
+        if log:
+            log.critical(
+                'No raw input files found. See the discovery summary above for '
+                'directories searched and the glob pattern required.'
+            )
+        else:
+            print(
+                'No raw input files found. See discovery summary above.',
+                flush=True,
+            )
         logging.shutdown()
         sys.exit(-1)
 
