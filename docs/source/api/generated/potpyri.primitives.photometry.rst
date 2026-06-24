@@ -19,3 +19,9 @@
       run_photometry
       run_sextractor
    
+   .. rubric:: Exceptions
+
+   .. autosummary::
+   
+      PhotometryError
+   

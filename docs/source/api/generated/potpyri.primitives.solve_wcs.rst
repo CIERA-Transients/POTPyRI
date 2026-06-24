@@ -7,7 +7,7 @@
    .. rubric:: Functions
 
    .. autosummary::
-
+   
       clean_up_astrometry
       fine_align_wcs
       get_fine_align_reference_catalog

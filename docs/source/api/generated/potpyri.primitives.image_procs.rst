@@ -10,6 +10,7 @@
    
       add_stack_mask
       align_images
+      compute_relative_scales
       create_error
       create_mask
       detrend_stack
