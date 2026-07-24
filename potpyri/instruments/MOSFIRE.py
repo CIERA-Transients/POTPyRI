@@ -2,6 +2,7 @@
 from potpyri._version import __version__
 
 import os
+import re
 import ccdproc
 import numpy as np
 
@@ -112,8 +113,39 @@ class MOSFIRE(instrument.Instrument):
 
     # Get a unique image number that can be derived only from the file header
     def get_number(self, header):
-        number = str(header['FRAMENO']).zfill(5)
-        return(number)
+        """Return a short sequential frame number for science filenames.
+
+        Prefers observing-sequence numbers::
+
+            FRAMENO (legacy) → FRAMENUM (current MOSFIRE) → trailing digits
+            from DATAFILE / ORGFILE / FILENAME (e.g. ``m260724_0180`` → ``00180``).
+
+        Returns
+        -------
+        str
+            Zero-padded 5-digit frame number.
+        """
+        for key in ('FRAMENO', 'FRAMENUM'):
+            if key in header:
+                return str(int(header[key])).zfill(5)
+
+        for key in ('DATAFILE', 'ORGFILE', 'FILENAME'):
+            if key not in header:
+                continue
+            base = os.path.basename(str(header[key]))
+            # Strip compression / FITS suffixes before matching
+            for suffix in ('.fits.gz', '.fits.fz', '.fits.bz2', '.fits'):
+                if base.lower().endswith(suffix):
+                    base = base[: -len(suffix)]
+                    break
+            match = re.search(r'(\d+)\s*$', base)
+            if match:
+                return str(int(match.group(1))).zfill(5)
+
+        raise KeyError(
+            'Cannot derive MOSFIRE frame number: header lacks FRAMENO/FRAMENUM '
+            'and no trailing digits in DATAFILE/ORGFILE/FILENAME.'
+        )
 
     def import_image(self, filename, amp, log=None):
 

@@ -167,6 +167,22 @@ def test_get_time_get_number():
     assert isinstance(n, (int, np.integer))
 
 
+def test_mosfire_get_number_fallbacks():
+    """MOSFIRE get_number prefers FRAMENO, then FRAMENUM, then DATAFILE digits."""
+    tel = instrument_getter('MOSFIRE')
+
+    assert tel.get_number(fits.Header({'FRAMENO': 42})) == '00042'
+    assert tel.get_number(fits.Header({'FRAMENUM': 180})) == '00180'
+    # FRAMENO wins over FRAMENUM when both exist
+    assert tel.get_number(fits.Header({'FRAMENO': 7, 'FRAMENUM': 180})) == '00007'
+    assert tel.get_number(fits.Header({'DATAFILE': 'm260724_0180'})) == '00180'
+    assert tel.get_number(
+        fits.Header({'ORGFILE': '/data/raw/m260724_0233.fits'})
+    ) == '00233'
+    with pytest.raises(KeyError):
+        tel.get_number(fits.Header({'OBJECT': 'FRB'}))
+
+
 def test_get_instrument_name():
     """get_instrument_name returns lowercase name."""
     tel = GMOS()
