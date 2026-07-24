@@ -119,6 +119,23 @@ def test_convert_filter_name():
     assert cal.convert_filter_name('Kspec') == 'K'
 
 
+def test_twomass_vega_to_ab_and_magsys():
+    """2MASS is Vega-native; pipeline converts to AB and reports MAGSYS='AB'."""
+    assert absphot.catalog_native_magsys('2MASS') == 'VEGA'
+    assert absphot.catalog_native_magsys('PS1') == 'AB'
+    assert absphot.TWOMASS_VEGA_TO_AB['K'] == pytest.approx(1.85)
+    assert absphot.TWOMASS_VEGA_TO_AB['J'] == pytest.approx(0.91)
+
+    cat = Table({'mag': [15.0, 16.0]})
+    magsys = absphot.apply_catalog_to_ab(cat, '2MASS', 'K', log=None)
+    assert magsys == 'AB'
+    np.testing.assert_allclose(cat['mag'], [15.0 + 1.85, 16.0 + 1.85])
+
+    cat_ps1 = Table({'mag': [20.0]})
+    assert absphot.apply_catalog_to_ab(cat_ps1, 'PS1', 'r') == 'AB'
+    np.testing.assert_allclose(cat_ps1['mag'], [20.0])
+
+
 def test_get_minmag():
     """get_minmag returns bright limit by filter."""
     cal = absphot.absphot()
