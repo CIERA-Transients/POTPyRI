@@ -129,5 +129,8 @@ class MOSFIRE(instrument.Instrument):
             readnoise=self.get_rdnoise(raw.header)*u.electron)
 
         red.header['SATURATE'] = self.get_saturation(red.header)
+        # Raw SCI headers use TRUITIME/COADDONE; ccdproc dark scaling needs
+        # exptime_keyword (ELAPTIME). Populate it from get_exptime().
+        self.ensure_exptime_keyword(red.header)
 
         return(red)

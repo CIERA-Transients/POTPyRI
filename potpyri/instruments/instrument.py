@@ -307,6 +307,32 @@ class Instrument(object):
         """Return exposure time from header (exptime_keyword)."""
         return(hdr[self.exptime_keyword])
 
+    def ensure_exptime_keyword(self, hdr):
+        """Ensure ``exptime_keyword`` is present for ccdproc dark scaling.
+
+        Some instruments (e.g. MOSFIRE) compute exposure time from other
+        keywords via ``get_exptime`` but do not store ``exptime_keyword`` in
+        the raw SCI header. ``ccdproc.subtract_dark(..., exposure_time=...)``
+        requires that keyword on both the science/flat and master dark headers.
+        If it is missing, write the value returned by ``get_exptime``.
+
+        Parameters
+        ----------
+        hdr : astropy.io.fits.Header or mapping
+            Header to update in place.
+
+        Returns
+        -------
+        header
+            The same header object, possibly updated.
+        """
+        if self.exptime_keyword not in hdr:
+            hdr[self.exptime_keyword] = (
+                float(self.get_exptime(hdr)),
+                'Exposure time (sec); filled by POTPyRI for ccdproc.',
+            )
+        return hdr
+
     def get_ampl(self, hdr):
         """Return amplifier identifier from header as string."""
         if self.amp_keyword in hdr.keys():
@@ -925,6 +951,8 @@ class Instrument(object):
 
             if mdark is not None:
                 if log: log.info('Subtracting dark')
+                self.ensure_exptime_keyword(flat_full.header)
+                self.ensure_exptime_keyword(mdark.header)
                 flat_full = ccdproc.subtract_dark(flat_full, mdark, 
                     exposure_time=self.exptime_keyword, exposure_unit=u.second)
 
@@ -1367,6 +1395,8 @@ class Instrument(object):
             # Subtract dark
             if mdark is not None:
                 if log: log.info('Subtracting dark')
+                self.ensure_exptime_keyword(sci_full.header)
+                self.ensure_exptime_keyword(mdark.header)
                 sci_full = ccdproc.subtract_dark(sci_full, mdark, 
                     exposure_time=self.exptime_keyword, exposure_unit=u.second)
 

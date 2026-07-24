@@ -38,6 +38,21 @@ def test_fix_deprecated_wcs_header_cards_radecsys_and_mjd():
     assert 'MJD-OBS' not in h
 
 
+def test_ensure_exptime_keyword_fills_missing_for_mosfire():
+    """MOSFIRE SCI headers lack ELAPTIME; ensure_exptime_keyword fills from get_exptime."""
+    tel = instrument_getter('MOSFIRE')
+    h = fits.Header()
+    h['TRUITIME'] = 1.45
+    h['COADDONE'] = 8
+    assert 'ELAPTIME' not in h
+    tel.ensure_exptime_keyword(h)
+    assert h['ELAPTIME'] == pytest.approx(1.45 * 8)
+    # Existing value is left alone
+    h['ELAPTIME'] = 99.0
+    tel.ensure_exptime_keyword(h)
+    assert h['ELAPTIME'] == 99.0
+
+
 def test_resolve_instrument_name_aliases():
     """resolve_instrument_name maps aliases and canonical names."""
     assert resolve_instrument_name('gmos') == 'GMOS'
