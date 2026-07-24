@@ -45,6 +45,18 @@ def test_wcs(tmp_path):
     assert dec_disp / tel.pixscale < 1
 
 
+def test_find_astrometry_index_dir_prefers_populated_path(tmp_path, monkeypatch):
+    """_find_astrometry_index_dir returns a directory that contains index-*.fits."""
+    empty = tmp_path / 'empty'
+    empty.mkdir()
+    filled = tmp_path / 'filled'
+    filled.mkdir()
+    (filled / 'index-5002-00.fits').write_bytes(b'')
+    monkeypatch.setenv('ANET_DATA', str(filled))
+    found = solve_wcs._find_astrometry_index_dir()
+    assert found == str(filled)
+
+
 @pytest.mark.integration
 def test_wcs_integration(tmp_path):
     """Full pipeline: solve_astrometry and fine_align_wcs on GMOS slice (requires network and index)."""
