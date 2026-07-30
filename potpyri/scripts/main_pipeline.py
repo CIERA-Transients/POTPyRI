@@ -49,6 +49,7 @@ def main_pipeline(instrument: str,
                   skip_fine_align: bool = None,
                   skip_gaia: bool = None,
                   fine_align_catalog: str = None,
+                  zp_catalog: str = None,
                   skip_external_astrometry: bool = None,
                   keep_all_astro: bool = None,
                   relative_calibration: bool = None,
@@ -66,6 +67,9 @@ def main_pipeline(instrument: str,
 
     if skip_flatten: tel.flat=False
 
+    if zp_catalog:
+        tel.set_zeropoint_catalog(zp_catalog)
+
     skip_fa = bool(skip_fine_align) or bool(skip_gaia)
     fac = fine_align_catalog if fine_align_catalog is not None else 'gaia'
 
@@ -76,6 +80,8 @@ def main_pipeline(instrument: str,
     log = logger.get_log(paths['log'])
     log.info(f'Running main pipeline version {__version__}')
     log.info(f'Running instrument paramater file version {tel.version}')
+    if zp_catalog:
+        log.info(f'Zeropoint catalog override: {tel.catalog_zp}')
 
     # This contains all of the file data
     file_table = sort_files.handle_files(paths['filelist'], paths, tel,

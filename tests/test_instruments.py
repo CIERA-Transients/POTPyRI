@@ -403,6 +403,17 @@ def test_base_get_catalog():
     assert base.get_catalog(hdr) == "PS1"
 
 
+def test_set_zeropoint_catalog_overrides_gmos_latitude_switch():
+    """set_zeropoint_catalog forces DECALS even for southern GMOS fields."""
+    tel = instrument_getter("GMOS")
+    tel.set_zeropoint_catalog("decals")
+    assert tel.catalog_zp == "DECALS"
+    hdr_s = fits.Header()
+    hdr_s["RA"] = 0.0
+    hdr_s["DEC"] = -40.0
+    assert tel.get_catalog(hdr_s) == "DECALS"
+
+
 def test_format_datasec_binning_one():
     """format_datasec with binning=1 preserves integer bounds."""
     base = Instrument()

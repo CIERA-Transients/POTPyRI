@@ -1,6 +1,8 @@
 """Absolute photometry zeropoint calibration using catalog magnitudes.
 
-Queries Vizier (e.g. PS1) via :mod:`potpyri.utils.catalogs`, matches sources,
+Queries VizieR (PS1, SDSS, 2MASS, UKIRT, SkyMapper, DES) or DECaLS / Legacy
+Surveys Tractor PSF photometry via NOIRLab Data Lab TAP
+(:mod:`potpyri.utils.catalogs`), applies point-source cuts, matches sources,
 and fits zeropoint via iterative ODR. Writes ZPTMAG and related keywords to
 the stack header.
 Authors: Kerry Paterson, Charlie Kilpatrick.
@@ -162,14 +164,19 @@ class absphot(object):
         return(zpt, zpterr, master_mask)
 
     def get_catalog(self, coords, catalog, filt, log=None):
-        """Query VizieR for catalog magnitudes in a filter around given coordinates.
+        """Query a reference catalog for magnitudes around given coordinates.
+
+        Supports VizieR catalogs (PS1, SDSS, 2MASS, UKIRT, SkyMapper, DES) and
+        DECaLS / Legacy Surveys Tractor PSF photometry via NOIRLab Data Lab TAP.
+        Applies catalog-specific point-source cuts and returns a uniform product
+        with columns ``ra``, ``dec``, ``mag``, ``mag_err``.
 
         Parameters
         ----------
         coords : astropy.coordinates.SkyCoord
             Target coordinates (used for region size).
         catalog : str
-            Catalog name (e.g. 'PS1', '2MASS').
+            Catalog name (e.g. 'PS1', '2MASS', 'DECALS').
         filt : str
             Filter name (e.g. 'g', 'r', 'J').
         log : ColoredLogger, optional
@@ -182,50 +189,81 @@ class absphot(object):
             if query fails.
         """
         if log: log.info(f'Searching for catalog {catalog}')
-        
+
         coord_ra = np.median([c.ra.degree for c in coords])
         coord_dec = np.median([c.dec.degree for c in coords])
 
         catalog, cat_ID, cat_ra, cat_dec, cat_mag, cat_err = catalogs.find_catalog(
             catalog, filt, coord_ra, coord_dec)
-        
-        med_coord = SkyCoord(coord_ra, coord_dec, unit='deg')
 
+        if cat_ID is None:
+            m = (f'ERROR: catalog {catalog!r} does not support filter {filt!r}')
+            if log:
+                log.error(m)
+            else:
+                print(m)
+            return (None, None, None)
+
+        med_coord = SkyCoord(coord_ra, coord_dec, unit='deg')
         seps = med_coord.separation(coords)
         max_sep = np.max(seps.to(u.deg).value)
+        width = np.max([2.0 * max_sep, 0.5]) * u.degree
+
+        # DECaLS / Legacy Surveys: Data Lab TAP (already PSF-selected).
+        if catalog == 'DECALS' or (
+                cat_ID in (catalogs.DECALS_TRACTOR_TABLE,
+                           catalogs.DECALS_TRACTOR_FALLBACK_TABLE)):
+            if log:
+                log.info(
+                    f'Getting DECaLS Tractor catalog ({cat_ID}) in filt {filt}'
+                )
+                log.info(f'Querying around {coord_ra}, {coord_dec} deg')
+            cat = catalogs.query_decals_region(
+                med_coord, width, filt, log=log, table=cat_ID)
+            if cat is None or len(cat) == 0:
+                m = ('ERROR: cat {0}, ra {1}, dec {2} did not return a catalog'
+                     ).format(catalog, coord_ra, coord_dec)
+                if log:
+                    log.error(m)
+                else:
+                    print(m)
+                return (None, None, None)
+            # Product already has ra/dec/mag/mag_err; re-apply cut for consistency.
+            cat = catalogs.apply_point_source_cut(
+                cat, cat_ID, filt, mag_col='mag', log=log)
+            if cat is None or len(cat) == 0:
+                return (None, None, None)
+            # Ensure exact product columns.
+            for required in ('ra', 'dec', 'mag', 'mag_err'):
+                if required not in cat.colnames:
+                    return (None, None, None)
+            return (cat['ra', 'dec', 'mag', 'mag_err'], catalog, cat_ID)
 
         cols = [cat_ra, cat_dec, cat_mag, cat_err]
-        # Add Kron mag if the catalog is PS1
-        if cat_ID=='II/349':
-            cols.append(f'{filt}Kmag')
-        
+        cols.extend(catalogs.point_source_extra_columns(cat_ID, filt))
+        # Preserve order while dropping duplicates.
+        seen = set()
+        cols = [c for c in cols if not (c in seen or seen.add(c))]
+
         if log:
             log.info(f'Getting {catalog} catalog with ID {cat_ID} in filt {filt}')
             log.info(f'Querying around {coord_ra}, {coord_dec} deg')
-        width = np.max([2.0 * max_sep, 0.5])
         cat = catalogs.query_vizier_region(
-            med_coord, width * u.degree, cat_ID, cols, log=log)
+            med_coord, width, cat_ID, cols, log=log)
 
         if cat is not None:
             cat = cat[~np.isnan(cat[cat_mag])]
-            cat = cat[cat[cat_err]>0.]
+            cat = cat[cat[cat_err] > 0.]
 
-            if cat_ID=='II/349':
+            cat = catalogs.apply_point_source_cut(
+                cat, cat_ID, filt, mag_col=cat_mag, log=log)
+            if cat is None or len(cat) == 0:
+                m = (f'ERROR: no point sources remain after cut for {catalog}')
                 if log:
-                    log.info('Cutting on Kron magnitudes')
+                    log.error(m)
                 else:
-                    print('Cutting on Kron magnitudes')
-
-                nsources = len(cat)
-                cat_kron = f'{filt}Kmag'
-                mask = cat[cat_mag]-cat[cat_kron] < 0.1
-                cat = cat[mask]
-                nkron = len(cat)
-
-                if log:
-                    log.info(f'Cut catalog from {nsources} to {nkron}')
-                else:
-                    print(f'Cut catalog from {nsources} to {nkron}')
+                    print(m)
+                return (None, None, None)
 
             cat.rename_column(cat_ra, 'ra')
             cat.rename_column(cat_dec, 'dec')
@@ -233,27 +271,31 @@ class absphot(object):
             cat.rename_column(cat_err, 'mag_err')
 
             # Convert to AB magnitudes
-            if catalog=='2MASS':
-                if filt=='J': cat['mag'] = cat['mag'] + (4.56-3.65)
-                if filt=='H': cat['mag'] = cat['mag'] + (4.71-3.32)
-                if filt=='K': cat['mag'] = cat['mag'] + (5.14-3.29)
-                if filt=='Ks': cat['mag'] = cat['mag'] + (5.14-3.29)
+            if catalog == '2MASS':
+                if filt == 'J':
+                    cat['mag'] = cat['mag'] + (4.56 - 3.65)
+                if filt == 'H':
+                    cat['mag'] = cat['mag'] + (4.71 - 3.32)
+                if filt == 'K':
+                    cat['mag'] = cat['mag'] + (5.14 - 3.29)
+                if filt == 'Ks':
+                    cat['mag'] = cat['mag'] + (5.14 - 3.29)
 
-            if catalog=='2MASS' and filt=='Y':
+            if catalog == '2MASS' and filt == 'Y':
                 cat = cat[~np.isnan(cat['Kmag'])]
-                cat['mag'], cat['mag_err'] = self.Y_band(cat['mag'], 
-                    cat['mag_err'], cat['Kmag'], cat['e_Kmag'])
+                cat['mag'], cat['mag_err'] = self.Y_band(
+                    cat['mag'], cat['mag_err'], cat['Kmag'], cat['e_Kmag'])
 
-            return(cat, catalog, cat_ID)
+            return (cat, catalog, cat_ID)
 
         else:
-            m='ERROR: cat {0}, ra {1}, dec {2} did not return a catalog'
-            m=m.format(catalog, coord_ra, coord_dec)
+            m = 'ERROR: cat {0}, ra {1}, dec {2} did not return a catalog'
+            m = m.format(catalog, coord_ra, coord_dec)
             if log:
                 log.error(m)
             else:
                 print(m)
-            return(None, None, None)
+            return (None, None, None)
 
     def find_zeropoint(self, cmpfile, tel, match_radius=2.5*u.arcsec,
         phottable='APPPHOT', input_catalog=None, log=None):

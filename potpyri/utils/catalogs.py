@@ -1,7 +1,7 @@
 """VizieR and catalog metadata for astrometry and photometric calibration.
 
-Photometric reference catalogs (PS1, 2MASS, SkyMapper, SDSS, etc.) and
-astrometric queries (e.g. Gaia DR3) live here so primitives such as
+Photometric reference catalogs (PS1, 2MASS, SkyMapper, SDSS, DES, DECaLS, etc.)
+and astrometric queries (e.g. Gaia DR3) live here so primitives such as
 ``solve_wcs`` and ``absphot`` can share mirror fallback and column metadata
 without duplicating ``astroquery`` usage.
 
@@ -15,6 +15,7 @@ Authors: Kerry Paterson, Charlie Kilpatrick.
 import numpy as np
 from astroquery.vizier import Vizier
 from astropy import units as u
+from astropy.coordinates import SkyCoord
 from astropy.table import Table
 
 # Vizier mirror servers (hostnames only); tried in order when a query fails.
@@ -124,6 +125,23 @@ POINT_SOURCE_CALIBRATION_CATALOGS = {
         ],
         'roles': ('astrometry', 'photometry'),
     },
+    'decals': {
+        'description': (
+            'DECaLS / DESI Legacy Surveys Tractor PSF photometry '
+            '(NOIRLab Data Lab TAP: ls_dr10.tractor)'
+        ),
+        'vizier_id': None,
+        'datalab_table': 'ls_dr10.tractor',
+        'ra_column': 'ra',
+        'dec_column': 'dec',
+        'default_vizier_columns': [
+            'ra', 'dec', 'type', 'dered_mag_g', 'dered_mag_r', 'dered_mag_i',
+            'dered_mag_z', 'flux_g', 'flux_r', 'flux_i', 'flux_z',
+            'flux_ivar_g', 'flux_ivar_r', 'flux_ivar_i', 'flux_ivar_z',
+        ],
+        'roles': ('astrometry', 'photometry'),
+        'notes': 'Queried via Data Lab TAP, not VizieR.',
+    },
     'unwise': {
         'description': 'unWISE forced photometry at W1/W2 (compact sources)',
         'vizier_id': 'II/363',
@@ -205,17 +223,115 @@ POINT_SOURCE_CALIBRATION_CATALOGS = {
 GAIA_DR3_VIZIER_ID = 'I/355/gaiadr3'
 GAIA_DR3_ASTROMETRY_COLUMNS = ['RA_ICRS', 'DE_ICRS', 'Plx', 'PSS', 'PM']
 
+# NOIRLab Astro Data Lab TAP endpoint for Legacy Surveys / DECaLS Tractor catalogs.
+DATALAB_TAP_URL = 'https://datalab.noirlab.edu/tap'
+DECALS_TRACTOR_TABLE = 'ls_dr10.tractor'
+DECALS_TRACTOR_FALLBACK_TABLE = 'ls_dr9.tractor'
+
+#: Catalogs used for photometric zeropoint calibration (instrument ``catalog_zp``).
+FLUX_CALIBRATION_CATALOGS = (
+    'PS1', 'SDSS', '2MASS', 'UKIRT', 'SKYMAPPER', 'DES', 'DECALS',
+)
+
+#: Point-source selection rules keyed by catalog ID returned from :func:`find_catalog`.
+#: Each rule is applied by :func:`apply_point_source_cut`.
+POINT_SOURCE_CUTS = {
+    'II/349': {  # Pan-STARRS1
+        'method': 'psf_kron',
+        'kron_template': '{filt}Kmag',
+        'threshold': 0.1,
+        'description': 'PSF - Kron < 0.1 mag',
+    },
+    'V/154': {  # SDSS (find_catalog ID)
+        'method': 'class_equals',
+        'column': 'class',
+        'column_aliases': ('class', 'cl', 'Class'),
+        'value': 6,
+        'description': 'SDSS photometric class == 6 (star)',
+    },
+    'V/147': {  # SDSS DR12 (legacy / fine-align ID)
+        'method': 'class_equals',
+        'column': 'class',
+        'column_aliases': ('class', 'cl', 'Class'),
+        'value': 6,
+        'description': 'SDSS photometric class == 6 (star)',
+    },
+    'II/246': {  # 2MASS PSC
+        'method': 'class_equals',
+        'column': 'Xflg',
+        'column_aliases': ('Xflg', 'X', 'ext_key'),
+        'value': 0,
+        'description': '2MASS extended-source flag Xflg == 0',
+    },
+    'II/319': {  # UKIRT / UKIDSS
+        'method': 'class_equals',
+        'column': 'mergedClass',
+        'column_aliases': ('mergedClass', 'mergedclass', 'Class'),
+        'value': -1,
+        'description': 'UKIDSS mergedClass == -1 (star)',
+    },
+    'II/379/smssdr4': {  # SkyMapper DR4
+        'method': 'score_above',
+        'column': 'ClassStar',
+        'column_aliases': ('ClassStar', 'class_star', 'Class_Star'),
+        'threshold': 0.9,
+        'description': 'SkyMapper ClassStar > 0.9',
+    },
+    'II/357': {  # DES DR1
+        'method': 'des_sg',
+        'column_template': 'S/G{filt}',
+        'threshold': 0.5,
+        'description': 'DES S/G flag > 0.5 (star-like)',
+    },
+    'ls_dr10.tractor': {  # DECaLS / Legacy Surveys
+        'method': 'type_equals',
+        'column': 'type',
+        'value': 'PSF',
+        'description': "Tractor morphological type == 'PSF'",
+    },
+    'ls_dr9.tractor': {
+        'method': 'type_equals',
+        'column': 'type',
+        'value': 'PSF',
+        'description': "Tractor morphological type == 'PSF'",
+    },
+}
+
+
+def normalize_flux_catalog_name(catalog):
+    """Normalize a flux-calibration catalog name to a canonical key."""
+    if catalog is None:
+        return None
+    key = str(catalog).strip().upper()
+    aliases = {
+        'PANSTARRS': 'PS1',
+        'PAN-STARRS': 'PS1',
+        'PANSTARRS1': 'PS1',
+        'PS1DR1': 'PS1',
+        'TWOMASS': '2MASS',
+        '2MASSPSC': '2MASS',
+        'SMSS': 'SKYMAPPER',
+        'SMSSDR4': 'SKYMAPPER',
+        'DECALS_DR10': 'DECALS',
+        'DECALS_DR9': 'DECALS',
+        'LEGACY': 'DECALS',
+        'LEGACYSURVEY': 'DECALS',
+        'LEGACY_SURVEY': 'DECALS',
+        'DESDR1': 'DES',
+    }
+    return aliases.get(key, key)
+
 
 def find_catalog(catalog, fil, coord_ra, coord_dec):
-    """Return Vizier catalog ID and column names for the given catalog and filter.
+    """Return catalog ID and column names for the given catalog and filter.
 
-    Supports SDSS, 2MASS, UKIRT, PS1, SKYMAPPER. For southern u-band, uses
-    SkyMapper automatically.
+    Supports PS1, SDSS, 2MASS, UKIRT, SKYMAPPER, DES, and DECALS. For southern
+    u-band, uses SkyMapper automatically when the requested catalog is PS1.
 
     Parameters
     ----------
     catalog : str
-        Catalog name (e.g. 'PS1', 'SDSS', '2MASS').
+        Catalog name (e.g. 'PS1', 'SDSS', '2MASS', 'DECALS').
     fil : str
         Filter band (e.g. 'r', 'g', 'J').
     coord_ra : float
@@ -227,44 +343,363 @@ def find_catalog(catalog, fil, coord_ra, coord_dec):
     -------
     tuple
         (catalog, catalog_ID, ra_col, dec_col, mag_col, err_col) for use in
-        Vizier queries. catalog_ID/ra/dec/mag/err may be None if filter not supported.
+        Vizier / Data Lab queries. catalog_ID/ra/dec/mag/err may be None if
+        the filter is not supported.
     """
     catalog_ID, ra, dec, mag, err = None, None, None, None, None
+    catalog = normalize_flux_catalog_name(catalog)
 
-    if coord_dec < 0 and fil.lower() == 'u':
-        catalog = 'skymapper'
+    if coord_dec < 0 and fil.lower() == 'u' and catalog in ('PS1', 'DES', 'DECALS'):
+        catalog = 'SKYMAPPER'
 
-    if catalog.upper() == 'SDSS':
+    if catalog == 'SDSS':
         if fil.lower() not in ['u', 'g', 'r', 'i', 'z']:
             return (catalog, catalog_ID, ra, dec, mag, err)
         catalog_ID, ra, dec, mag, err = (
-            'V/154', 'RA_ICRS', 'DE_ICRS', fil.lower() + 'mag', 'e_' + fil.lower() + 'mag')
-    elif catalog.upper() == '2MASS':
+            'V/154', 'RA_ICRS', 'DE_ICRS',
+            fil.lower() + 'mag', 'e_' + fil.lower() + 'mag')
+    elif catalog == '2MASS':
         fil_2mass = fil.upper()
         if fil_2mass in ('KS', 'KSPEC'):
             fil_2mass = 'K'
         if fil_2mass not in ['J', 'H', 'K']:
             return (catalog, catalog_ID, ra, dec, mag, err)
         catalog_ID, ra, dec, mag, err = (
-            'II/246', 'RAJ2000', 'DEJ2000', fil_2mass + 'mag', 'e_' + fil_2mass + 'mag')
-    elif catalog.upper() == 'UKIRT':
+            'II/246', 'RAJ2000', 'DEJ2000',
+            fil_2mass + 'mag', 'e_' + fil_2mass + 'mag')
+    elif catalog == 'UKIRT':
         if fil.upper() not in ['Y', 'J', 'H', 'K']:
             return (catalog, catalog_ID, ra, dec, mag, err)
         catalog_ID, ra, dec, mag, err = (
-            'II/319', 'ra', 'dec', fil.upper() + 'mag', 'e_' + fil.upper() + 'mag')
-    elif catalog.upper() == 'PS1':
+            'II/319', 'ra', 'dec',
+            fil.upper() + 'mag', 'e_' + fil.upper() + 'mag')
+    elif catalog == 'PS1':
         if fil.lower() not in ['g', 'r', 'i', 'z', 'y']:
             return (catalog, catalog_ID, ra, dec, mag, err)
         catalog_ID, ra, dec, mag, err = (
-            'II/349', 'RAJ2000', 'DEJ2000', fil.lower() + 'mag', 'e_' + fil.lower() + 'mag')
-    elif catalog.upper() == 'SKYMAPPER':
+            'II/349', 'RAJ2000', 'DEJ2000',
+            fil.lower() + 'mag', 'e_' + fil.lower() + 'mag')
+    elif catalog == 'SKYMAPPER':
         if fil.lower() not in ['u', 'v', 'g', 'r', 'i', 'z']:
             return (catalog, catalog_ID, ra, dec, mag, err)
         catalog_ID, ra, dec, mag, err = (
             'II/379/smssdr4', 'RAICRS', 'DEICRS',
             fil.lower() + 'PSF', 'e_' + fil.lower() + 'PSF')
+    elif catalog == 'DES':
+        if fil.lower() not in ['g', 'r', 'i', 'z', 'y']:
+            return (catalog, catalog_ID, ra, dec, mag, err)
+        # DES DR1 on Vizier uses y as Y in some releases; prefer lowercase ymag.
+        f = fil.lower()
+        mag_col = f + 'mag' if f != 'y' else 'Ymag'
+        err_col = 'e_' + mag_col if f != 'y' else 'e_Ymag'
+        # Prefer standard lowercase columns used in viziercat for griz.
+        if f in ('g', 'r', 'i', 'z'):
+            mag_col = f + 'mag'
+            err_col = 'e_' + f + 'mag'
+        catalog_ID, ra, dec, mag, err = (
+            'II/357', 'RAJ2000', 'DEJ2000', mag_col, err_col)
+    elif catalog == 'DECALS':
+        if fil.lower() not in ['g', 'r', 'i', 'z']:
+            return (catalog, catalog_ID, ra, dec, mag, err)
+        f = fil.lower()
+        catalog_ID, ra, dec, mag, err = (
+            DECALS_TRACTOR_TABLE, 'ra', 'dec',
+            f'dered_mag_{f}', f'e_dered_mag_{f}')
 
     return (catalog, catalog_ID, ra, dec, mag, err)
+
+
+def point_source_extra_columns(catalog_id, filt):
+    """Return extra VizieR/TAP columns needed for the point-source cut."""
+    rule = POINT_SOURCE_CUTS.get(catalog_id)
+    if rule is None:
+        return []
+    method = rule['method']
+    if method == 'psf_kron':
+        return [rule['kron_template'].format(filt=filt.lower())]
+    if method in ('class_equals', 'score_above', 'type_equals'):
+        cols = [rule['column']]
+        for alias in rule.get('column_aliases', ()):
+            if alias not in cols:
+                cols.append(alias)
+        return cols
+    if method == 'des_sg':
+        f = filt.lower()
+        # DES S/G columns are S/Gg, S/Gr, ...
+        return [f'S/G{f}', f'S/G{f.upper()}']
+    return []
+
+
+def _resolve_cut_column(table, names):
+    """Return the first column name in *names* present in *table*, else None."""
+    for name in names:
+        if name in table.colnames:
+            return name
+    return None
+
+
+def apply_point_source_cut(table, catalog_id, filt, mag_col=None, log=None):
+    """Apply the catalog-specific point-source selection to *table*.
+
+    Parameters
+    ----------
+    table : astropy.table.Table
+        Catalog rows (may include cut-helper columns).
+    catalog_id : str
+        Catalog ID from :func:`find_catalog` (e.g. ``'II/349'``, ``'ls_dr10.tractor'``).
+    filt : str
+        Filter used for PSF–Kron or DES S/G cuts.
+    mag_col : str, optional
+        Magnitude column for PSF–Kron (defaults to ``{filt}mag`` / catalog default).
+    log : ColoredLogger, optional
+        Logger.
+
+    Returns
+    -------
+    astropy.table.Table
+        Filtered table. If the cut columns are missing, returns *table* unchanged
+        (with a warning) so network/schema drift does not hard-fail calibration.
+    """
+    if table is None or len(table) == 0:
+        return table
+
+    rule = POINT_SOURCE_CUTS.get(catalog_id)
+    if rule is None:
+        if log:
+            log.warning(f'No point-source cut defined for catalog_id={catalog_id!r}')
+        return table
+
+    n0 = len(table)
+    method = rule['method']
+    filt_l = str(filt).lower()
+
+    if method == 'psf_kron':
+        kron_col = rule['kron_template'].format(filt=filt_l)
+        if mag_col is None:
+            mag_col = f'{filt_l}mag'
+        if mag_col not in table.colnames or kron_col not in table.colnames:
+            msg = (
+                f'Point-source cut skipped for {catalog_id}: missing '
+                f'{mag_col!r} or {kron_col!r}'
+            )
+            if log:
+                log.warning(msg)
+            else:
+                print(msg)
+            return table
+        mag = np.asarray(table[mag_col], dtype=float)
+        kron = np.asarray(table[kron_col], dtype=float)
+        mask = np.isfinite(mag) & np.isfinite(kron) & (
+            (mag - kron) < float(rule['threshold']))
+        out = table[mask]
+    elif method == 'class_equals':
+        col = _resolve_cut_column(
+            table, (rule['column'],) + tuple(rule.get('column_aliases', ())))
+        if col is None:
+            msg = (
+                f'Point-source cut skipped for {catalog_id}: missing '
+                f'{rule["column"]!r}'
+            )
+            if log:
+                log.warning(msg)
+            else:
+                print(msg)
+            return table
+        vals = np.asarray(table[col])
+        # Allow numeric or string-encoded integers (e.g. Vizier).
+        try:
+            vals_num = np.asarray(vals, dtype=float)
+            mask = vals_num == float(rule['value'])
+        except (TypeError, ValueError):
+            mask = np.asarray([str(v).strip() == str(rule['value']) for v in vals])
+        out = table[mask]
+    elif method == 'score_above':
+        col = _resolve_cut_column(
+            table, (rule['column'],) + tuple(rule.get('column_aliases', ())))
+        if col is None:
+            msg = (
+                f'Point-source cut skipped for {catalog_id}: missing '
+                f'{rule["column"]!r}'
+            )
+            if log:
+                log.warning(msg)
+            else:
+                print(msg)
+            return table
+        score = np.asarray(table[col], dtype=float)
+        mask = np.isfinite(score) & (score > float(rule['threshold']))
+        out = table[mask]
+    elif method == 'type_equals':
+        col = rule['column']
+        if col not in table.colnames:
+            msg = f'Point-source cut skipped for {catalog_id}: missing {col!r}'
+            if log:
+                log.warning(msg)
+            else:
+                print(msg)
+            return table
+        types = np.asarray([str(v).strip().upper() for v in table[col]])
+        mask = types == str(rule['value']).strip().upper()
+        out = table[mask]
+    elif method == 'des_sg':
+        candidates = [
+            f'S/G{filt_l}',
+            f'S/G{filt_l.upper()}',
+            rule.get('column_template', 'S/G{filt}').format(filt=filt_l),
+        ]
+        col = _resolve_cut_column(table, candidates)
+        if col is None:
+            msg = f'Point-source cut skipped for {catalog_id}: missing DES S/G column'
+            if log:
+                log.warning(msg)
+            else:
+                print(msg)
+            return table
+        sg = np.asarray(table[col], dtype=float)
+        mask = np.isfinite(sg) & (sg > float(rule['threshold']))
+        out = table[mask]
+    else:
+        if log:
+            log.warning(f'Unknown point-source cut method {method!r}')
+        return table
+
+    msg = (
+        f'Point-source cut ({rule["description"]}): {n0} -> {len(out)} sources'
+    )
+    if log:
+        log.info(msg)
+    else:
+        print(msg)
+    return out
+
+
+def nanomaggy_to_ab_mag(flux, flux_ivar=None):
+    """Convert Legacy Surveys nanomaggy flux (+ optional ivar) to AB mag / magerr."""
+    flux = np.asarray(flux, dtype=float)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        mag = 22.5 - 2.5 * np.log10(flux)
+    magerr = np.full(flux.shape, np.nan, dtype=float)
+    if flux_ivar is not None:
+        flux_ivar = np.asarray(flux_ivar, dtype=float)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            snr = flux * np.sqrt(flux_ivar)
+            magerr = (2.5 / np.log(10.0)) / snr
+            magerr[~np.isfinite(snr) | (snr <= 0)] = np.nan
+    mag[~np.isfinite(flux) | (flux <= 0)] = np.nan
+    return mag, magerr
+
+
+def query_decals_region(center, width, filt, log=None, table=None):
+    """Query DECaLS / Legacy Surveys Tractor PSF sources via Data Lab TAP.
+
+    Selects ``type='PSF'`` rows and returns a table with columns ``ra``, ``dec``,
+    ``mag``, ``mag_err``, and ``type`` — the same product schema used by
+    :meth:`potpyri.primitives.absphot.absphot.get_catalog` after renaming.
+
+    Parameters
+    ----------
+    center : astropy.coordinates.SkyCoord
+        Field center.
+    width : astropy.units.Quantity
+        Search box width (cone radius uses half-width).
+    filt : str
+        Optical band ``g``, ``r``, ``i``, or ``z``.
+    log : ColoredLogger, optional
+        Logger.
+    table : str, optional
+        Tractor TAP table (default :data:`DECALS_TRACTOR_TABLE`).
+
+    Returns
+    -------
+    astropy.table.Table or None
+        Point-source photometry table, or None on failure / empty result.
+    """
+    f = str(filt).lower()
+    if f not in ('g', 'r', 'i', 'z'):
+        raise ValueError(f'DECaLS filter must be g/r/i/z, got {filt!r}')
+
+    if not isinstance(center, SkyCoord):
+        center = SkyCoord(center)
+
+    radius_deg = 0.5 * float(width.to(u.deg).value)
+    radius_deg = max(radius_deg, 0.1)
+    ra = float(center.ra.degree)
+    dec = float(center.dec.degree)
+    # Data Lab Tractor tables do not expose q3c_radial_query in all TAP setups;
+    # use a conservative RA/Dec box (no cos(dec) shrink — slightly larger area).
+    ra_lo, ra_hi = ra - radius_deg, ra + radius_deg
+    dec_lo, dec_hi = dec - radius_deg, dec + radius_deg
+    tables = [table or DECALS_TRACTOR_TABLE, DECALS_TRACTOR_FALLBACK_TABLE]
+    # Deduplicate while preserving order.
+    seen = set()
+    tables = [t for t in tables if not (t in seen or seen.add(t))]
+
+    try:
+        from astroquery.utils.tap.core import TapPlus
+    except Exception as e:
+        if log:
+            log.error(f'Data Lab TAP client unavailable: {e}')
+        return None
+
+    last_error = None
+    for tap_table in tables:
+        query = f"""
+SELECT ra, dec, type,
+       dered_mag_{f} AS mag,
+       flux_{f}, flux_ivar_{f}
+FROM {tap_table}
+WHERE ra BETWEEN {ra_lo} AND {ra_hi}
+  AND dec BETWEEN {dec_lo} AND {dec_hi}
+  AND type = 'PSF'
+  AND flux_{f} > 0
+  AND flux_ivar_{f} > 0
+  AND dered_mag_{f} > 0
+  AND dered_mag_{f} < 30
+""".strip()
+        try:
+            if log:
+                log.info(
+                    f'Querying DECaLS Tractor via Data Lab ({tap_table}), '
+                    f'filter={f}, box half-width={radius_deg:.3f} deg'
+                )
+            tap = TapPlus(url=DATALAB_TAP_URL)
+            # Default TAP maxrec is often 2000; raise it for typical ZP fields.
+            job = tap.launch_job(query, maxrec=100000)
+            result = job.get_results()
+            if result is None or len(result) == 0:
+                continue
+            out = Table(result)
+            # Prefer dereddened mag; recompute magerr from flux ivar.
+            mag = np.asarray(out['mag'], dtype=float)
+            _, magerr = nanomaggy_to_ab_mag(out['flux_' + f], out['flux_ivar_' + f])
+            # If dered mag is missing/NaN, fall back to nanomaggy conversion.
+            bad = ~np.isfinite(mag)
+            if np.any(bad):
+                mag_fb, _ = nanomaggy_to_ab_mag(
+                    out['flux_' + f], out['flux_ivar_' + f])
+                mag = np.where(bad, mag_fb, mag)
+            out['mag'] = mag
+            out['mag_err'] = magerr
+            keep = (
+                np.isfinite(out['mag']) & np.isfinite(out['mag_err'])
+                & (out['mag_err'] > 0)
+            )
+            out = out[keep]
+            # Drop intermediate flux columns for a stable product schema.
+            for col in list(out.colnames):
+                if col.startswith('flux'):
+                    out.remove_column(col)
+            if log:
+                log.info(f'DECaLS query returned {len(out)} PSF sources')
+            return out if len(out) else None
+        except Exception as e:
+            last_error = e
+            if log:
+                log.warning(f'DECaLS TAP query failed for {tap_table}: {e}')
+
+    if log and last_error is not None:
+        log.warning(f'All DECaLS TAP attempts failed; last error: {last_error}')
+    return None
 
 
 def query_vizier_region(center, width, catalog_id, columns, log=None):

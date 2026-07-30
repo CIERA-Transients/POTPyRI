@@ -368,6 +368,28 @@ class Instrument(object):
         """Return catalog name for zeropoint (e.g. 'PS1')."""
         return(self.catalog_zp)
 
+    def set_zeropoint_catalog(self, catalog):
+        """Override the flux / zeropoint reference catalog for this run.
+
+        Sets :attr:`catalog_zp` and replaces :meth:`get_catalog` so instrument-
+        specific latitude switches (e.g. GMOS PS1 vs SkyMapper) are bypassed.
+
+        Parameters
+        ----------
+        catalog : str
+            Catalog name or alias (e.g. ``'DECALS'``, ``'legacy'``, ``'PS1'``).
+        """
+        from potpyri.utils.catalogs import normalize_flux_catalog_name
+        name = normalize_flux_catalog_name(catalog)
+        if name not in (
+                'PS1', 'SDSS', '2MASS', 'UKIRT', 'SKYMAPPER', 'DES', 'DECALS'):
+            raise ValueError(
+                f'Unsupported zeropoint catalog {catalog!r} '
+                f'(normalized to {name!r})'
+            )
+        self.catalog_zp = name
+        self.get_catalog = lambda hdr, _n=name: _n
+
     def format_datasec(self, sec_string, binning=1):
         """Convert datasec string to binned pixel bounds (e.g. '[1:100,1:200]').
 

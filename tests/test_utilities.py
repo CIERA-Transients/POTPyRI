@@ -50,7 +50,7 @@ def test_find_catalog_sdss():
 def test_find_catalog_skymapper_u_south():
     """find_catalog uses SkyMapper for u-band when dec < 0."""
     cat, cid, ra, dec, mag, err = utilities.find_catalog("PS1", "u", 180.0, -40.0)
-    assert cat == "skymapper"
+    assert cat == "SKYMAPPER"
     assert cid == "II/379/smssdr4"
 
 
