@@ -5,6 +5,11 @@ Surveys Tractor PSF photometry via NOIRLab Data Lab TAP
 (:mod:`potpyri.utils.catalogs`), applies point-source cuts, matches sources,
 and fits zeropoint via iterative ODR. Writes ZPTMAG and related keywords to
 the stack header.
+
+All zeropoints and limiting magnitudes are reported in the **AB** system.
+Native-Vega catalogs (notably 2MASS) are converted to AB before the fit; see
+:data:`TWOMASS_VEGA_TO_AB` and header keyword ``MAGSYS``.
+
 Authors: Kerry Paterson, Charlie Kilpatrick.
 """
 from potpyri._version import __version__
@@ -19,6 +24,22 @@ from astropy.io import fits
 # Internal dependencies
 from potpyri.utils import catalogs
 
+# 2MASS PSC is published on the Vega system. Offsets below are
+# (ABmag - Vegamag) = (mag_zero_AB - mag_zero_Vega) from the Tokunaga & Vacca
+# (2005) / Bessell style zeropoints used historically in this pipeline:
+#   J: 4.56 - 3.65 = 1.91
+#   H: 4.71 - 3.32 = 1.39
+#   K/Ks: 5.14 - 3.29 = 1.85
+TWOMASS_VEGA_TO_AB = {
+    'J': 4.56 - 3.65,
+    'H': 4.71 - 3.32,
+    'K': 5.14 - 3.29,
+    'Ks': 5.14 - 3.29,
+}
+
+# FITS MAGSYS value written with ZPTMAG / M*SIGMA (always AB after conversion).
+MAGSYS_AB = 'AB'
+
 
 def _fits_extension_names(hdulist):
     """Return EXTNAME values for an HDUList (empty string if unset)."""
@@ -31,6 +52,63 @@ def _log_or_print(msg, log, level='info'):
         print(msg, flush=True)
         return
     getattr(log, level)(msg)
+
+
+def catalog_native_magsys(catalog):
+    """Return the native magnitude system of a photometric reference catalog.
+
+    Parameters
+    ----------
+    catalog : str
+        Catalog name (e.g. ``'PS1'``, ``'2MASS'``).
+
+    Returns
+    -------
+    str
+        ``'VEGA'`` for 2MASS; ``'AB'`` for PS1 / SDSS / SkyMapper and others
+        treated as AB in this pipeline.
+    """
+    if str(catalog).upper() in ('2MASS', 'TWOMASS'):
+        return 'VEGA'
+    return 'AB'
+
+
+def apply_catalog_to_ab(cat, catalog, filt, log=None):
+    """Convert catalog magnitudes in-place to AB if they are native Vega.
+
+    Parameters
+    ----------
+    cat : astropy.table.Table
+        Table with a ``mag`` column (modified in place).
+    catalog : str
+        Catalog name.
+    filt : str
+        Catalog filter (``J``, ``H``, ``K``, ``Ks``, ...).
+    log : ColoredLogger, optional
+        Logger.
+
+    Returns
+    -------
+    str
+        Magnitude system of the returned photometry (``'AB'``).
+    """
+    native = catalog_native_magsys(catalog)
+    if native == 'VEGA' and filt in TWOMASS_VEGA_TO_AB:
+        offset = TWOMASS_VEGA_TO_AB[filt]
+        cat['mag'] = cat['mag'] + offset
+        _log_or_print(
+            f'Converted {catalog} {filt} magnitudes Vega→AB '
+            f'(+{offset:.2f} mag); MAGSYS will be {MAGSYS_AB!r}',
+            log,
+        )
+    elif native == 'VEGA':
+        _log_or_print(
+            f'WARNING: {catalog} is Vega-native but no AB offset is defined '
+            f'for filter {filt!r}; magnitudes left unchanged',
+            log,
+            level='warning',
+        )
+    return MAGSYS_AB
 
 
 class absphot(object):
@@ -270,16 +348,8 @@ class absphot(object):
             cat.rename_column(cat_mag, 'mag')
             cat.rename_column(cat_err, 'mag_err')
 
-            # Convert to AB magnitudes
-            if catalog == '2MASS':
-                if filt == 'J':
-                    cat['mag'] = cat['mag'] + (4.56 - 3.65)
-                if filt == 'H':
-                    cat['mag'] = cat['mag'] + (4.71 - 3.32)
-                if filt == 'K':
-                    cat['mag'] = cat['mag'] + (5.14 - 3.29)
-                if filt == 'Ks':
-                    cat['mag'] = cat['mag'] + (5.14 - 3.29)
+            # Convert native-Vega catalogs (2MASS) to AB; PS1/SDSS already AB.
+            apply_catalog_to_ab(cat, catalog, filt, log=log)
 
             if catalog == '2MASS' and filt == 'Y':
                 cat = cat[~np.isnan(cat['Kmag'])]
@@ -301,8 +371,10 @@ class absphot(object):
         phottable='APPPHOT', input_catalog=None, log=None):
         """Compute zeropoint from cmpfile photometry and catalog; write to FITS header.
 
-        Matches sources to catalog (e.g. PS1), runs iterative ODR fit, and
-        updates ZPTMAG, ZPTNSTAR, ZPTCAT, etc. in the stack FITS.
+        Matches sources to catalog (e.g. PS1, 2MASS), runs iterative ODR fit, and
+        updates ZPTMAG, ZPTNSTAR, ZPTCAT, MAGSYS, etc. in the stack FITS.
+        Magnitudes are always stored in the AB system (``MAGSYS='AB'``); 2MASS
+        Vega values are converted before the fit.
 
         Parameters
         ----------
@@ -443,6 +515,12 @@ class absphot(object):
                 metadata['ZPTCATID'] = cat_ID
                 metadata['ZPTPHOT'] = phottable
                 metadata['FILTER'] = filtorig
+                # Zeropoint and limiting mags are always on the AB system
+                # (2MASS Vega→AB applied in get_catalog / apply_catalog_to_ab).
+                metadata['MAGSYS'] = (
+                    MAGSYS_AB,
+                    'Magnitude system for ZPTMAG and M*SIGMA (AB)',
+                )
 
                 # Add limiting magnitudes
                 if 'FWHM' in header.keys() and 'SKYSIG' in header.keys():
@@ -459,7 +537,10 @@ class absphot(object):
                     metadata['M3SIGMA'] = m3sigma
                     metadata['M5SIGMA'] = m5sigma
                     metadata['M10SIGMA'] = m10sigma
-                    _log_or_print(f'3-sigma limiting mag of image is {m3sigma}', log)
+                    _log_or_print(
+                        f'3-sigma limiting mag of image is {m3sigma} ({MAGSYS_AB})',
+                        log,
+                    )
 
                 hdu['PRIMARY'].header.update(metadata)
                 hdu['SCI'].header.update(metadata)
