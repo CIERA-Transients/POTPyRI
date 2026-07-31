@@ -57,6 +57,60 @@ def test_find_astrometry_index_dir_prefers_populated_path(tmp_path, monkeypatch)
     assert found == str(filled)
 
 
+def test_build_solve_field_index_args_uses_backend_config_fallback(tmp_path, monkeypatch):
+    """Older solve-field without --index-dir gets a --backend-config instead."""
+    filled = tmp_path / 'indexes'
+    filled.mkdir()
+    (filled / 'index-5001-06.fits').write_bytes(b'')
+    work = tmp_path / 'work'
+    work.mkdir()
+
+    monkeypatch.setattr(
+        solve_wcs, '_solve_field_helptext',
+        lambda: 'usage: solve-field\n  -b / --backend-config <filename>\n')
+
+    args = solve_wcs.build_solve_field_index_args(
+        index=str(filled), work_dir=str(work), auto=False, log=None)
+    assert args.startswith('--backend-config ')
+    cfg = args.split()[1]
+    assert os.path.exists(cfg)
+    text = open(cfg).read()
+    assert str(filled) in text
+    assert 'autoindex' in text
+
+
+def test_build_solve_field_index_args_uses_index_dir_when_supported(tmp_path, monkeypatch):
+    """Newer solve-field with --index-dir uses that flag directly."""
+    filled = tmp_path / 'indexes'
+    filled.mkdir()
+    (filled / 'index-5001-06.fits').write_bytes(b'')
+
+    monkeypatch.setattr(
+        solve_wcs, '_solve_field_helptext',
+        lambda: 'usage: solve-field\n  --index-dir <path>\n')
+
+    args = solve_wcs.build_solve_field_index_args(
+        index=str(filled), work_dir=str(tmp_path), auto=False, log=None)
+    assert args == f'--index-dir {filled} '
+
+
+def test_anet_index_dir_cli_option():
+    """CLI exposes --anet-index-dir."""
+    import sys
+    from potpyri.utils import options as optmod
+
+    old = sys.argv
+    try:
+        sys.argv = [
+            'main_pipeline', 'GMOS', '/tmp',
+            '--anet-index-dir', '/usr/local/astrometry/data',
+        ]
+        parsed = optmod.add_options()
+    finally:
+        sys.argv = old
+    assert parsed.anet_index_dir == '/usr/local/astrometry/data'
+
+
 @pytest.mark.integration
 def test_wcs_integration(tmp_path):
     """Full pipeline: solve_astrometry and fine_align_wcs on GMOS slice (requires network and index)."""

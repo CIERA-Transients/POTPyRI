@@ -120,6 +120,14 @@ def init_options():
         dest='fine_align_catalog',
         help='Reference catalog for fine WCS alignment after astrometry.net: gaia (default), '
              'panstarrs, sdss (SDSS V/147), legacy, 2mass, or skymapper.')
+    params.add_argument('--anet-index-dir',
+        type=str,
+        default=None,
+        dest='anet_index_dir',
+        help='Directory (or single index-*.fits file) of astrometry.net indexes for '
+             'solve-field. Use when the default/conda index path is empty or wrong. '
+             'On older solve-field builds without --index-dir, POTPyRI writes a '
+             'temporary --backend-config. Overrides $ANET_DATA auto-detection.')
     params.add_argument('--zp-catalog',
         type=str,
         default=None,
