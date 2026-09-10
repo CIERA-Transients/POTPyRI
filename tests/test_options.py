@@ -53,3 +53,29 @@ def test_skip_skysub_sets_bkg_sub_none(monkeypatch):
     )
     args = options.add_options()
     assert args.bkg_sub == 'none'
+
+
+def test_zp_catalog_decals_normalized(monkeypatch):
+    """--zp-catalog decals/legacy normalize to DECALS."""
+    monkeypatch.setattr(
+        'sys.argv',
+        ['main_pipeline', 'GMOS', '/tmp/data', '--zp-catalog', 'decals'],
+    )
+    args = options.add_options()
+    assert args.zp_catalog == 'DECALS'
+
+    monkeypatch.setattr(
+        'sys.argv',
+        ['main_pipeline', 'GMOS', '/tmp/data', '--zp-catalog', 'legacy'],
+    )
+    args = options.add_options()
+    assert args.zp_catalog == 'DECALS'
+
+
+def test_zp_catalog_in_parser_choices():
+    parser = options.init_options()
+    actions = {a.dest: a for a in parser._actions}
+    assert 'zp_catalog' in actions
+    assert 'decals' in actions['zp_catalog'].choices
+    assert 'legacy' in actions['zp_catalog'].choices
+    assert 'ps1' in actions['zp_catalog'].choices

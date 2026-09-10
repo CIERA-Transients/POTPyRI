@@ -204,6 +204,11 @@ class Instrument(object):
         self.bad_keywords = []
         self.bad_values = []
 
+        # Optional closed-door + short-exptime bias fallback (see LRIS)
+        self.bias_max_exptime = None
+        self.bias_door_keyword = None
+        self.bias_door_value = 'closed'
+
         self.detrend = True
         self.catalog_zp = 'PS1'
 
@@ -307,6 +312,32 @@ class Instrument(object):
         """Return exposure time from header (exptime_keyword)."""
         return(hdr[self.exptime_keyword])
 
+    def ensure_exptime_keyword(self, hdr):
+        """Ensure ``exptime_keyword`` is present for ccdproc dark scaling.
+
+        Some instruments (e.g. MOSFIRE) compute exposure time from other
+        keywords via ``get_exptime`` but do not store ``exptime_keyword`` in
+        the raw SCI header. ``ccdproc.subtract_dark(..., exposure_time=...)``
+        requires that keyword on both the science/flat and master dark headers.
+        If it is missing, write the value returned by ``get_exptime``.
+
+        Parameters
+        ----------
+        hdr : astropy.io.fits.Header or mapping
+            Header to update in place.
+
+        Returns
+        -------
+        header
+            The same header object, possibly updated.
+        """
+        if self.exptime_keyword not in hdr:
+            hdr[self.exptime_keyword] = (
+                float(self.get_exptime(hdr)),
+                'Exposure time (sec); filled by POTPyRI for ccdproc.',
+            )
+        return hdr
+
     def get_ampl(self, hdr):
         """Return amplifier identifier from header as string."""
         if self.amp_keyword in hdr.keys():
@@ -367,6 +398,28 @@ class Instrument(object):
     def get_catalog(self, hdr):
         """Return catalog name for zeropoint (e.g. 'PS1')."""
         return(self.catalog_zp)
+
+    def set_zeropoint_catalog(self, catalog):
+        """Override the flux / zeropoint reference catalog for this run.
+
+        Sets :attr:`catalog_zp` and replaces :meth:`get_catalog` so instrument-
+        specific latitude switches (e.g. GMOS PS1 vs SkyMapper) are bypassed.
+
+        Parameters
+        ----------
+        catalog : str
+            Catalog name or alias (e.g. ``'DECALS'``, ``'legacy'``, ``'PS1'``).
+        """
+        from potpyri.utils.catalogs import normalize_flux_catalog_name
+        name = normalize_flux_catalog_name(catalog)
+        if name not in (
+                'PS1', 'SDSS', '2MASS', 'UKIRT', 'SKYMAPPER', 'DES', 'DECALS'):
+            raise ValueError(
+                f'Unsupported zeropoint catalog {catalog!r} '
+                f'(normalized to {name!r})'
+            )
+        self.catalog_zp = name
+        self.get_catalog = lambda hdr, _n=name: _n
 
     def format_datasec(self, sec_string, binning=1):
         """Convert datasec string to binned pixel bounds (e.g. '[1:100,1:200]').
@@ -925,6 +978,8 @@ class Instrument(object):
 
             if mdark is not None:
                 if log: log.info('Subtracting dark')
+                self.ensure_exptime_keyword(flat_full.header)
+                self.ensure_exptime_keyword(mdark.header)
                 flat_full = ccdproc.subtract_dark(flat_full, mdark, 
                     exposure_time=self.exptime_keyword, exposure_unit=u.second)
 
@@ -1367,6 +1422,8 @@ class Instrument(object):
             # Subtract dark
             if mdark is not None:
                 if log: log.info('Subtracting dark')
+                self.ensure_exptime_keyword(sci_full.header)
+                self.ensure_exptime_keyword(mdark.header)
                 sci_full = ccdproc.subtract_dark(sci_full, mdark, 
                     exposure_time=self.exptime_keyword, exposure_unit=u.second)
 

@@ -38,6 +38,21 @@ def test_fix_deprecated_wcs_header_cards_radecsys_and_mjd():
     assert 'MJD-OBS' not in h
 
 
+def test_ensure_exptime_keyword_fills_missing_for_mosfire():
+    """MOSFIRE SCI headers lack ELAPTIME; ensure_exptime_keyword fills from get_exptime."""
+    tel = instrument_getter('MOSFIRE')
+    h = fits.Header()
+    h['TRUITIME'] = 1.45
+    h['COADDONE'] = 8
+    assert 'ELAPTIME' not in h
+    tel.ensure_exptime_keyword(h)
+    assert h['ELAPTIME'] == pytest.approx(1.45 * 8)
+    # Existing value is left alone
+    h['ELAPTIME'] = 99.0
+    tel.ensure_exptime_keyword(h)
+    assert h['ELAPTIME'] == 99.0
+
+
 def test_resolve_instrument_name_aliases():
     """resolve_instrument_name maps aliases and canonical names."""
     assert resolve_instrument_name('gmos') == 'GMOS'
@@ -150,6 +165,22 @@ def test_get_time_get_number():
     assert t > 0 and np.isfinite(t)
     n = tel.get_number(hdr)
     assert isinstance(n, (int, np.integer))
+
+
+def test_mosfire_get_number_fallbacks():
+    """MOSFIRE get_number prefers FRAMENO, then FRAMENUM, then DATAFILE digits."""
+    tel = instrument_getter('MOSFIRE')
+
+    assert tel.get_number(fits.Header({'FRAMENO': 42})) == '00042'
+    assert tel.get_number(fits.Header({'FRAMENUM': 180})) == '00180'
+    # FRAMENO wins over FRAMENUM when both exist
+    assert tel.get_number(fits.Header({'FRAMENO': 7, 'FRAMENUM': 180})) == '00007'
+    assert tel.get_number(fits.Header({'DATAFILE': 'm260724_0180'})) == '00180'
+    assert tel.get_number(
+        fits.Header({'ORGFILE': '/data/raw/m260724_0233.fits'})
+    ) == '00233'
+    with pytest.raises(KeyError):
+        tel.get_number(fits.Header({'OBJECT': 'FRB'}))
 
 
 def test_get_instrument_name():
@@ -401,6 +432,17 @@ def test_base_get_catalog():
     base = Instrument()
     hdr = fits.Header()
     assert base.get_catalog(hdr) == "PS1"
+
+
+def test_set_zeropoint_catalog_overrides_gmos_latitude_switch():
+    """set_zeropoint_catalog forces DECALS even for southern GMOS fields."""
+    tel = instrument_getter("GMOS")
+    tel.set_zeropoint_catalog("decals")
+    assert tel.catalog_zp == "DECALS"
+    hdr_s = fits.Header()
+    hdr_s["RA"] = 0.0
+    hdr_s["DEC"] = -40.0
+    assert tel.get_catalog(hdr_s) == "DECALS"
 
 
 def test_format_datasec_binning_one():

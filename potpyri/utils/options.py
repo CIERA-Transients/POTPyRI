@@ -12,6 +12,8 @@ import sys
 import subprocess
 
 from potpyri import instruments
+from potpyri.utils import catalogs as catalog_utils
+
 
 def init_options():
     """Build and return the argument parser for the main pipeline.
@@ -118,6 +120,25 @@ def init_options():
         dest='fine_align_catalog',
         help='Reference catalog for fine WCS alignment after astrometry.net: gaia (default), '
              'panstarrs, sdss (SDSS V/147), legacy, 2mass, or skymapper.')
+    params.add_argument('--anet-index-dir',
+        type=str,
+        default=None,
+        dest='anet_index_dir',
+        help='Directory (or single index-*.fits file) of astrometry.net indexes for '
+             'solve-field. Use when the default/conda index path is empty or wrong. '
+             'On older solve-field builds without --index-dir, POTPyRI writes a '
+             'temporary --backend-config. Overrides $ANET_DATA auto-detection.')
+    params.add_argument('--zp-catalog',
+        type=str,
+        default=None,
+        choices=[
+            'ps1', 'sdss', '2mass', 'ukirt', 'skymapper', 'des', 'decals', 'legacy',
+        ],
+        dest='zp_catalog',
+        help='Catalog for flux / zeropoint calibration. Default is the instrument '
+             'setting (e.g. PS1 or 2MASS). Use ``decals`` or ``legacy`` for DECaLS / '
+             'Legacy Surveys Tractor PSF photometry; also ``ps1``, ``sdss``, ``2mass``, '
+             '``ukirt``, ``skymapper``, or ``des``.')
     params.add_argument('--skip-external-astrometry',
         default=False,
         action='store_true',
@@ -156,6 +177,9 @@ def add_options():
 
     if args.skip_skysub:
         args.bkg_sub = 'none'
+
+    if getattr(args, 'zp_catalog', None) is not None:
+        args.zp_catalog = catalog_utils.normalize_flux_catalog_name(args.zp_catalog)
 
     return(args)
 

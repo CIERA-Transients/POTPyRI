@@ -217,6 +217,147 @@ def clean_up_astrometry(directory, file, exten):
         if os.path.exists(f):
             os.remove(f)
 
+def _find_astrometry_index_dir():
+    """Return a directory that contains astrometry.net ``index-*.fits`` files.
+
+    Prefers common system install locations and ``$ANET_DATA`` when the
+    default conda config points at an empty data directory.
+    """
+    candidates = []
+    env = os.environ.get('ANET_DATA') or os.environ.get('ASTROMETRY_DATA')
+    if env:
+        candidates.append(env)
+    candidates.extend([
+        '/usr/local/astrometry/data',
+        '/usr/share/astrometry',
+        '/opt/astrometry/data',
+        os.path.expanduser('~/astrometry-data'),
+    ])
+    # Also probe beside the solve-field that will run
+    which = subprocess.run(['which', 'solve-field'], capture_output=True, text=True)
+    sf = which.stdout.strip()
+    if sf:
+        bindir = os.path.dirname(os.path.abspath(sf))
+        root = os.path.dirname(bindir)
+        candidates.extend([
+            os.path.join(root, 'data'),
+            os.path.join(root, 'share', 'astrometry'),
+        ])
+    for path in candidates:
+        if not path or not os.path.isdir(path):
+            continue
+        try:
+            if any(name.startswith('index-') and name.endswith('.fits')
+                   for name in os.listdir(path)):
+                return path
+        except OSError:
+            continue
+    return None
+
+
+def _solve_field_helptext():
+    """Return lowercase ``solve-field -h`` text (empty string if unavailable)."""
+    try:
+        p = subprocess.run(['solve-field', '-h'], capture_output=True)
+        return (p.stdout or b'').decode(errors='ignore').lower()
+    except OSError:
+        return ''
+
+
+def _write_backend_config_for_indexes(config_path, index_dir=None, index_file=None):
+    """Write an astrometry.net backend config that points at index data.
+
+    Older ``solve-field`` builds (e.g. 0.91) lack ``--index-dir`` / ``--index-file``
+    but accept ``--backend-config``.
+    """
+    lines = ['cpulimit 300']
+    if index_dir:
+        lines.append(f'add_path {os.path.abspath(index_dir)}')
+        lines.append('autoindex')
+    if index_file:
+        index_file = os.path.abspath(index_file)
+        lines.append(f'add_path {os.path.dirname(index_file)}')
+        lines.append(f'index {os.path.basename(index_file)}')
+    with open(config_path, 'w') as fh:
+        fh.write('\n'.join(lines) + '\n')
+    return config_path
+
+
+def build_solve_field_index_args(index=None, work_dir=None, auto=True, log=None):
+    """Build CLI args that point ``solve-field`` at index data.
+
+    Uses ``--index-dir`` / ``--index-file`` when the installed ``solve-field``
+    supports them; otherwise falls back to a temporary ``--backend-config``.
+
+    Parameters
+    ----------
+    index : str, optional
+        Explicit index file or directory. When omitted and ``auto`` is True,
+        :func:`_find_astrometry_index_dir` is used.
+    work_dir : str, optional
+        Directory for a temporary backend config file when needed.
+    auto : bool, optional
+        If True and ``index`` is unset, auto-detect a populated index directory.
+    log : ColoredLogger, optional
+        Logger for progress.
+
+    Returns
+    -------
+    str
+        Trailing space-separated solve-field arguments (may be empty).
+    """
+    index_path = None
+    if index:
+        index_path = os.path.abspath(index)
+        if not os.path.exists(index_path):
+            if log:
+                log.warning(f'Astrometry index path does not exist: {index_path}')
+            return ''
+    elif auto:
+        index_path = _find_astrometry_index_dir()
+        if not index_path:
+            return ''
+
+    helptext = _solve_field_helptext()
+    is_file = os.path.isfile(index_path)
+    is_dir = os.path.isdir(index_path)
+
+    if is_file and '--index-file' in helptext:
+        if log:
+            log.info(f'Using astrometry index file: {index_path}')
+        return f'--index-file {index_path} '
+
+    if is_dir and '--index-dir' in helptext:
+        if log:
+            log.info(f'Using astrometry index directory: {index_path}')
+        return f'--index-dir {index_path} '
+
+    # Fallback for older solve-field (no --index-dir / --index-file).
+    if 'backend-config' not in helptext:
+        if log:
+            log.warning(
+                'solve-field does not support --index-dir/--index-file or '
+                '--backend-config; relying on the default astrometry.cfg')
+        return ''
+
+    cfg_dir = work_dir or os.getcwd()
+    os.makedirs(cfg_dir, exist_ok=True)
+    cfg_path = os.path.join(cfg_dir, '.potpyri_anet_backend.cfg')
+    if is_file:
+        _write_backend_config_for_indexes(cfg_path, index_file=index_path)
+        if log:
+            log.info(
+                f'solve-field lacks --index-file; using backend-config for '
+                f'{index_path}')
+    else:
+        _write_backend_config_for_indexes(cfg_path, index_dir=index_path)
+        if log:
+            log.info(
+                f'solve-field lacks --index-dir; using backend-config with '
+                f'add_path {index_path}')
+    return f'--backend-config {cfg_path} '
+
+
 def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
     shift_only=False, index=None, log=None):
     """Run astrometry.net (solve-field) to get coarse WCS; optionally use custom index.
@@ -230,7 +371,8 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
     binn : str
         Binning string (e.g. '22') for pixel scale.
     paths : dict
-        Paths dict (source_extractor key for solve-field).
+        Paths dict (``source_extractor``; optional ``anet_index_dir`` from
+        ``--anet-index-dir``).
     radius : float, optional
         Search radius in degrees. Default is 0.5.
     replace : bool, optional
@@ -238,20 +380,22 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
     shift_only : bool, optional
         If True, only update CRPIX/CRVAL. Default is False.
     index : str, optional
-        Path to custom index file or directory for solve-field.
+        Path to custom index file or directory for solve-field. Overrides
+        ``paths['anet_index_dir']`` when set.
     log : ColoredLogger, optional
         Logger for progress.
 
     Returns
     -------
     bool
-        True if solve succeeded, False otherwise.
+        True if solve succeeded (or an existing usable header WCS was kept as
+        fallback), False otherwise.
     """
     # Starting solve, print file and directory for reference
     fullfile = os.path.abspath(file)
     directory = os.path.dirname(file)
 
-    if log: 
+    if log:
         log.info(f'Trying to solve file: {file}')
     else:
         print(f'Trying to solve file: {file}')
@@ -260,14 +404,12 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
         return(False)
 
     with fits.open(fullfile) as hdu:
-        data = hdu[0].data
         header = hdu[0].header
-    hkeys = list(header.keys())
 
     exten = '.'+file.split('.')[-1]
     if not replace:
         if os.path.exists(fullfile.replace(exten,'.solved.fits')):
-            if log: 
+            if log:
                 log.info(f'SUCCESS: solved {fullfile}')
             else:
                 print(f'SUCCESS: solved {fullfile}')
@@ -275,13 +417,16 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
 
     exten = '.'+file.split('.')[-1]
 
-    if tel.name.upper=='BINOSPEC':
+    # Prefer telescope pointing keywords, but fall back to CRVAL when needed.
+    # (BINOSPEC often has a more reliable CRVAL than RA/DEC.)
+    if getattr(tel, 'name', '').upper() == 'BINOSPEC':
         check_pairs = [('CRVAL1','CRVAL2'),('RA','DEC'),('OBJCTRA','OBJCTDEC')]
     else:
         check_pairs = [('RA','DEC'),('OBJCTRA','OBJCTDEC'),('TARGRA','TARGDEC'),
             ('CRVAL1','CRVAL2')]
 
     coord = None
+    existing_wcs_ok, existing_wcs_reason = validate_existing_wcs_header(header)
 
     for pair in check_pairs:
         if pair[0] in header.keys() and pair[1] in header.keys():
@@ -316,45 +461,97 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
     ra = float('%.6f'%coord.ra.degree)
     dec = float('%.6f'%coord.dec.degree)
 
-    cmd = 'solve-field'
-    args = '--scale-units arcsecperpix '
-    args += f'--scale-low {scale_low} --scale-high {scale_high} '
-    args += f'--ra {ra} --dec {dec} '
-    args += f' --radius {radius} --no-plots -T '
-    args += f'--overwrite -N {newfile} --dir {directory} '
-
-    if index and os.path.exists(index):
-        if os.path.isfile(index):
-            args += f'--index-file {index} '
-        elif os.path.isdir(index):
-            args += f'--index-dir {index} '
-
-    # Test for --use-source-extractor flag
+    # Optional Source Extractor flags (preferred for NIR / crowded residuals).
+    # Only pass --source-extractor-path when we have a real executable; an empty
+    # value makes solve-field treat the next flag (e.g. --continue) as the path.
     p = subprocess.run(['solve-field','-h'],capture_output=True)
-    data = p.stdout.decode().lower()
+    helptext = p.stdout.decode().lower()
+    sex_args = ''
+    sex_path = (paths.get('source_extractor') or '').strip()
+    if not sex_path or not os.path.exists(sex_path):
+        which = subprocess.run(['which', 'sex'], capture_output=True, text=True)
+        sex_path = which.stdout.strip()
+    if sex_path and os.path.exists(sex_path):
+        if '--use-source-extractor' in helptext:
+            sex_args = (
+                f'--use-source-extractor '
+                f'--source-extractor-path {sex_path} '
+            )
+        elif '--use-sextractor' in helptext:
+            sex_args = '--use-sextractor '
 
-    if '--use-source-extractor' in data:
-        source_extractor_path = paths['source_extractor']
-        args += '--use-source-extractor '
-        args += f'--source-extractor-path {source_extractor_path} '
-    elif '--use-sextractor' in data:
-        args += '--use-sextractor '
+    # Explicit CLI/API index wins; else paths['anet_index_dir']; else auto-detect.
+    # Older solve-field (0.91) rejects --index-dir, so build args defensively.
+    if not index and paths:
+        index = paths.get('anet_index_dir')
+    index_args = build_solve_field_index_args(
+        index=index, work_dir=directory, auto=(index is None), log=log)
 
-    extra_opts = '--downsample 2 --no-verify --odds-to-tune-up 1e4 --objs 15'
 
-    tries = 1
-    good = False
-    while tries < 6 and not good:
+    def _base_args(include_radec=True, include_sex=True):
+        args = (
+            f'--scale-units arcsecperpix '
+            f'--scale-low {scale_low} --scale-high {scale_high} '
+            f'--no-plots -T --overwrite -N {newfile} --dir {directory} '
+        )
+        if include_radec:
+            args += f'--ra {ra} --dec {dec} --radius {radius} '
+        if include_sex:
+            args += sex_args
+        args += index_args
+        return args
+
+    # Retry ladder tuned for instruments with usable header WCS (e.g. MOSFIRE)
+    # and for NIR frames where bright residuals make a tiny --objs cut harmful.
+    # Empirically, --objs 15 fails on MOSFIRE K-band while --objs 50 / no limit
+    # and --continue (existing WCS near the telescope pointing) succeed.
+    attempts = []
+    continue_ok = False
+    if existing_wcs_ok:
+        try:
+            wcs_coord = utilities.parse_coord(header['CRVAL1'], header['CRVAL2'])
+            sep_deg = float(coord.separation(wcs_coord).degree)
+            continue_ok = sep_deg <= float(radius)
+            if log and not continue_ok:
+                log.info(
+                    f'Skipping --continue: CRVAL is {sep_deg:.3f} deg from '
+                    f'pointing (limit {radius} deg)'
+                )
+        except Exception:
+            continue_ok = False
+    if continue_ok and sex_args:
+        attempts.append(('continue existing WCS', _base_args(),
+                         '--continue --no-verify'))
+    elif continue_ok:
+        attempts.append(('continue existing WCS', _base_args(include_sex=False),
+                         '--continue --no-verify'))
+    if sex_args:
+        attempts.append(('sextractor objs=50 downsample=2', _base_args(),
+                         '--downsample 2 --no-verify --objs 50'))
+        attempts.append(('sextractor objs=100', _base_args(),
+                         '--no-verify --objs 100'))
+        attempts.append(('sextractor no objs limit', _base_args(),
+                         '--no-verify'))
+    attempts.append(('built-in detection + RA/Dec',
+                     _base_args(include_sex=False), '--no-verify'))
+    attempts.append(('built-in detection, no RA/Dec',
+                     _base_args(include_radec=False, include_sex=False),
+                     '--no-verify'))
+
+    for tries, (label, args, extra_opts) in enumerate(attempts, start=1):
+        # Avoid reusing a truncated .axy from a prior --objs-limited attempt
+        clean_up_astrometry(directory, file, exten)
+        if os.path.exists(newfile):
+            os.remove(newfile)
+
         input_args = f'{args} {extra_opts}'
-
-        if log: 
-            log.info(f'Try #{tries} with astrometry.net...')
+        if log:
+            log.info(f'Try #{tries} with astrometry.net ({label})...')
         else:
-            print(f'Try #{tries} with astrometry.net...')
+            print(f'Try #{tries} with astrometry.net ({label})...')
 
-        process = [cmd,fullfile]+input_args.split()
-
-        if log: 
+        process = ['solve-field', fullfile] + input_args.split()
+        if log:
             log.info(' '.join(process))
         else:
             print(' '.join(process))
@@ -362,39 +559,16 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
         with open(os.devnull, 'w') as FNULL:
             p = subprocess.Popen(process, stdout=FNULL, stderr=subprocess.STDOUT)
             try:
-                p.wait(90)
+                p.wait(180)
             except subprocess.TimeoutExpired:
                 p.kill()
 
         if os.path.exists(newfile):
-            good = True
-        else:
-            tries += 1
-            if tries==2:
-                extra_opts='--objs 15 --no-verify'
-            elif tries==3:
-                extra_opts='--no-verify'
-            elif tries==4:
-                # Try without source extractor
-                extra_opts='--no-verify'
-                args = '--scale-units arcsecperpix '
-                args += f'--scale-low {scale_low} --scale-high {scale_high} '
-                args += f'--no-plots -T '
-                args += f'--overwrite -N {newfile} --dir {directory} '
-                args += f'--ra {ra} --dec {dec} '
-                args += f' --radius {radius} '
-            elif tries==5:
-                # Try with no constraint on RA/Dec
-                args = '--scale-units arcsecperpix '
-                args += f'--scale-low {scale_low} --scale-high {scale_high} '
-                args += f'--no-plots -T '
-                args += f'--overwrite -N {newfile} --dir {directory} '
-                extra_opts='--no-verify'
-
+            break
 
     file_exists=os.path.exists(newfile)
 
-    if log: 
+    if log:
         log.info(f'{newfile} exists: {file_exists}')
     else:
         print(f'{newfile} exists: {file_exists}')
@@ -402,7 +576,7 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
     if os.path.exists(newfile):
 
         clean_up_astrometry(directory, file, exten)
-        if log: 
+        if log:
             log.info(f'SUCCESS: solved {fullfile}')
         else:
             print(f'SUCCESS: solved {fullfile}')
@@ -455,7 +629,7 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
             try:
                 hdu.writeto(output_file, overwrite=True, output_verify='silentfix')
             except TypeError:
-                if log: 
+                if log:
                     log.error(f'FAILURE: could not save file {fullfile}')
                 else:
                     print(f'FAILURE: could not save file {fullfile}')
@@ -464,12 +638,31 @@ def solve_astrometry(file, tel, binn, paths, radius=0.5, replace=True,
         return(True)
 
     else:
-        if log: 
+        clean_up_astrometry(directory, file, exten)
+        # MOSFIRE (and similar) often ship a usable header WCS with only a small
+        # offset; keep it so fine_align_wcs can refine rather than dropping the frame.
+        if existing_wcs_ok:
+            msg = (
+                f'astrometry.net did not solve {fullfile}; keeping existing '
+                f'header WCS for fine alignment'
+                + (f' ({existing_wcs_reason}).' if existing_wcs_reason else '.')
+            )
+            if log:
+                log.warning(msg)
+            else:
+                print(msg)
+            with fits.open(fullfile, mode='update') as hdu:
+                hdu[0].header['ASTNET'] = (
+                    False, 'astrometry.net solve failed; kept header WCS')
+                hdu.flush()
+            return(True)
+
+        if log:
             log.error(f'FAILURE: did not solve {fullfile}')
         else:
             print(f'FAILURE: did not solve {fullfile}')
-        clean_up_astrometry(directory, file, exten)
         return(False)
+
 
 def fine_align_wcs(file, tel, catalog='gaia', radius=0.5,
     max_search_radius=5.0*u.arcsec, save_centroids=False, min_cat_match=7, log=None):

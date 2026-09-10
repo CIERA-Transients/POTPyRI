@@ -8,7 +8,6 @@
 
    .. autosummary::
    
-      find_catalog
       is_number
       parse_coord
    
