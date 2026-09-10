@@ -204,6 +204,11 @@ class Instrument(object):
         self.bad_keywords = []
         self.bad_values = []
 
+        # Optional closed-door + short-exptime bias fallback (see LRIS)
+        self.bias_max_exptime = None
+        self.bias_door_keyword = None
+        self.bias_door_value = 'closed'
+
         self.detrend = True
         self.catalog_zp = 'PS1'
 
