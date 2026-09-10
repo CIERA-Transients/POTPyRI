@@ -1,0 +1,20 @@
+﻿potpyri.primitives.absphot
+==========================
+
+.. automodule:: potpyri.primitives.absphot
+
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      apply_catalog_to_ab
+      catalog_native_magsys
+      find_zeropoint
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+   
+      absphot
+   
