@@ -41,7 +41,7 @@ def is_bad(hdr, tel):
     assert len(keywords)==len(values)
     if len(keywords)==0: return(False)
 
-    bad = np.any([bool(re.search(v, str(hdr[k]).lower())) 
+    bad = np.any([bool(re.search(v, str(hdr.get(k, '')).lower()))
         for k,v in zip(keywords,values)])
 
     binn = str(tel.get_binning(hdr))
@@ -73,7 +73,7 @@ def is_spec(hdr, tel):
     assert len(keywords)==len(values)
     if len(keywords)==0: return(False)
 
-    spec = np.all([bool(re.search(v, str(hdr[k]).lower())) 
+    spec = np.all([bool(re.search(v, str(hdr.get(k, '')).lower()))
         for k,v in zip(keywords,values)])
 
     return(spec)
@@ -99,7 +99,7 @@ def is_flat(hdr, tel):
     assert len(keywords)==len(values)
     if len(keywords)==0: return(False)
 
-    flat = np.all([bool(re.search(v, str(hdr[k]).lower())) 
+    flat = np.all([bool(re.search(v, str(hdr.get(k, '')).lower()))
         for k,v in zip(keywords,values)])
 
     return(flat)
@@ -125,7 +125,7 @@ def is_dark(hdr, tel):
     assert len(keywords)==len(values)
     if len(keywords)==0: return(False)
 
-    dark = np.all([bool(re.search(v, str(hdr[k]).lower())) 
+    dark = np.all([bool(re.search(v, str(hdr.get(k, '')).lower()))
         for k,v in zip(keywords,values)])
 
     # Similar to bad, require that dark have equivalent binning in both dirs
@@ -140,6 +140,10 @@ def is_dark(hdr, tel):
 
 def is_bias(hdr, tel):
     """Return True if the header matches bias observation keywords and valid binning.
+
+    Missing keywords are treated as a non-match. Instruments may also set
+    ``bias_max_exptime`` and ``bias_door_keyword`` so closed-door, zero-second
+    frames (e.g. raw LRIS HORIZON STOW) count as biases.
 
     Parameters
     ----------
@@ -157,18 +161,32 @@ def is_bias(hdr, tel):
     values = tel.bias_values
 
     assert len(keywords)==len(values)
-    if len(keywords)==0: return(False)
 
-    bias = np.all([bool(re.search(v, str(hdr[k]).lower())) 
-        for k,v in zip(keywords,values)])
+    bias = False
+    if len(keywords) > 0:
+        bias = np.all([bool(re.search(v, str(hdr.get(k, '')).lower()))
+            for k,v in zip(keywords,values)])
+
+    # Closed-door, zero-second frames (raw LRIS HORIZON STOW, etc.)
+    max_exp = getattr(tel, 'bias_max_exptime', None)
+    door_kw = getattr(tel, 'bias_door_keyword', None)
+    door_val = getattr(tel, 'bias_door_value', 'closed')
+    if not bias and max_exp is not None and door_kw:
+        if bool(re.search(door_val, str(hdr.get(door_kw, '')).lower())):
+            try:
+                bias = tel.get_exptime(hdr) <= max_exp
+            except Exception:
+                bias = False
+
+    if not bias:
+        return(False)
 
     # Similar to bad, require that bias have equivalent binning in both dirs
-    if bias:
-        binn = str(tel.get_binning(hdr))
-        if len(binn)>1:
-            # Check if telescope is binned the same in all directions, we do not
-            # want to reduce images with variable binning in different directions
-            bias = binn == len(binn) * binn[0]
+    binn = str(tel.get_binning(hdr))
+    if len(binn)>1:
+        # Check if telescope is binned the same in all directions, we do not
+        # want to reduce images with variable binning in different directions
+        bias = binn == len(binn) * binn[0]
     
     return(bias)
 
@@ -193,7 +211,7 @@ def is_science(hdr, tel):
     assert len(keywords)==len(values)
     if len(keywords)==0: return(False)
 
-    science = np.all([bool(re.search(v, str(hdr[k]).lower())) 
+    science = np.all([bool(re.search(v, str(hdr.get(k, '')).lower()))
         for k,v in zip(keywords,values)])
 
     # Check minimum exposure time

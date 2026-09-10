@@ -73,19 +73,25 @@ class LRIS(instrument.Instrument):
         self.bin_keyword = 'BINNING'
         self.amp_keyword = '2'
 
-        # File sorting keywords
-        self.science_keywords = ['KOAIMTYP','SLITNAME','GRANAME','TRAPDOOR']
-        self.science_values = ['object','direct','mirror','open']
-        self.flat_keywords = ['KOAIMTYP']
+        # File sorting keywords. Use raw-safe headers (KOAIMTYP is KOA-only).
+        self.science_keywords = ['SLITNAME','GRANAME','TRAPDOOR']
+        self.science_values = ['direct','mirror','open']
+        self.flat_keywords = ['OBJECT']
         self.flat_values = ['flat']
-        self.bias_keywords = ['KOAIMTYP']
+        self.bias_keywords = ['OBJECT']
         self.bias_values = ['bias']
         self.dark_keywords = []
         self.dark_values = []
         self.spec_keywords = ['GRISTRAN']
         self.spec_values = ['deployed']
+        # KOAIMTYP=focus still rejects KOA focus frames; missing keys are ignored.
         self.bad_keywords = ['SLITNAME','KOAIMTYP']
         self.bad_values = ['goh_lris','focus']
+
+        # Closed-door, zero-second frames (e.g. HORIZON STOW) are also biases.
+        self.bias_max_exptime = 0.0
+        self.bias_door_keyword = 'TRAPDOOR'
+        self.bias_door_value = 'closed'
 
         self.detrend = True
         self.catalog_zp = 'PS1'

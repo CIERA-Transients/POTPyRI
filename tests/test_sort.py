@@ -136,6 +136,70 @@ def test_is_bias_gmos():
     assert sort_files.is_bias(hdr, tel) == False
 
 
+def _lris_imaging_hdr(**kwargs):
+    """Minimal raw LRIS imaging header (no KOAIMTYP)."""
+    hdr = fits.Header()
+    hdr['SLITNAME'] = 'direct'
+    hdr['GRANAME'] = 'mirror'
+    hdr['TRAPDOOR'] = 'open'
+    hdr['GRISTRAN'] = 'stowed'
+    hdr['BINNING'] = '2,2'
+    hdr['ELAPTIME'] = 240
+    hdr['OBJECT'] = 'FRB20260326A'
+    hdr.update(kwargs)
+    return hdr
+
+
+def test_is_science_lris_raw_without_koaimtyp():
+    """Raw LRIS science matches slit/grating/door; missing KOAIMTYP does not raise."""
+    tel = instrument_getter('LRIS')
+    hdr = _lris_imaging_hdr()
+    assert 'KOAIMTYP' not in hdr
+    assert sort_files.is_science(hdr, tel) == True
+    assert sort_files.is_flat(hdr, tel) == False
+    assert sort_files.is_bias(hdr, tel) == False
+
+    hdr['ELAPTIME'] = 5
+    assert sort_files.is_science(hdr, tel) == False
+
+
+def test_is_flat_lris_object_name():
+    """LRIS flats match OBJECT containing 'flat' (dome flat direct)."""
+    tel = instrument_getter('LRIS')
+    hdr = _lris_imaging_hdr(OBJECT='dome flat direct', ELAPTIME=60)
+    assert sort_files.is_flat(hdr, tel) == True
+    assert sort_files.is_bias(hdr, tel) == False
+
+
+def test_is_bias_lris_object_and_horizon_stow():
+    """LRIS bias from OBJECT=bias or closed-door zero-second HORIZON STOW."""
+    tel = instrument_getter('LRIS')
+    hdr = _lris_imaging_hdr(
+        OBJECT='bias', TARGNAME='HORIZON STOW', TRAPDOOR='closed',
+        SLITNAME='long_1.0', GRANAME='600/7500', GRISTRAN='deployed',
+        ELAPTIME=0,
+    )
+    assert sort_files.is_bias(hdr, tel) == True
+
+    hdr['OBJECT'] = 'HORIZON STOW'
+    assert sort_files.is_bias(hdr, tel) == True
+
+    hdr['ELAPTIME'] = 120
+    assert sort_files.is_bias(hdr, tel) == False
+
+
+def test_lris_missing_keywords_do_not_raise():
+    """Missing sort keywords are a non-match, not a KeyError."""
+    tel = instrument_getter('LRIS')
+    hdr = fits.Header()
+    hdr['BINNING'] = '2,2'
+    hdr['ELAPTIME'] = 240
+    assert sort_files.is_flat(hdr, tel) == False
+    assert sort_files.is_bias(hdr, tel) == False
+    assert sort_files.is_spec(hdr, tel) == False
+    assert sort_files.is_science(hdr, tel) == False
+
+
 def test_handle_files_logs_discovery_when_no_files(tmp_path, capsys):
     """handle_files prints search paths and glob pattern before exiting on empty input."""
     tel = instrument_getter('F2')
