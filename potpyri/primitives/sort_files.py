@@ -78,8 +78,14 @@ def is_spec(hdr, tel):
 
     return(spec)
 
-def is_flat(hdr, tel):
+def is_flat(hdr, tel, data=None):
     """Return True if the header matches flat-field observation keywords.
+
+    Missing keywords are a non-match. Instruments may also set
+    ``flat_lamp_keywords`` so lamp-on frames (e.g. raw LRIS ``FLAMP1/2``)
+    count as flats even when ``OBJECT`` is not named ``flat``. Twilight
+    flats are detected via ``Instrument.is_twilight_flat`` (solar altitude
+    and optional sky-level limits; pass ``data`` for the count check).
 
     Parameters
     ----------
@@ -87,6 +93,8 @@ def is_flat(hdr, tel):
         FITS header to check.
     tel : Instrument
         Instrument instance (flat_keywords, flat_values).
+    data : array-like, optional
+        Image data used for twilight sky-level limits.
 
     Returns
     -------
@@ -97,10 +105,27 @@ def is_flat(hdr, tel):
     values = tel.flat_values
 
     assert len(keywords)==len(values)
-    if len(keywords)==0: return(False)
 
-    flat = np.all([bool(re.search(v, str(hdr.get(k, '')).lower()))
-        for k,v in zip(keywords,values)])
+    flat = False
+    if len(keywords) > 0:
+        flat = np.all([bool(re.search(v, str(hdr.get(k, '')).lower()))
+            for k,v in zip(keywords,values)])
+
+    alt_k = getattr(tel, 'flat_alt_keywords', None) or []
+    alt_v = getattr(tel, 'flat_alt_values', None) or []
+    if not flat and alt_k:
+        assert len(alt_k)==len(alt_v)
+        flat = np.all([bool(re.search(v, str(hdr.get(k, '')).lower()))
+            for k,v in zip(alt_k, alt_v)])
+
+    lamp_kws = getattr(tel, 'flat_lamp_keywords', None) or []
+    lamp_val = getattr(tel, 'flat_lamp_value', 'on')
+    if not flat and lamp_kws:
+        flat = np.any([bool(re.search(lamp_val, str(hdr.get(k, '')).lower()))
+            for k in lamp_kws])
+
+    if not flat:
+        flat = bool(tel.is_twilight_flat(hdr, data=data))
 
     return(flat)
 
@@ -369,6 +394,7 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
     file_table = Table(names=params, dtype=dtypes)
 
     for i, f in enumerate(sorted(files)):
+        image_data = None
         try:
             with fits.open(f, mode='readonly') as file_open:
                 ext = tel.raw_header_ext
@@ -386,6 +412,7 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
                                     hdr[key] = value
 
                 check_data = file_open[ext].data
+                image_data = tel.get_twilight_image_data(file_open, ext)
                 file_open._verify()
         except IndexError:
             if log: 
@@ -413,7 +440,7 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
             file_time = tel.get_time(hdr)
 
             if (is_bad(hdr, tel) and not is_bias(hdr, tel) and 
-                not is_dark(hdr, tel) and not is_flat(hdr, tel)):
+                not is_dark(hdr, tel) and not is_flat(hdr, tel, data=image_data)):
                 file_type = 'BAD'
                 moved_path = paths['bad']
                 bad_num += 1
@@ -421,7 +448,7 @@ def sort_files(files, file_list, tel, paths, incl_bad=False, log=None):
                 file_type = 'SPEC'
                 moved_path = paths['bad']
                 spec_num += 1
-            elif is_flat(hdr, tel):
+            elif is_flat(hdr, tel, data=image_data):
                 file_type = 'FLAT'
                 moved_path = paths['raw']
                 flat_num += 1

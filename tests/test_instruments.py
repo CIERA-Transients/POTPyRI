@@ -407,6 +407,298 @@ def test_load_bias_raises_when_missing(tmp_path):
         tel.load_bias(paths, "1", "22")
 
 
+def test_load_flat_falls_back_to_caldb(tmp_path):
+    """load_flat uses packaged caldb when the night cal is missing."""
+    tel = GMOS()
+    night = tmp_path / "cals"
+    caldb = tmp_path / "caldb"
+    night.mkdir()
+    caldb.mkdir()
+    fits.PrimaryHDU(np.ones((8, 8), dtype=np.float32)).writeto(
+        caldb / "mflat_r_1_22.fits", overwrite=True,
+    )
+    paths = {"cal": str(night), "caldb": str(caldb)}
+    mflat = tel.load_flat(paths, "r", "1", "22")
+    assert mflat.data.shape == (8, 8)
+
+
+def test_do_bias_no_frames_does_not_exit(tmp_path, capsys):
+    """A night with no bias frames must not abort the whole pipeline."""
+    from potpyri.primitives import calibration
+
+    class _Tel:
+        bias = True
+        filetype_keywords = {'BIAS': 'BIAS', 'SCIENCE': 'SCIENCE'}
+
+        def match_type_keywords(self, kwds, table):
+            return table['Type'] == kwds
+
+        def get_mbias_name(self, paths, amp, binn):
+            return os.path.join(paths['cal'], f'mbias_{amp}_{binn}.fits')
+
+        def _find_cal_file(self, paths, filename):
+            return (None, None)
+
+    table = Table({
+        'Type': ['SCIENCE'],
+        'CalType': ['R_1R_11'],
+        'Amp': ['1R'],
+        'Binning': ['11'],
+        'File': ['d'],
+    })
+    calibration.do_bias(table, _Tel(), {'cal': str(tmp_path)}, nmin_images=3, log=None)
+    out = capsys.readouterr().out
+    assert 'No usable master bias' in out
+    assert 'No master bias for science setup amp=1R' in out
+
+
+def test_do_bias_reports_missing_science_setup(tmp_path, capsys):
+    """do_bias warns when science amp/bin has no master and does not abort."""
+    from potpyri.primitives import calibration
+
+    class _Tel:
+        bias = True
+        filetype_keywords = {'BIAS': 'BIAS', 'SCIENCE': 'SCIENCE'}
+
+        def match_type_keywords(self, kwds, table):
+            return table['Type'] == kwds
+
+        def get_mbias_name(self, paths, amp, binn):
+            return os.path.join(paths['cal'], f'mbias_{amp}_{binn}.fits')
+
+        def create_bias(self, files, amp, binn, paths, log=None):
+            with open(self.get_mbias_name(paths, amp, binn), 'w') as fh:
+                fh.write('bias')
+
+        def _find_cal_file(self, paths, filename):
+            path = os.path.join(paths['cal'], filename)
+            return (path, 0) if os.path.exists(path) else (None, None)
+
+    cal = tmp_path / 'cals'
+    cal.mkdir()
+    table = Table({
+        'Type': ['BIAS', 'BIAS', 'BIAS', 'SCIENCE'],
+        'CalType': ['4B_11', '4B_11', '4B_11', 'R_1R_11'],
+        'Amp': ['4B', '4B', '4B', '1R'],
+        'Binning': ['11', '11', '11', '11'],
+        'File': ['a', 'b', 'c', 'd'],
+    })
+    calibration.do_bias(table, _Tel(), {'cal': str(cal)}, nmin_images=3, log=None)
+    out = capsys.readouterr().out
+    assert 'No master bias for science setup amp=1R' in out
+    assert (cal / 'mbias_4B_11.fits').exists()
+
+
+def test_do_dark_no_frames_does_not_exit(tmp_path, capsys):
+    """A required dark with no frames must not abort the whole pipeline."""
+    from potpyri.primitives import calibration
+
+    class _Tel:
+        dark = True
+        filetype_keywords = {'DARK': 'DARK', 'SCIENCE': 'SCIENCE'}
+
+        def match_type_keywords(self, kwds, table):
+            return table['Type'] == kwds
+
+        def get_mdark_name(self, paths, amp, binn):
+            return os.path.join(paths['cal'], f'mdark_{amp}_{binn}.fits')
+
+        def _find_cal_file(self, paths, filename):
+            return (None, None)
+
+    table = Table({
+        'Type': ['SCIENCE'],
+        'CalType': ['R_1R_11'],
+        'Amp': ['1R'],
+        'Binning': ['11'],
+        'File': ['d'],
+    })
+    calibration.do_dark(table, _Tel(), {'cal': str(tmp_path)}, nmin_images=3, log=None)
+    out = capsys.readouterr().out
+    assert 'No usable master dark' in out
+    assert 'No master dark for science setup amp=1R' in out
+
+
+def test_do_dark_reports_missing_science_setup(tmp_path, capsys):
+    """do_dark warns when science amp/bin has no master and does not abort."""
+    from potpyri.primitives import calibration
+
+    class _Tel:
+        dark = True
+        bias = False
+        filetype_keywords = {'DARK': 'DARK', 'SCIENCE': 'SCIENCE'}
+
+        def match_type_keywords(self, kwds, table):
+            return table['Type'] == kwds
+
+        def get_mdark_name(self, paths, amp, binn):
+            return os.path.join(paths['cal'], f'mdark_{amp}_{binn}.fits')
+
+        def create_dark(self, files, amp, binn, paths, mbias=None, log=None):
+            with open(self.get_mdark_name(paths, amp, binn), 'w') as fh:
+                fh.write('dark')
+
+        def _find_cal_file(self, paths, filename):
+            path = os.path.join(paths['cal'], filename)
+            return (path, 0) if os.path.exists(path) else (None, None)
+
+    cal = tmp_path / 'cals'
+    cal.mkdir()
+    table = Table({
+        'Type': ['DARK', 'DARK', 'DARK', 'SCIENCE'],
+        'CalType': ['4B_11', '4B_11', '4B_11', 'R_1R_11'],
+        'Amp': ['4B', '4B', '4B', '1R'],
+        'Binning': ['11', '11', '11', '11'],
+        'Exp': [100.0, 100.0, 100.0, 30.0],
+        'File': ['a', 'b', 'c', 'd'],
+    })
+    calibration.do_dark(table, _Tel(), {'cal': str(cal)}, nmin_images=3, log=None)
+    out = capsys.readouterr().out
+    assert 'No master dark for science setup amp=1R' in out
+    assert (cal / 'mdark_4B_11.fits').exists()
+
+
+def test_do_dark_skipped_when_not_required(tmp_path, capsys):
+    """Instruments that do not require darks emit no missing-dark errors."""
+    from potpyri.primitives import calibration
+
+    class _Tel:
+        dark = False
+        filetype_keywords = {'DARK': 'DARK', 'SCIENCE': 'SCIENCE'}
+
+        def match_type_keywords(self, kwds, table):
+            return table['Type'] == kwds
+
+    table = Table({
+        'Type': ['SCIENCE'],
+        'CalType': ['R_1R_11'],
+        'Amp': ['1R'],
+        'Binning': ['11'],
+        'File': ['d'],
+    })
+    calibration.do_dark(table, _Tel(), {'cal': str(tmp_path)}, nmin_images=3, log=None)
+    assert capsys.readouterr().out == ''
+
+
+def test_do_flat_reports_missing_science_setup(tmp_path, capsys):
+    """do_flat warns when science filter/amp/bin has no master and does not abort."""
+    from potpyri.primitives import calibration
+
+    class _Tel:
+        flat = True
+        bias = False
+        dark = False
+        filetype_keywords = {'FLAT': 'FLAT', 'SCIENCE': 'SCIENCE'}
+
+        def match_type_keywords(self, kwds, table):
+            return table['Type'] == kwds
+
+        def get_mflat_name(self, paths, fil, amp, binn):
+            return os.path.join(paths['cal'], f'mflat_{fil}_{amp}_{binn}.fits')
+
+        def create_flat(self, files, fil, amp, binn, paths, mbias=None,
+                mdark=None, is_science=False, log=None):
+            with open(self.get_mflat_name(paths, fil, amp, binn), 'w') as fh:
+                fh.write('flat')
+
+        def _find_cal_file(self, paths, filename):
+            path = os.path.join(paths['cal'], filename)
+            return (path, 0) if os.path.exists(path) else (None, None)
+
+    cal = tmp_path / 'cals'
+    cal.mkdir()
+    table = Table({
+        'Type': ['FLAT', 'FLAT', 'FLAT', 'SCIENCE'],
+        'CalType': ['g_4B_11', 'g_4B_11', 'g_4B_11', 'R_1R_11'],
+        'Filter': ['g', 'g', 'g', 'R'],
+        'Amp': ['4B', '4B', '4B', '1R'],
+        'Binning': ['11', '11', '11', '11'],
+        'File': ['a', 'b', 'c', 'd'],
+    })
+    calibration.do_flat(table, _Tel(), {'cal': str(cal)}, nmin_images=3, log=None)
+    out = capsys.readouterr().out
+    assert 'No master flat for science setup filter=R, amp=1R' in out
+    assert (cal / 'mflat_g_4B_11.fits').exists()
+
+
+def test_do_flat_caldb_satisfies_science_setup(tmp_path, capsys):
+    """A packaged caldb flat counts as present; no missing-flat error."""
+    from potpyri.primitives import calibration
+
+    cal = tmp_path / 'cals'
+    caldb = tmp_path / 'caldb'
+    cal.mkdir()
+    caldb.mkdir()
+    (caldb / 'mflat_R_1R_11.fits').write_text('flat')
+
+    class _Tel:
+        flat = True
+        filetype_keywords = {'FLAT': 'FLAT', 'SCIENCE': 'SCIENCE'}
+
+        def match_type_keywords(self, kwds, table):
+            return table['Type'] == kwds
+
+        def get_mflat_name(self, paths, fil, amp, binn):
+            return os.path.join(paths['cal'], f'mflat_{fil}_{amp}_{binn}.fits')
+
+        def _find_cal_file(self, paths, filename):
+            for key in ('cal', 'caldb'):
+                path = os.path.join(paths[key], filename)
+                if os.path.exists(path):
+                    return (path, 0)
+            return (None, None)
+
+    table = Table({
+        'Type': ['SCIENCE'],
+        'CalType': ['R_1R_11'],
+        'Filter': ['R'],
+        'Amp': ['1R'],
+        'Binning': ['11'],
+        'File': ['d'],
+    })
+    calibration.do_flat(
+        table, _Tel(), {'cal': str(cal), 'caldb': str(caldb)},
+        nmin_images=3, log=None,
+    )
+    out = capsys.readouterr().out
+    assert 'No night master flat was built' in out
+    assert 'No master flat for science setup' not in out
+
+
+def test_do_flat_empty_does_not_change_cal_path(capsys):
+    """No flat frames must not retarget paths['cal'] to the packaged caldb."""
+    from potpyri.primitives import calibration
+
+    tel = instrument_getter("LRIS")
+    paths = {"cal": "/night/cals", "caldb": "/pkg/caldb"}
+    table = Table({
+        "Type": ["SCIENCE"],
+        "CalType": ["x"],
+        "Filter": ["R"],
+        "Amp": ["1R"],
+        "Binning": ["11"],
+    })
+    calibration.do_flat(table, tel, paths)
+    assert paths["cal"] == "/night/cals"
+    out = capsys.readouterr().out
+    assert 'No master flat for science setup filter=R, amp=1R' in out
+
+
+def test_mask_flat_sources_excludes_stars_from_flat_level():
+    """Stars above the twilight-flat level are masked and do not change the median."""
+    tel = instrument_getter("LRIS")
+    data = np.full((64, 64), 10000.0)
+    data[28:36, 28:36] = 40000.0
+    unmasked_mean = float(np.mean(data))
+    frame = CCDData(data.copy(), unit=u.electron)
+    tel.mask_flat_sources(frame)
+    assert np.any(np.isnan(frame.data))
+    assert np.all(np.isnan(frame.data[30:34, 30:34]))
+    after = float(np.nanmedian(frame.data))
+    assert abs(after - 10000.0) < 1.0
+    assert after < unmasked_mean
+
+
 def test_expand_mask():
     """expand_mask combines NaN, inf, zero pixels with optional input mask."""
     tel = Instrument()

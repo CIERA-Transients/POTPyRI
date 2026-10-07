@@ -9,6 +9,7 @@ from potpyri._version import __version__
 
 import glob
 import os
+import re
 import astropy
 import datetime
 import copy
@@ -209,6 +210,22 @@ class Instrument(object):
         self.bias_door_keyword = None
         self.bias_door_value = 'closed'
 
+        # Optional lamp-on flat fallback (see LRIS FLAMP1/FLAMP2)
+        self.flat_lamp_keywords = []
+        self.flat_lamp_value = 'on'
+
+        # Optional twilight-flat detection from solar altitude (see LRIS)
+        self.twilight_flat = False
+        self.twilight_sunalt_min = -18.0
+        self.twilight_sunalt_max = 0.0
+        self.twilight_median_min = None
+        self.twilight_median_max = None
+        self.twilight_site_lat = None
+        self.twilight_site_lon = None
+        self.twilight_site_height = None
+        self.flat_source_n_sigma = 5.0
+        self.flat_source_dilate = 3
+
         self.detrend = True
         self.catalog_zp = 'PS1'
 
@@ -364,6 +381,152 @@ class Instrument(object):
     def get_time(self, hdr):
         """Return MJD from header (mjd_keyword) as float."""
         return(float(hdr[self.mjd_keyword]))
+
+    def get_sun_altitude(self, hdr):
+        """Return solar altitude in degrees at the instrument site, or None."""
+        lat = getattr(self, 'twilight_site_lat', None)
+        lon = getattr(self, 'twilight_site_lon', None)
+        if lat is None or lon is None:
+            return None
+        try:
+            obstime = Time(self.get_time(hdr), format='mjd')
+        except Exception:
+            return None
+        from astropy.coordinates import AltAz, EarthLocation, get_sun
+
+        height = getattr(self, 'twilight_site_height', None) or 0.0
+        location = EarthLocation(
+            lat=float(lat) * u.deg,
+            lon=float(lon) * u.deg,
+            height=float(height) * u.m,
+        )
+        altaz = get_sun(obstime).transform_to(AltAz(obstime=obstime, location=location))
+        return float(altaz.alt.deg)
+
+    def get_twilight_image_data(self, hdul, ext=0):
+        """Return image data used to measure the twilight sky level.
+
+        Default is the requested extension, otherwise the first 2-D image HDU.
+        """
+        if hdul is None:
+            return None
+        try:
+            data = hdul[ext].data
+        except Exception:
+            data = None
+        if data is not None and getattr(data, 'ndim', 0) >= 2 and np.size(data) > 0:
+            return data
+        for hdu in hdul:
+            data = getattr(hdu, 'data', None)
+            if data is not None and getattr(data, 'ndim', 0) >= 2 and np.size(data) > 0:
+                return data
+        return None
+
+    def twilight_sky_level(self, data):
+        """Return the sigma-clipped median of ``data``, or None if unusable."""
+        if data is None:
+            return None
+        array = np.asarray(data, dtype=float)
+        if array.size == 0:
+            return None
+        try:
+            _mean, median, _std = sigma_clipped_stats(
+                array, sigma_upper=3.0, sigma_lower=5.0, maxiters=5,
+            )
+        except Exception:
+            return None
+        if not np.isfinite(median):
+            return None
+        return float(median)
+
+    def is_twilight_setup(self, hdr):
+        """Return True if the header is imaging, lamps off, and in twilight."""
+        if not getattr(self, 'twilight_flat', False):
+            return False
+
+        keywords = getattr(self, 'science_keywords', None) or []
+        values = getattr(self, 'science_values', None) or []
+        if keywords and values:
+            imaging = np.all([
+                bool(re.search(v, str(hdr.get(k, '')).lower()))
+                for k, v in zip(keywords, values)
+            ])
+            if not imaging:
+                return False
+
+        lamp_kws = getattr(self, 'flat_lamp_keywords', None) or []
+        lamp_val = getattr(self, 'flat_lamp_value', 'on')
+        if lamp_kws and np.any([
+            bool(re.search(lamp_val, str(hdr.get(k, '')).lower()))
+            for k in lamp_kws
+        ]):
+            return False
+
+        altitude = self.get_sun_altitude(hdr)
+        if altitude is None:
+            return False
+        return (
+            self.twilight_sunalt_min <= altitude <= self.twilight_sunalt_max
+        )
+
+    def is_twilight_flat(self, hdr, data=None):
+        """Return True if this is an unlabeled twilight flat.
+
+        Requires imaging setup, lamps off, and sun altitude in
+        ``[twilight_sunalt_min, twilight_sunalt_max]``. When median limits
+        are set, ``data`` must be provided and its sigma-clipped median must
+        fall in ``[twilight_median_min, twilight_median_max]``.
+        """
+        if not self.is_twilight_setup(hdr):
+            return False
+
+        med_min = getattr(self, 'twilight_median_min', None)
+        med_max = getattr(self, 'twilight_median_max', None)
+        if med_min is None and med_max is None:
+            return True
+        level = self.twilight_sky_level(data)
+        if level is None:
+            return False
+        if med_min is not None and level < med_min:
+            return False
+        if med_max is not None and level > med_max:
+            return False
+        return True
+
+    def mask_flat_sources(self, flat_full, log=None):
+        """Mask stars and other emission above the twilight/sky-flat level.
+
+        Uses sigma-clipped statistics for the illumination, flags pixels well
+        above that level, and dilates the mask so stellar wings do not bias
+        the flat normalization or the master-flat combine.
+        """
+        from scipy.ndimage import binary_dilation
+
+        data = np.asarray(flat_full.data, dtype=float)
+        mean, median, stddev = sigma_clipped_stats(
+            data, sigma_upper=3.0, sigma_lower=5.0, maxiters=5,
+        )
+        n_sigma = float(getattr(self, 'flat_source_n_sigma', 5.0))
+        source_mask = data > (median + n_sigma * stddev)
+        dilate = int(getattr(self, 'flat_source_dilate', 0) or 0)
+        if dilate > 0 and np.any(source_mask):
+            source_mask = binary_dilation(source_mask, iterations=dilate)
+
+        n_masked = int(np.sum(source_mask))
+        if n_masked == 0:
+            return flat_full
+
+        flat_full.data[source_mask] = np.nan
+        if flat_full.mask is None:
+            flat_full.mask = source_mask
+        else:
+            flat_full.mask = np.asarray(flat_full.mask, dtype=bool) | source_mask
+        if log:
+            log.info(
+                f'Masked {n_masked} pixels above the flat level '
+                f'(median={median:.1f}, {n_sigma:.1f} sigma).'
+            )
+        return flat_full
 
     def get_instrument_name(self, hdr):
         """Return instrument name (lowercase) for paths/filenames."""
@@ -575,6 +738,24 @@ class Instrument(object):
 
         return(bkg_filename)
 
+    def _find_cal_file(self, paths, filename):
+        """Return (path, hdu_index) for a night cal, then a packaged caldb file.
+
+        Night reductions write to paths['cal'] (red/cals). Packaged fallbacks
+        live in paths['caldb']. Prefer the night file when both exist.
+        """
+        for key in ('cal', 'caldb'):
+            directory = paths.get(key)
+            if not directory:
+                continue
+            path = os.path.join(directory, filename)
+            if os.path.exists(path):
+                return path, 0
+            compressed = path + '.fz'
+            if os.path.exists(compressed):
+                return compressed, 1
+        return None, None
+
     def get_mbias_name(self, paths, amp, binn):
         """Return path for master bias FITS (paths['cal']/mbias_amp_binn.fits)."""
         red_path = paths['cal']
@@ -618,13 +799,10 @@ class Instrument(object):
             If master bias file not found.
         """
         bias = self.get_mbias_name(paths, amp, binn)
-        if os.path.exists(bias):
-            mbias = _read_calibration_ccd(bias, u.electron, hdu_index=0)
-        elif os.path.exists(bias+'.fz'):
-            mbias = _read_calibration_ccd(bias+'.fz', u.electron, hdu_index=1)
-        else:
+        path, hdu_index = self._find_cal_file(paths, os.path.basename(bias))
+        if path is None:
             raise Exception(f'Could not find bias: {bias}')
-        return(mbias)
+        return _read_calibration_ccd(path, u.electron, hdu_index=hdu_index)
 
     def load_dark(self, paths, amp, binn):
         """Load master dark CCDData for given amp and binning.
@@ -649,13 +827,10 @@ class Instrument(object):
             If master dark file not found.
         """
         dark = self.get_mdark_name(paths, amp, binn)
-        if os.path.exists(dark):
-            mdark = _read_calibration_ccd(dark, u.electron, hdu_index=0)
-        elif os.path.exists(dark+'.fz'):
-            mdark = _read_calibration_ccd(dark+'.fz', u.electron, hdu_index=1)
-        else:
+        path, hdu_index = self._find_cal_file(paths, os.path.basename(dark))
+        if path is None:
             raise Exception(f'Could not find dark: {dark}')
-        return(mdark)
+        return _read_calibration_ccd(path, u.electron, hdu_index=hdu_index)
 
     def load_flat(self, paths, fil, amp, binn):
         """Load master flat CCDData for given filter, amp, and binning.
@@ -682,13 +857,10 @@ class Instrument(object):
             If master flat file not found.
         """
         flat = self.get_mflat_name(paths, fil, amp, binn)
-        if os.path.exists(flat):
-            mflat = _read_calibration_ccd(flat, u.dimensionless_unscaled, hdu_index=0)
-        elif os.path.exists(flat+'.fz'):
-            mflat = _read_calibration_ccd(flat+'.fz', u.dimensionless_unscaled, hdu_index=1)
-        else:
+        path, hdu_index = self._find_cal_file(paths, os.path.basename(flat))
+        if path is None:
             raise Exception(f'Could not find flat: {flat}')
-        return(mflat)
+        return _read_calibration_ccd(path, u.dimensionless_unscaled, hdu_index=hdu_index)
 
     def load_sky(self, paths, fil, amp, binn):
         """Load master sky CCDData for given filter, amp, and binning.
@@ -944,7 +1116,8 @@ class Instrument(object):
         mdark : ccdproc.CCDData, optional
             Master dark to subtract.
         is_science : bool, optional
-            If True, mask high pixels as for science. Default is False.
+            If True, mask high pixels as for science. Twilight flats are
+            masked the same way even when this is False. Default is False.
         log : ColoredLogger, optional
             Logger for progress.
         **kwargs
@@ -983,11 +1156,11 @@ class Instrument(object):
                 flat_full = ccdproc.subtract_dark(flat_full, mdark, 
                     exposure_time=self.exptime_keyword, exposure_unit=u.second)
 
-            # Mask flat_full if the image is a science frame
-            if is_science:
-                mean, median, stddev = sigma_clipped_stats(flat_full.data)
-                mask = flat_full.data > 5*stddev + median
-                flat_full.mask = mask.astype(np.uint8)
+            # Mask stars/sources so they do not set the flat level
+            if is_science or self.is_twilight_setup(flat_full.header):
+                if log:
+                    log.info('Masking stars and other emission above the flat level.')
+                self.mask_flat_sources(flat_full, log=log)
 
             exptime = self.get_exptime(flat_full.header)
             if log: log.info(f'Exposure time of image is {exptime}')

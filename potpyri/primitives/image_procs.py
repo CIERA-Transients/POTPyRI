@@ -379,24 +379,29 @@ def image_proc(image_data, tel, paths, skip_skysub=False, bkg_sub='local',
         try:
             mbias = tel.load_bias(paths, amp, binn)
         except Exception as e:
-            if log: 
-                log.error('No master bias found for this configuration')
-                log.error(f'Skipping reduction for: {cal_type}')
-                log.error(e)
+            if log:
+                log.error(
+                    f'Cannot reduce {cal_type}: no master bias for amp={amp}, '
+                    f'bin={binn}. Bias frames for this detector setup were not '
+                    f'provided or a master bias could not be built ({e}). '
+                    f'Skipping this target; remaining targets will still run.'
+                )
             return(None)
     else:
         mbias = None
 
-    # Load bias frame
+    # Load dark frame
     if tel.dark:
         if log: log.info('Loading master dark.')
         try:
             mdark = tel.load_dark(paths, amp, binn)
         except Exception as e:
-            if log: 
-                log.error('No master dark found for this configuration')
-                log.error(f'Skipping reduction for: {cal_type}')
-                log.error(e)
+            if log:
+                log.error(
+                    f'Cannot reduce {cal_type}: no master dark for amp={amp}, '
+                    f'bin={binn} ({e}). Skipping this target; remaining '
+                    f'targets will still run.'
+                )
             return(None)
     else:
         mdark = None
@@ -408,9 +413,11 @@ def image_proc(image_data, tel, paths, skip_skysub=False, bkg_sub='local',
             mflat = tel.load_flat(paths, fil, amp, binn)
         except Exception as e:
             if log: 
-                log.error('No master bias found for this configuration')
-                log.error(f'Skipping reduction for: {cal_type}')
-                log.error(e)
+                log.error(
+                    f'Cannot reduce {cal_type}: no master flat for filter={fil}, '
+                    f'amp={amp}, bin={binn} ({e}). Skipping this target; '
+                    f'remaining targets will still run.'
+                )
             return(None)
     else:
         mflat = None
