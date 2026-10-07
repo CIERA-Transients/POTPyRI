@@ -105,3 +105,61 @@ def test_main_pipeline_propagates_photometry_error_without_calling_absphot(
         )
 
     assert absphot_called == []
+
+
+def test_main_pipeline_skips_photometry_when_stack_is_none(monkeypatch, tmp_path):
+    """A failed stack must not run photometry or abort later targets."""
+    phot_called = []
+    absphot_called = []
+    processed = []
+
+    def _image_proc(table, *a, **k):
+        tar = table['TargType'][0]
+        processed.append(tar)
+        if tar == 'failed':
+            return None
+        return str(tmp_path / 'stack.fits')
+
+    def _file_table():
+        return Table(
+            {
+                'TargType': ['failed', 'ok'],
+                'Type': ['SCIENCE', 'SCIENCE'],
+                'Filename': ['a.fits', 'b.fits'],
+            },
+        )
+
+    monkeypatch.setattr(mp, 'instrument_getter', lambda name: _FakeTel())
+    monkeypatch.setattr(mp.sort_files, 'handle_files', lambda *a, **k: _file_table())
+    monkeypatch.setattr(mp.calibration, 'do_bias', lambda *a, **k: None)
+    monkeypatch.setattr(mp.calibration, 'do_dark', lambda *a, **k: None)
+    monkeypatch.setattr(mp.calibration, 'do_flat', lambda *a, **k: None)
+    monkeypatch.setattr(mp.image_procs, 'image_proc', _image_proc)
+    monkeypatch.setattr(
+        mp.photometry, 'photloop', lambda *a, **k: phot_called.append(a[0]),
+    )
+    monkeypatch.setattr(
+        mp.absphot, 'find_zeropoint', lambda *a, **k: absphot_called.append(True),
+    )
+    monkeypatch.setattr(
+        mp.options,
+        'add_paths',
+        lambda *a, **k: {
+            'log': str(tmp_path / 'log'),
+            'work': str(tmp_path),
+            'filelist': str(tmp_path / 'files.txt'),
+        },
+    )
+    monkeypatch.setattr(mp.logger, 'get_log', lambda *a, **k: _FakeLog())
+    (tmp_path / 'log').mkdir(exist_ok=True)
+
+    mp.main_pipeline(
+        instrument='LRIS',
+        data_path=str(tmp_path),
+        target=None,
+        file_list_name='files.txt',
+    )
+
+    assert processed == ['failed', 'ok']
+    assert phot_called == [str(tmp_path / 'stack.fits')]
+    assert absphot_called == [True]

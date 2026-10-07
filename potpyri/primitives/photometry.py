@@ -991,6 +991,12 @@ def photloop(stack, phot_sn_min=3.0, phot_sn_max=40.0, fwhm_init=5.0, log=None):
     PhotometryError
         If every S/N attempt fails (no APPPHOT written).
     """
+    if not stack:
+        raise PhotometryError(
+            f'Cannot run photometry: no stacked image was produced (got {stack!r}). '
+            'This usually means a master bias or flat was missing for this setup.'
+        )
+
     if phot_sn_max <= phot_sn_min:
         raise PhotometryError(
             f'phot_sn_max ({phot_sn_max}) must be greater than phot_sn_min ({phot_sn_min}).'

@@ -114,6 +114,14 @@ def main_pipeline(instrument: str,
             keep_all_astro=keep_all_astro,
             relative_calibration=relative_calibration or False, log=log)
 
+        if not stack:
+            log.error(
+                f'Skipping photometry and zeropoint for {tar}: no stacked image '
+                f'was produced (see the calibration error above; often a missing '
+                f'master bias or flat). Continuing with any remaining targets.'
+            )
+            continue
+
         # Photometry step
         #################
         log.info('Running PSF photometry.')

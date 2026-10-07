@@ -76,8 +76,12 @@ class LRIS(instrument.Instrument):
         # File sorting keywords. Use raw-safe headers (KOAIMTYP is KOA-only).
         self.science_keywords = ['SLITNAME','GRANAME','TRAPDOOR']
         self.science_values = ['direct','mirror','open']
+        # Primary: OBJECT~flat/twilight/skyflat. Alternate: KOAIMTYP~flat
+        # (matches flatlamp). The two rules are OR-ed; both are not required.
         self.flat_keywords = ['OBJECT']
-        self.flat_values = ['flat']
+        self.flat_values = ['flat|twilight|skyflat']
+        self.flat_alt_keywords = ['KOAIMTYP']
+        self.flat_alt_values = ['flat']
         self.bias_keywords = ['OBJECT']
         self.bias_values = ['bias']
         self.dark_keywords = []
@@ -92,6 +96,25 @@ class LRIS(instrument.Instrument):
         self.bias_max_exptime = 0.0
         self.bias_door_keyword = 'TRAPDOOR'
         self.bias_door_value = 'closed'
+
+        # Dome / focus-loop flats often have OBJECT=HORIZON STOW or Focus loop.
+        self.flat_lamp_keywords = ['FLAMP1', 'FLAMP2']
+        self.flat_lamp_value = 'on'
+
+        # Unlabeled twilight flats: imaging + lamps off + sun 0 to -18 deg
+        # and a sigma-clipped median between 15k and 50k ADU.
+        self.twilight_flat = True
+        self.twilight_sunalt_min = -18.0
+        self.twilight_sunalt_max = 0.0
+        self.twilight_median_min = 15000.0
+        self.twilight_median_max = 50000.0
+        self.twilight_site_lat = 19.8283
+        self.twilight_site_lon = -155.4783
+        self.twilight_site_height = 4160.0
+        self.flat_source_n_sigma = 5.0
+        self.flat_source_dilate = 3
+        # LRISblue amps 1 and 4 are often unilluminated; use 2 and 3 only.
+        self.twilight_blue_hdus = ('VidInp2', 'VidInp3')
 
         self.detrend = True
         self.catalog_zp = 'PS1'
@@ -118,6 +141,30 @@ class LRIS(instrument.Instrument):
             return('lris.red')
         else:
             raise Exception('Cannot determine instrument name')
+
+    def get_twilight_image_data(self, hdul, ext=0):
+        """On LRISblue, use only the illuminated VidInp2 and VidInp3 amps."""
+        if hdul is None:
+            return None
+        try:
+            inst = str(hdul[ext].header.get('INSTRUME', ''))
+        except Exception:
+            inst = str(hdul[0].header.get('INSTRUME', '')) if len(hdul) else ''
+        if inst == 'LRISBLUE':
+            by_name = {}
+            for hdu in hdul:
+                name = str(getattr(hdu, 'name', '') or '').upper()
+                if name:
+                    by_name[name] = hdu
+            chunks = []
+            for name in getattr(self, 'twilight_blue_hdus', ('VidInp2', 'VidInp3')):
+                hdu = by_name.get(str(name).upper())
+                data = None if hdu is None else hdu.data
+                if data is not None and np.size(data) > 0:
+                    chunks.append(np.asarray(data, dtype=float).ravel())
+            if chunks:
+                return np.concatenate(chunks)
+        return super().get_twilight_image_data(hdul, ext)
 
     # Specialized procedures for LRIS since we need to deal with red/blue
     def get_filter(self, hdr):

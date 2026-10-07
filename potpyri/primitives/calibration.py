@@ -7,9 +7,67 @@ from potpyri._version import __version__
 
 import os
 import time
-import logging
 import numpy as np
-import sys
+
+
+def _emit(log, msg, level='error'):
+    """Write msg to log at level, or print when no logger is provided."""
+    if log:
+        getattr(log, level)(msg)
+    else:
+        print(msg)
+
+
+def _master_exists(tel, paths, cal_name):
+    """True if a night or packaged-caldb master exists at cal_name."""
+    found = os.path.exists(cal_name) or os.path.exists(cal_name + '.fz')
+    if not found and hasattr(tel, '_find_cal_file'):
+        path, _hdu = tel._find_cal_file(paths, os.path.basename(cal_name))
+        found = path is not None
+    return found
+
+
+def _warn_missing_science_masters(file_table, tel, paths, nmin_images, log,
+        cal_kind, get_name, name_cols):
+    """Error for each science setup that has no master calibration file.
+
+    name_cols are file_table columns passed to get_name after paths
+    (e.g. ('Amp', 'Binning') or ('Filter', 'Amp', 'Binning')).
+    """
+    kwds = tel.filetype_keywords
+    if 'SCIENCE' not in kwds:
+        return
+    sci_match = tel.match_type_keywords(kwds['SCIENCE'], file_table)
+    if not (len(file_table) and np.any(sci_match)):
+        return
+    sci = file_table[sci_match]
+    seen = set()
+    for i in range(len(sci)):
+        vals = tuple(str(sci[col][i]) for col in name_cols)
+        if vals in seen:
+            continue
+        seen.add(vals)
+        cal_name = get_name(paths, *vals)
+        if _master_exists(tel, paths, cal_name):
+            continue
+        setup = ', '.join(
+            f'{col.lower()}={val}' for col, val in zip(name_cols, vals)
+        ).replace('binning=', 'bin=')
+        _emit(log, (
+            f'No master {cal_kind} for science setup {setup}. '
+            f'Need at least {nmin_images} {cal_kind} frames for this detector '
+            f'configuration (expected {cal_name}). Science in this '
+            f'setup will be skipped; other setups will still be reduced.'
+        ))
+
+
+def _not_enough_frames(cal_kind, cal_type, n_found, nmin_images, log):
+    _emit(log, (
+        f'Not enough {cal_kind} frames for {cal_type} '
+        f'({n_found} < {nmin_images}); science with this '
+        f'setup will be skipped.'
+    ))
+
 
 def do_bias(file_table, tel, paths, nmin_images=3, log=None):
     """Build master bias frames from file_table; skip if instrument has no bias.
@@ -30,7 +88,8 @@ def do_bias(file_table, tel, paths, nmin_images=3, log=None):
     Returns
     -------
     None
-        Master bias FITS written to paths; exits if no bias and instrument requires it.
+        Master bias FITS written to paths. Missing setups are logged and
+        skipped; the pipeline continues with remaining targets.
     """
     # Exit if telescope does not require bias
     if not tel.bias:
@@ -47,10 +106,7 @@ def do_bias(file_table, tel, paths, nmin_images=3, log=None):
 
         # Skip if cal_table does not have enough images
         if len(cal_table)<nmin_images:
-            if log:
-                log.info('No bias images were provided for this setup.')
-            else:
-                print('No bias images were provided for this setup.')
+            _not_enough_frames('bias', cal_type, len(cal_table), nmin_images, log)
             continue
         else:
             if log: 
@@ -77,9 +133,16 @@ def do_bias(file_table, tel, paths, nmin_images=3, log=None):
             if log: log.info(f'Master bias creation completed in {t2-t1} sec')
 
     if bias_num==0:
-        if log: log.critical('No bias present, check data before rerunning.')
-        logging.shutdown()
-        sys.exit(-1)
+        _emit(log, (
+            'No usable master bias could be built (no bias frames, or fewer '
+            'than the minimum per detector setup). Science that requires a '
+            'bias will be skipped; other setups will still be reduced.'
+        ))
+
+    _warn_missing_science_masters(
+        file_table, tel, paths, nmin_images, log, 'bias',
+        tel.get_mbias_name, ('Amp', 'Binning'),
+    )
 
 def do_dark(file_table, tel, paths, nmin_images=3, log=None):
     """Build master dark frames from file_table; skip if instrument has no dark.
@@ -100,7 +163,8 @@ def do_dark(file_table, tel, paths, nmin_images=3, log=None):
     Returns
     -------
     None
-        Master dark FITS written to paths.
+        Master dark FITS written to paths. Missing setups are logged and
+        skipped when the instrument requires darks.
     """
     # Exit if telescope does not require dark
     if not tel.dark:
@@ -110,16 +174,14 @@ def do_dark(file_table, tel, paths, nmin_images=3, log=None):
     dark_match = tel.match_type_keywords(kwds['DARK'], file_table)
     dark_table = file_table[dark_match]
 
+    dark_num = 0
     for cal_type in np.unique(dark_table['CalType']):
         mask = dark_table['CalType']==cal_type
         cal_table = dark_table[mask]
 
         # Skip if cal_table does not have enough images
         if len(cal_table)<nmin_images:
-            if log:
-                log.info('No dark images were provided for this setup.')
-            else:
-                print('No dark images were provided for this setup.')
+            _not_enough_frames('dark', cal_type, len(cal_table), nmin_images, log)
             continue
         else:
             if log: 
@@ -135,6 +197,7 @@ def do_dark(file_table, tel, paths, nmin_images=3, log=None):
 
         if os.path.exists(dark_name):
             if log: log.info(f'Master dark {dark_name} exists.')
+            dark_num += 1
         else:
             if log: log.info(f'Master dark is being created...')
             mbias = None
@@ -142,10 +205,13 @@ def do_dark(file_table, tel, paths, nmin_images=3, log=None):
                 if log: log.info('Loading master bias.')
                 try:
                     mbias = tel.load_bias(paths, amp, binn)
-                except:
-                    if log: log.error(f''''No master bias found for this 
-                        configuration, skipping master dark creation for 
-                        exposure {exp}, {amp} amps and {binn} binning.''')
+                except Exception as e:
+                    _emit(log, (
+                        f'Cannot build master dark for exposure={exp}, '
+                        f'amp={amp}, bin={binn}: no master bias ({e}). '
+                        f'Science in this setup will be skipped; other '
+                        f'setups will still be reduced.'
+                    ))
                     continue
 
             t1 = time.time()
@@ -153,6 +219,19 @@ def do_dark(file_table, tel, paths, nmin_images=3, log=None):
                 paths, mbias=mbias, log=log)
             t2 = time.time()
             if log: log.info(f'Master dark creation completed in {t2-t1} sec.')
+            dark_num += 1
+
+    if dark_num==0:
+        _emit(log, (
+            'No usable master dark could be built (no dark frames, or fewer '
+            'than the minimum per detector setup). Science that requires a '
+            'dark will be skipped; other setups will still be reduced.'
+        ))
+
+    _warn_missing_science_masters(
+        file_table, tel, paths, nmin_images, log, 'dark',
+        tel.get_mdark_name, ('Amp', 'Binning'),
+    )
 
 def do_flat(file_table, tel, paths, nmin_images=3, log=None):
     """Build master flat frames from file_table; skip if instrument has no flat.
@@ -173,9 +252,11 @@ def do_flat(file_table, tel, paths, nmin_images=3, log=None):
     Returns
     -------
     None
-        Master flat FITS written to paths.
+        Master flat FITS written to paths. Missing setups are logged and
+        skipped when the instrument requires flats. Night cals stay in
+        paths['cal']; packaged caldb flats still satisfy a science setup.
     """
-    # Exit if telescope does not require dark
+    # Exit if telescope does not require flats
     if not tel.flat:
         return(None)
 
@@ -183,21 +264,16 @@ def do_flat(file_table, tel, paths, nmin_images=3, log=None):
     flat_match = tel.match_type_keywords(kwds['FLAT'], file_table)
     flat_table = file_table[flat_match]
 
-    # If there are no files for flats, then return without doing anything
-    if tel.flat and len(flat_table)==0:
-        paths['cal'] = paths['caldb']
-        return(None)
-
+    # Do not rewrite paths['cal']: night biases/darks live in red/cals.
+    # Missing flats are loaded later from red/cals, then packaged caldb.
+    flat_num = 0
     for cal_type in np.unique(flat_table['CalType']):
         mask = flat_table['CalType']==cal_type
         cal_table = flat_table[mask]
 
         # Skip if cal_table does not have enough images
         if len(cal_table)<nmin_images:
-            if log:
-                log.info('No flat images were provided for this setup.')
-            else:
-                print('No flat images were provided for this setup.')
+            _not_enough_frames('flat', cal_type, len(cal_table), nmin_images, log)
             continue
         else:
             if log: 
@@ -215,6 +291,7 @@ def do_flat(file_table, tel, paths, nmin_images=3, log=None):
 
         if os.path.exists(flat_name):
             if log: log.info(f'Master flat {flat_name} exists.')
+            flat_num += 1
         else:
             if log: log.info(f'Master flat is being created...')
             mbias = None
@@ -223,20 +300,26 @@ def do_flat(file_table, tel, paths, nmin_images=3, log=None):
                 if log: log.info('Loading master bias.')
                 try:
                     mbias = tel.load_bias(paths, amp, binn)
-                except:
-                    if log: log.error(f'''No master bias found for this 
-                        configuration, skipping master flat creation for 
-                        filter {fil}, {amp} amps, {binn} binning.''')
+                except Exception as e:
+                    _emit(log, (
+                        f'Cannot build master flat for filter={fil}, '
+                        f'amp={amp}, bin={binn}: no master bias ({e}). '
+                        f'Science in this setup will be skipped; other '
+                        f'setups will still be reduced.'
+                    ))
                     continue
 
             if tel.dark:
                 if log: log.info('Loading master dark.')
                 try:
                     mdark = tel.load_dark(paths, amp, binn)
-                except:
-                    if log: log.error(f''''No master dark found for this 
-                        configuration, skipping master flat creation for 
-                        filter {fil}, {amp} amps and {binn} binning.''')
+                except Exception as e:
+                    _emit(log, (
+                        f'Cannot build master flat for filter={fil}, '
+                        f'amp={amp}, bin={binn}: no master dark ({e}). '
+                        f'Science in this setup will be skipped; other '
+                        f'setups will still be reduced.'
+                    ))
                     continue
 
             t1 = time.time()
@@ -245,4 +328,19 @@ def do_flat(file_table, tel, paths, nmin_images=3, log=None):
                 log=log)
             t2 = time.time()            
             if log: log.info(f'Master flat creation completed in {t2-t1} sec')
+            flat_num += 1
+
+    if flat_num==0:
+        # Night flats are optional when a packaged caldb master exists.
+        _emit(log, (
+            'No night master flat was built (no flat frames, or fewer than '
+            'the minimum per detector setup). Science will use a packaged '
+            'caldb master if one exists; setups without a night or caldb '
+            'flat will be skipped.'
+        ), level='error')
+
+    _warn_missing_science_masters(
+        file_table, tel, paths, nmin_images, log, 'flat',
+        tel.get_mflat_name, ('Filter', 'Amp', 'Binning'),
+    )
 

@@ -171,6 +171,104 @@ def test_is_flat_lris_object_name():
     assert sort_files.is_bias(hdr, tel) == False
 
 
+def test_is_flat_lris_object_twilight_name():
+    """LRIS flats also match OBJECT containing twilight or skyflat."""
+    tel = instrument_getter('LRIS')
+    hdr = _lris_imaging_hdr(OBJECT='twilight', ELAPTIME=20)
+    assert sort_files.is_flat(hdr, tel) == True
+    hdr['OBJECT'] = 'skyflat R'
+    assert sort_files.is_flat(hdr, tel) == True
+
+
+def test_is_flat_lris_twilight_sun_altitude():
+    """Unlabeled imaging frames in twilight with 15k-50k sky are flats."""
+    tel = instrument_getter('LRIS')
+    from astropy.time import Time
+    import numpy as np
+
+    twilight = Time('2026-07-16T06:00:00')
+    night = Time('2026-07-16T12:00:00')
+    twilight_alt = tel.get_sun_altitude(
+        _lris_imaging_hdr(MJD=twilight.mjd, OBJECT='FRB20251015A', ELAPTIME=30)
+    )
+    night_alt = tel.get_sun_altitude(
+        _lris_imaging_hdr(MJD=night.mjd, OBJECT='FRB20251015A', ELAPTIME=180)
+    )
+    assert twilight_alt is not None
+    assert tel.twilight_sunalt_min <= twilight_alt <= tel.twilight_sunalt_max
+    assert night_alt < tel.twilight_sunalt_min
+
+    sky = np.full((32, 32), 20000.0)
+    hdr = _lris_imaging_hdr(
+        MJD=twilight.mjd, OBJECT='FRB20251015A', ELAPTIME=30, FLAMP1='off', FLAMP2='off',
+    )
+    assert tel.is_twilight_setup(hdr) == True
+    assert tel.is_twilight_flat(hdr) == False
+    assert tel.is_twilight_flat(hdr, data=sky) == True
+    assert sort_files.is_flat(hdr, tel, data=sky) == True
+    assert sort_files.is_flat(hdr, tel, data=np.full((32, 32), 1000.0)) == False
+    assert sort_files.is_flat(hdr, tel, data=np.full((32, 32), 60000.0)) == False
+
+    hdr['MJD'] = night.mjd
+    hdr['ELAPTIME'] = 180
+    assert tel.is_twilight_setup(hdr) == False
+    assert tel.is_twilight_flat(hdr, data=sky) == False
+    assert sort_files.is_flat(hdr, tel, data=sky) == False
+
+
+def test_lris_blue_twilight_uses_vidinp2_and_vidinp3():
+    """LRISblue sky level ignores unilluminated VidInp1 and VidInp4."""
+    import numpy as np
+    from astropy.time import Time
+
+    tel = instrument_getter('LRIS')
+    primary = fits.PrimaryHDU(header=_lris_imaging_hdr(
+        INSTRUME='LRISBLUE', MJD=Time('2026-07-16T06:00:00').mjd,
+        OBJECT='ZTF26abnuyoi', ELAPTIME=13, FLAMP1='off', FLAMP2='off',
+        BLUFILT='G',
+    ))
+    hdus = [primary]
+    for name, level in (
+        ('VidInp1', 1300.0),
+        ('VidInp2', 22000.0),
+        ('VidInp3', 23000.0),
+        ('VidInp4', 1500.0),
+    ):
+        hdus.append(fits.ImageHDU(np.full((16, 16), level, dtype=np.float32), name=name))
+    hdul = fits.HDUList(hdus)
+
+    data = tel.get_twilight_image_data(hdul, 0)
+    assert data is not None
+    assert data.size == 16 * 16 * 2
+    level = tel.twilight_sky_level(data)
+    assert 20000.0 <= level <= 24000.0
+    assert tel.is_twilight_flat(hdul[0].header, data=data) == True
+    assert sort_files.is_flat(hdul[0].header, tel, data=data) == True
+
+
+def test_is_flat_lris_focus_loop_flatlamp():
+    """KOA dome flats keep OBJECT='Focus loop' and KOAIMTYP=flatlamp."""
+    tel = instrument_getter('LRIS')
+    hdr = _lris_imaging_hdr(
+        OBJECT='Focus loop', TARGNAME='unknown', KOAIMTYP='flatlamp',
+        ELAPTIME=2, FLAMP1='off', FLAMP2='off',
+    )
+    assert sort_files.is_flat(hdr, tel) == True
+    assert sort_files.is_science(hdr, tel) == False
+
+
+def test_is_flat_lris_lamp_on():
+    """LRIS lamp-on frames are flats even when OBJECT is not named flat."""
+    tel = instrument_getter('LRIS')
+    hdr = _lris_imaging_hdr(OBJECT='HORIZON STOW', ELAPTIME=15, FLAMP1='on', FLAMP2='on')
+    assert sort_files.is_flat(hdr, tel) == True
+    assert sort_files.is_science(hdr, tel) == True
+
+    hdr['FLAMP1'] = 'off'
+    hdr['FLAMP2'] = 'off'
+    assert sort_files.is_flat(hdr, tel) == False
+
+
 def test_is_bias_lris_object_and_horizon_stow():
     """LRIS bias from OBJECT=bias or closed-door zero-second HORIZON STOW."""
     tel = instrument_getter('LRIS')
